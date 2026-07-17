@@ -22,6 +22,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         ]);
     })->name('health');
 
+    Route::get('/map/config', [MapController::class, 'config'])->name('map.config');
     Route::get('/map/style.json', [MapController::class, 'style'])->name('map.style');
     Route::post('/map/route', [MapController::class, 'route'])
         ->middleware('throttle:60,1')

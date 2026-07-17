@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
+use App\Http\Controllers\Admin\CalendarEventController as AdminCalendarEventController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DirectoryController as AdminDirectoryController;
 use App\Http\Controllers\Admin\ModerationController as AdminModerationController;
@@ -14,9 +15,11 @@ use App\Http\Controllers\Admin\TogetherController as AdminTogetherController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Service\DashboardController as ServiceDashboardController;
 use App\Http\Controllers\Service\ObjectController as ServiceObjectController;
+use App\Http\Controllers\Service\TicketScannerController as ServiceTicketScannerController;
 use App\Http\Controllers\Site\AuthController as SiteAuthController;
 use App\Http\Controllers\Site\BlogPostController as SiteBlogPostController;
 use App\Http\Controllers\Site\BookingController as SiteBookingController;
+use App\Http\Controllers\Site\CalendarController as SiteCalendarController;
 use App\Http\Controllers\Site\CommunityController as SiteCommunityController;
 use App\Http\Controllers\Site\FavoriteController as SiteFavoriteController;
 use App\Http\Controllers\Site\HomeController as SiteHomeController;
@@ -28,6 +31,7 @@ use App\Http\Controllers\Site\ReviewController as SiteReviewController;
 use App\Http\Controllers\Site\RouteController as SiteRouteController;
 use App\Http\Controllers\Site\RoutePlanController as SiteRoutePlanController;
 use App\Http\Controllers\Site\SafetyController as SiteSafetyController;
+use App\Http\Controllers\Site\TicketController as SiteTicketController;
 use App\Http\Controllers\Site\TogetherController as SiteTogetherController;
 use App\Http\Controllers\Site\TogetherMessageController as SiteTogetherMessageController;
 use App\Http\Controllers\Site\UserMediaController as SiteUserMediaController;
@@ -43,6 +47,10 @@ Route::get('/objects', [SiteObjectController::class, 'index'])->name('objects.in
 Route::get('/objects/{object:slug}', [SiteObjectController::class, 'show'])->name('objects.show');
 Route::get('/routes', [SiteRouteController::class, 'index'])->name('routes.index');
 Route::get('/routes/{pilgrimageRoute:slug}', [SiteRouteController::class, 'show'])->name('routes.show');
+
+Route::get('/calendar', [SiteCalendarController::class, 'index'])->name('calendar.index');
+Route::get('/calendar/{calendarEvent:slug}/ics', [SiteCalendarController::class, 'ics'])->name('calendar.ics');
+Route::get('/calendar/{calendarEvent:slug}', [SiteCalendarController::class, 'show'])->name('calendar.show');
 
 Route::get('/community', [SiteCommunityController::class, 'index'])->name('community.index');
 Route::get('/community/together', [SiteTogetherController::class, 'index'])->name('together.index');
@@ -71,6 +79,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile/achievements', [SiteProfileController::class, 'achievements'])->name('profile.achievements');
     Route::get('/profile/activity', [SiteProfileController::class, 'activity'])->name('profile.activity');
     Route::get('/profile/blocked-users', [SiteProfileController::class, 'blockedUsers'])->name('profile.blocked-users');
+
+    Route::get('/bookings/{booking}/ticket', [SiteTicketController::class, 'show'])->name('tickets.show');
+    Route::get('/bookings/{booking}/calendar.ics', [SiteTicketController::class, 'ics'])->name('tickets.ics');
 
     Route::post('/favorites/lists', [SiteFavoriteController::class, 'storeList'])->name('favorites.lists.store');
     Route::delete('/favorites/lists/{favoriteList}', [SiteFavoriteController::class, 'destroyList'])->name('favorites.lists.destroy');
@@ -132,6 +143,10 @@ Route::prefix('service')
         Route::get('/objects/{object}/edit', [ServiceObjectController::class, 'edit'])->name('objects.edit');
         Route::put('/objects/{object}', [ServiceObjectController::class, 'update'])->name('objects.update');
         Route::post('/objects/{object}/media', [ServiceObjectController::class, 'storeMedia'])->name('objects.media.store');
+
+        Route::get('/tickets/scanner', [ServiceTicketScannerController::class, 'index'])->name('tickets.scanner');
+        Route::get('/tickets/lookup', [ServiceTicketScannerController::class, 'lookup'])->middleware('throttle:120,1')->name('tickets.lookup');
+        Route::post('/tickets/check-in', [ServiceTicketScannerController::class, 'checkIn'])->middleware('throttle:60,1')->name('tickets.check-in');
     });
 
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
@@ -143,6 +158,10 @@ Route::prefix('admin')
     ->group(function () {
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
         Route::get('/', AdminDashboardController::class)->name('dashboard');
+
+        Route::resource('calendar', AdminCalendarEventController::class)
+            ->parameters(['calendar' => 'calendarEvent']);
+
         Route::resource('objects', AdminPilgrimageObjectController::class)->parameters(['objects' => 'object']);
         Route::post('/objects/{object}/media', [AdminObjectMediaController::class, 'store'])->name('objects.media.store');
         Route::get('/media/{media}/edit', [AdminObjectMediaController::class, 'edit'])->name('media.edit');

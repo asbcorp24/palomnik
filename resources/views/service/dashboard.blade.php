@@ -9,9 +9,9 @@
             <div class="col-lg-8">
                 <div class="section-kicker mb-2">Проверенный контент</div>
                 <h1 class="section-title mb-3">Кабинет представителя</h1>
-                <p class="section-lead mb-0">Обновляйте расписание, контакты, описание и материалы закреплённых храмов. Изменения публикуются после проверки администратора.</p>
+                <p class="section-lead mb-0">Обновляйте расписание, контакты, описание и материалы закреплённых храмов, а также проверяйте электронные билеты участников.</p>
             </div>
-            <div class="col-lg-4 text-lg-end"><a class="btn btn-pm-gold" href="{{ route('service.objects.index') }}"><i class="bi bi-buildings me-2"></i>Мои объекты</a></div>
+            <div class="col-lg-4 text-lg-end"><div class="d-flex flex-wrap justify-content-lg-end gap-2"><a class="btn btn-outline-pm" href="{{ route('service.tickets.scanner') }}"><i class="bi bi-qr-code-scan me-2"></i>Проверка билетов</a><a class="btn btn-pm-gold" href="{{ route('service.objects.index') }}"><i class="bi bi-buildings me-2"></i>Мои объекты</a></div></div>
         </div>
     </div>
 </section>

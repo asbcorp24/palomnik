@@ -134,7 +134,7 @@ class CalendarEventController extends Controller
 
     private function transform(Request $request, array $data, ?CalendarEvent $event = null): array
     {
-        $base = Str::slug($data['slug'] ?: $data['title']) ?: 'event';
+        $base = Str::slug(($data['slug'] ?? null) ?: $data['title']) ?: 'event';
         $data['slug'] = $this->uniqueSlug($base, $event?->id);
         $data['all_day'] = $request->boolean('all_day');
         $data['is_published'] = $request->boolean('is_published');

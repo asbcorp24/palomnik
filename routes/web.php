@@ -72,9 +72,17 @@ Route::middleware('auth')->group(function () {
     Route::post('/community/media', [SiteUserMediaController::class, 'store'])->name('community.media.store');
     Route::delete('/community/media/{media}', [SiteUserMediaController::class, 'destroy'])->name('community.media.destroy');
 
-    Route::resource('/my-routes', SiteRoutePlanController::class)
+    Route::resource('my-routes', SiteRoutePlanController::class)
         ->parameters(['my-routes' => 'plan'])
-        ->names('route-plans');
+        ->names([
+            'index' => 'route-plans.index',
+            'create' => 'route-plans.create',
+            'store' => 'route-plans.store',
+            'show' => 'route-plans.show',
+            'edit' => 'route-plans.edit',
+            'update' => 'route-plans.update',
+            'destroy' => 'route-plans.destroy',
+        ]);
 });
 
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');

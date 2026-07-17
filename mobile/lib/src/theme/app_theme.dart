@@ -24,6 +24,7 @@ class AppTheme {
         foregroundColor: green,
         elevation: 0,
         centerTitle: false,
+        surfaceTintColor: Colors.transparent,
       ),
       cardTheme: CardThemeData(
         color: paper,
@@ -60,6 +61,55 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: paper,
         indicatorColor: cream,
+        labelTextStyle: WidgetStateProperty.all(const TextStyle(fontSize: 11)),
+      ),
+    );
+  }
+
+  static ThemeData dark() {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: gold,
+      brightness: Brightness.dark,
+      primary: gold,
+      secondary: green,
+      surface: const Color(0xFF1B2421),
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: const Color(0xFF111714),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF17201D),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF1B2421),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF1B2421),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: gold, width: 1.5)),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: gold,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(0, 50),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: const Color(0xFF17201D),
+        indicatorColor: gold.withValues(alpha: 0.22),
         labelTextStyle: WidgetStateProperty.all(const TextStyle(fontSize: 11)),
       ),
     );

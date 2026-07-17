@@ -45,11 +45,12 @@ class UserController extends Controller
 
     public function show(User $user): View
     {
-        $user->loadCount(['visits', 'bookings', 'achievements', 'reviews', 'blogPosts', 'media', 'favoriteLists']);
+        $user->loadCount(['visits', 'bookings', 'achievements', 'reviews', 'blogPosts', 'media', 'favoriteLists', 'objectRepresentatives', 'receivedReports']);
         $user->load([
             'visits' => fn ($query) => $query->with('pilgrimageObject')->latest('visited_at')->limit(10),
             'bookings' => fn ($query) => $query->with('trip.pilgrimageRoute')->latest()->limit(10),
             'achievements' => fn ($query) => $query->orderByDesc('user_achievements.awarded_at'),
+            'objectRepresentatives.pilgrimageObject',
         ]);
 
         return view('admin.users.show', [
@@ -66,6 +67,7 @@ class UserController extends Controller
             'phone' => ['nullable', 'string', 'max:64', Rule::unique('users', 'phone')->ignore($user->id)],
             'role' => ['required', Rule::in(array_keys($this->roles()))],
             'is_active' => ['nullable', 'boolean'],
+            'is_verified_organizer' => ['nullable', 'boolean'],
         ]);
 
         if ($user->is(auth()->user()) && ! $request->boolean('is_active')) {
@@ -73,6 +75,8 @@ class UserController extends Controller
         }
 
         $data['is_active'] = $request->boolean('is_active');
+        $data['is_verified_organizer'] = $request->boolean('is_verified_organizer');
+        $data['verified_organizer_at'] = $data['is_verified_organizer'] ? ($user->verified_organizer_at ?? now()) : null;
         $user->update($data);
 
         return back()->with('success', 'Профиль пользователя обновлён.');

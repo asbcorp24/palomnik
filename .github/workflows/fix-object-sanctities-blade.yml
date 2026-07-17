@@ -1,0 +1,108 @@
+name: Fix object sanctities Blade template
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-object-sanctities-blade.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, sqlite3, pdo_sqlite, fileinfo
+          coverage: none
+
+      - name: Rewrite sanctities section
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('resources/views/site/objects/show.blade.php')
+          text = path.read_text(encoding='utf-8')
+
+          start_marker = "                @if($object->sanctities->isNotEmpty())\n"
+          end_marker = "                @if($officialImages->isNotEmpty())\n"
+
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+
+          replacement = '''                @if($object->sanctities->isNotEmpty())
+                    <section class="mb-5">
+                        <div class="section-kicker mb-2">Главное</div>
+                        <h2 class="h2 mb-4">Святыни</h2>
+
+                        <div class="row g-3">
+                            @foreach($object->sanctities as $sanctity)
+                                <div class="col-md-6">
+                                    <div class="info-card h-100 overflow-hidden p-0">
+                                        @if($sanctity->image_url)
+                                            <img
+                                                class="w-100 offline-asset"
+                                                src="{{ $sanctity->image_url }}"
+                                                alt="{{ $sanctity->name }}"
+                                                style="height:190px;object-fit:cover"
+                                                loading="lazy"
+                                            >
+                                        @endif
+
+                                        <div class="p-4 d-flex gap-3">
+                                            <span class="info-icon flex-shrink-0">
+                                                <i class="bi bi-star"></i>
+                                            </span>
+
+                                            <div>
+                                                <h3 class="h6 mb-2">{{ $sanctity->name }}</h3>
+
+                                                @if($sanctity->description)
+                                                    <div class="small text-secondary mb-2">
+                                                        {{ $sanctity->description }}
+                                                    </div>
+                                                @endif
+
+                                                @if($sanctity->pivot->note)
+                                                    <div class="small text-secondary">
+                                                        {{ $sanctity->pivot->note }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
+'''
+
+          path.write_text(text[:start] + replacement + text[end:], encoding='utf-8')
+          PY
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Compile Blade views
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan view:clear
+          php artisan view:cache
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add resources/views/site/objects/show.blade.php
+          git commit -m "fix(view): correct sanctities Blade directives"
+          git push origin HEAD:main

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DirectoryController;
+use App\Http\Controllers\Api\V1\MapController;
 use App\Http\Controllers\Api\V1\MobileActionController;
 use App\Http\Controllers\Api\V1\MobileBookingController;
 use App\Http\Controllers\Api\V1\MobileContentController;
@@ -20,6 +21,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             'time' => now()->toIso8601String(),
         ]);
     })->name('health');
+
+    Route::get('/map/style.json', [MapController::class, 'style'])->name('map.style');
+    Route::post('/map/route', [MapController::class, 'route'])
+        ->middleware('throttle:60,1')
+        ->name('map.route');
 
     Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('register');

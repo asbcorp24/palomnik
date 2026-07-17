@@ -6,13 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\BlogPost;
 use App\Models\Booking;
 use App\Models\Review;
+use App\Models\Trip;
 use App\Models\UserMedia;
 use App\Models\Visit;
+use App\Services\AchievementService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ModerationController extends Controller
@@ -69,8 +73,12 @@ class ModerationController extends Controller
         ]);
     }
 
-    public function update(Request $request, string $resource, int $id): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        string $resource,
+        int $id,
+        AchievementService $achievementService
+    ): RedirectResponse {
         $config = $this->config($resource);
         $item = $config['model']::query()->findOrFail($id);
 
@@ -84,11 +92,33 @@ class ModerationController extends Controller
         }
 
         $data = $request->validate($rules);
+        $oldStatus = $item->status;
         $item->status = $data['status'];
 
         if ($resource === 'bookings') {
-            $item->payment_status = $data['payment_status'];
-            $item->notes = $data['notes'] ?? $item->notes;
+            DB::transaction(function () use ($item, $oldStatus, $data) {
+                $trip = Trip::query()->lockForUpdate()->findOrFail($item->trip_id);
+                $closedStatuses = ['cancelled', 'refunded'];
+                $wasClosed = in_array($oldStatus, $closedStatuses, true);
+                $willBeClosed = in_array($data['status'], $closedStatuses, true);
+
+                if (! $wasClosed && $willBeClosed) {
+                    $trip->booked_count = max(0, $trip->booked_count - $item->participants_count);
+                    $trip->save();
+                } elseif ($wasClosed && ! $willBeClosed) {
+                    if ($trip->capacity !== null
+                        && $trip->booked_count + $item->participants_count > $trip->capacity) {
+                        throw ValidationException::withMessages([
+                            'status' => 'Нельзя восстановить бронирование: недостаточно свободных мест.',
+                        ]);
+                    }
+                    $trip->increment('booked_count', $item->participants_count);
+                }
+
+                $item->payment_status = $data['payment_status'];
+                $item->notes = $data['notes'] ?? $item->notes;
+                $item->save();
+            });
         } elseif (in_array($resource, ['reviews', 'posts', 'media'], true)) {
             $item->moderated_by = auth()->id();
             $item->moderated_at = now();
@@ -98,11 +128,18 @@ class ModerationController extends Controller
                     ? ($item->published_at ?? now())
                     : null;
             }
+            $item->save();
         } elseif ($resource === 'visits') {
             $item->notes = $data['notes'] ?? $item->notes;
+            $item->save();
         }
 
-        $item->save();
+        if ($resource === 'visits' && $item->status === 'verified' && $item->user) {
+            $achievementService->evaluate($item->user);
+        }
+        if ($resource === 'bookings' && $item->status === 'completed' && $item->user) {
+            $achievementService->evaluate($item->user);
+        }
 
         return back()->with('success', 'Статус обновлён.');
     }

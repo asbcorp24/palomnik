@@ -8,9 +8,14 @@
         <h1 class="page-title">Обзор платформы</h1>
         <div class="page-subtitle">Состояние каталога паломнических объектов и справочников.</div>
     </div>
-    <a class="btn btn-gold" href="{{ route('admin.objects.create') }}">
-        <i class="bi bi-plus-lg me-1"></i> Добавить объект
-    </a>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-green" href="{{ route('home') }}" target="_blank" rel="noopener">
+            <i class="bi bi-box-arrow-up-right me-1"></i> Открыть сайт
+        </a>
+        <a class="btn btn-gold" href="{{ route('admin.objects.create') }}">
+            <i class="bi bi-plus-lg me-1"></i> Добавить объект
+        </a>
+    </div>
 </div>
 
 <div class="row g-3 mb-4">

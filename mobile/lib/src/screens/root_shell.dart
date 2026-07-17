@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/push_service.dart';
 import '../core/session_controller.dart';
-import 'advanced_features.dart';
 import 'app_sections.dart';
+import 'maplibre_map.dart';
 
 class RootShell extends StatefulWidget {
   const RootShell({super.key, required this.session});
@@ -20,7 +20,7 @@ class _RootShellState extends State<RootShell> {
   late final List<Widget> _pages = [
     HomeTab(session: widget.session),
     const CatalogTab(),
-    const NativeMapTab(),
+    const MapLibreMapTab(),
     const CalendarTab(),
     ProfileTab(session: widget.session),
   ];

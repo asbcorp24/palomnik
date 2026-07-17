@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Site;
 use App\Http\Controllers\Controller;
 use App\Models\Achievement;
 use App\Models\FavoriteList;
+use App\Services\AchievementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -15,8 +16,10 @@ use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
-    public function dashboard(Request $request): View
+    public function dashboard(Request $request, AchievementService $achievementService): View
     {
+        $achievementService->evaluate($request->user());
+
         $user = $request->user()->loadCount([
             'bookings',
             'visits',
@@ -87,8 +90,8 @@ class ProfileController extends Controller
         $user->fill([
             'name' => $data['name'],
             'email' => mb_strtolower($data['email']),
-            'phone' => $data['phone'] ?: null,
-            'birth_date' => $data['birth_date'] ?: null,
+            'phone' => ! empty($data['phone']) ? $data['phone'] : null,
+            'birth_date' => ! empty($data['birth_date']) ? $data['birth_date'] : null,
             'preferences' => [
                 'notifications' => $request->boolean('notifications'),
                 'privacy' => $data['privacy'],
@@ -137,8 +140,10 @@ class ProfileController extends Controller
         return view('site.profile.bookings', compact('bookings'));
     }
 
-    public function achievements(Request $request): View
+    public function achievements(Request $request, AchievementService $achievementService): View
     {
+        $achievementService->evaluate($request->user());
+
         $earned = $request->user()->achievements()
             ->get()
             ->keyBy('id');

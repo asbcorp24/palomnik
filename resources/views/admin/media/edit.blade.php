@@ -7,7 +7,7 @@
     <div>
         <a class="small text-decoration-none text-secondary" href="{{ route('admin.objects.edit', $media->pilgrimageObject) }}"><i class="bi bi-arrow-left me-1"></i>{{ $media->pilgrimageObject->name }}</a>
         <h1 class="page-title mt-2">Медиаматериал</h1>
-        <div class="page-subtitle">Настройка подписи, порядка и обложки.</div>
+        <div class="page-subtitle">Замена файла, настройка подписи, порядка и обложки.</div>
     </div>
 </div>
 
@@ -26,7 +26,7 @@
         </div>
     </div>
     <div class="col-lg-7">
-        <form method="POST" action="{{ route('admin.media.update', $media) }}">
+        <form method="POST" enctype="multipart/form-data" action="{{ route('admin.media.update', $media) }}">
             @csrf
             @method('PUT')
             <div class="card-soft p-4">
@@ -42,6 +42,11 @@
                     <div class="col-md-6">
                         <label class="form-label required" for="sort_order">Порядок</label>
                         <input class="form-control" id="sort_order" type="number" min="0" name="sort_order" value="{{ old('sort_order', $media->sort_order) }}" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="replacement_file">Заменить загруженный файл</label>
+                        <input class="form-control" id="replacement_file" type="file" name="replacement_file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
+                        <div class="form-text">Поле можно оставить пустым. При замене старый файл будет удалён.</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label" for="title">Заголовок</label>

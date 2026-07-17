@@ -48,6 +48,21 @@ class CalendarEvent extends Model
         'published_at' => 'datetime',
     ];
 
+    public static function typeLabels(): array
+    {
+        return [
+            'service' => 'Богослужение',
+            'feast' => 'Престольный праздник',
+            'procession' => 'Крестный ход',
+            'pilgrimage' => 'Паломническая поездка',
+            'lecture' => 'Лекция или встреча',
+            'family' => 'Семейное мероприятие',
+            'youth' => 'Молодёжное мероприятие',
+            'charity' => 'Благотворительное событие',
+            'other' => 'Другое',
+        ];
+    }
+
     public function getRouteKeyName(): string
     {
         return 'slug';
@@ -91,5 +106,10 @@ class CalendarEvent extends Model
                     $query->whereNull('ends_at')->where('starts_at', '>=', now());
                 });
         });
+    }
+
+    public function typeLabel(): string
+    {
+        return static::typeLabels()[$this->type] ?? $this->type;
     }
 }

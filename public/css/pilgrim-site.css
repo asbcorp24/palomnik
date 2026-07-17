@@ -209,7 +209,7 @@ a { color: inherit; }
         z-index: 1050;
         inset: auto 0 0;
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         padding: 7px 4px calc(7px + env(safe-area-inset-bottom));
         background: rgba(255,253,249,.96);
         border-top: 1px solid var(--pm-border);

@@ -6,7 +6,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div>
         <h1 class="page-title">Обзор платформы</h1>
-        <div class="page-subtitle">Состояние каталога паломнических объектов и справочников.</div>
+        <div class="page-subtitle">Состояние каталога, маршрутов, бронирований и пользовательского контента.</div>
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-outline-green" href="{{ route('home') }}" target="_blank" rel="noopener">
@@ -36,6 +36,41 @@
                 <div class="stat-number">{{ $card['value'] }}</div>
                 <div class="stat-label">{{ $card['label'] }}</div>
             </div>
+        </div>
+    @endforeach
+</div>
+
+<div class="d-flex justify-content-between align-items-end gap-3 mb-3 mt-5">
+    <div>
+        <h2 class="h4 mb-1">Функциональные модули</h2>
+        <div class="small text-secondary">Все основные разделы доступны из панели управления.</div>
+    </div>
+</div>
+
+<div class="row g-3 mb-5">
+    @php
+        $modules = [
+            ['title' => 'Маршруты', 'value' => $moduleStats['routes'], 'icon' => 'bi-signpost-split', 'route' => route('admin.modules.index', 'routes')],
+            ['title' => 'Поездки', 'value' => $moduleStats['trips'], 'icon' => 'bi-calendar3', 'route' => route('admin.modules.index', 'trips')],
+            ['title' => 'Бронирования', 'value' => $moduleStats['bookings'], 'icon' => 'bi-ticket-perforated', 'route' => route('admin.moderation.index', 'bookings')],
+            ['title' => 'Достижения', 'value' => $moduleStats['achievements'], 'icon' => 'bi-trophy', 'route' => route('admin.modules.index', 'achievements')],
+            ['title' => 'Посещения на проверке', 'value' => $moduleStats['visits_pending'], 'icon' => 'bi-geo-fill', 'route' => route('admin.moderation.index', 'visits')],
+            ['title' => 'Отзывы на проверке', 'value' => $moduleStats['reviews_pending'], 'icon' => 'bi-chat-square-text', 'route' => route('admin.moderation.index', 'reviews')],
+            ['title' => 'Статьи на проверке', 'value' => $moduleStats['posts_pending'], 'icon' => 'bi-journal-richtext', 'route' => route('admin.moderation.index', 'posts')],
+            ['title' => 'Медиа на проверке', 'value' => $moduleStats['media_pending'], 'icon' => 'bi-camera', 'route' => route('admin.moderation.index', 'media')],
+            ['title' => 'Пользователи', 'value' => $moduleStats['users'], 'icon' => 'bi-people', 'route' => route('admin.users.index')],
+        ];
+    @endphp
+    @foreach($modules as $module)
+        <div class="col-md-6 col-xl-4">
+            <a class="card-soft p-4 d-flex align-items-center gap-3 text-decoration-none h-100" href="{{ $module['route'] }}">
+                <div class="stat-icon flex-shrink-0"><i class="bi {{ $module['icon'] }}"></i></div>
+                <div class="flex-grow-1">
+                    <div class="small text-secondary">{{ $module['title'] }}</div>
+                    <div class="fs-4 fw-bold text-dark">{{ $module['value'] }}</div>
+                </div>
+                <i class="bi bi-chevron-right text-secondary"></i>
+            </a>
         </div>
     @endforeach
 </div>

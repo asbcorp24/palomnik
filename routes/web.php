@@ -69,6 +69,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile/bookings', [SiteProfileController::class, 'bookings'])->name('profile.bookings');
     Route::get('/profile/achievements', [SiteProfileController::class, 'achievements'])->name('profile.achievements');
     Route::get('/profile/activity', [SiteProfileController::class, 'activity'])->name('profile.activity');
+    Route::get('/profile/blocked-users', [SiteProfileController::class, 'blockedUsers'])->name('profile.blocked-users');
 
     Route::post('/favorites/lists', [SiteFavoriteController::class, 'storeList'])->name('favorites.lists.store');
     Route::delete('/favorites/lists/{favoriteList}', [SiteFavoriteController::class, 'destroyList'])->name('favorites.lists.destroy');
@@ -132,9 +133,7 @@ Route::prefix('service')
     });
 
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
-Route::post('/admin/login', [AdminAuthController::class, 'login'])
-    ->middleware('throttle:10,1')
-    ->name('admin.login.submit');
+Route::post('/admin/login', [AdminAuthController::class, 'login'])->middleware('throttle:10,1')->name('admin.login.submit');
 
 Route::prefix('admin')
     ->name('admin.')
@@ -142,10 +141,7 @@ Route::prefix('admin')
     ->group(function () {
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
         Route::get('/', AdminDashboardController::class)->name('dashboard');
-
-        Route::resource('objects', AdminPilgrimageObjectController::class)
-            ->parameters(['objects' => 'object']);
-
+        Route::resource('objects', AdminPilgrimageObjectController::class)->parameters(['objects' => 'object']);
         Route::post('/objects/{object}/media', [AdminObjectMediaController::class, 'store'])->name('objects.media.store');
         Route::get('/media/{media}/edit', [AdminObjectMediaController::class, 'edit'])->name('media.edit');
         Route::put('/media/{media}', [AdminObjectMediaController::class, 'update'])->name('media.update');

@@ -158,7 +158,7 @@ class DemoSeeder extends Seeder
         foreach ($sanctityRows as $key => $row) {
             $sanctities[$key] = Sanctity::query()->updateOrCreate(
                 ['slug' => $row['slug']],
-                array_merge($row, [
+                array_merge(array_diff_key($row, ['image' => true]), [
                     'description' => 'Демонстрационное описание святыни для каталога и поиска.',
                     'image_path' => $images[$row['image']],
                 ])

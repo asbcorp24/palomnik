@@ -73,7 +73,7 @@ class DirectoryController extends Controller
                 'type' => $sanctity->type,
                 'description' => $sanctity->description,
                 'image_url' => $sanctity->image_url,
-            ]); 
+            ]);
 
         return response()->json(['data' => $sanctities]);
     }

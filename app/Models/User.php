@@ -31,6 +31,8 @@ class User extends Authenticatable
         'birth_date',
         'preferences',
         'is_active',
+        'is_verified_organizer',
+        'verified_organizer_at',
     ];
 
     protected $hidden = [
@@ -43,6 +45,8 @@ class User extends Authenticatable
         'birth_date' => 'date',
         'preferences' => 'array',
         'is_active' => 'boolean',
+        'is_verified_organizer' => 'boolean',
+        'verified_organizer_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -57,6 +61,11 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN], true);
+    }
+
+    public function canManageObjects(): bool
+    {
+        return $this->isAdmin() || in_array($this->role, [self::ROLE_OBJECT_EDITOR, self::ROLE_SERVICE_MANAGER], true);
     }
 
     public function bookings(): HasMany
@@ -112,6 +121,51 @@ class User extends Authenticatable
     public function jointPilgrimageMessages(): HasMany
     {
         return $this->hasMany(JointPilgrimageMessage::class);
+    }
+
+    public function objectRepresentatives(): HasMany
+    {
+        return $this->hasMany(ObjectRepresentative::class);
+    }
+
+    public function objectUpdateRequests(): HasMany
+    {
+        return $this->hasMany(ObjectUpdateRequest::class);
+    }
+
+    public function objectMediaSubmissions(): HasMany
+    {
+        return $this->hasMany(ObjectMediaSubmission::class);
+    }
+
+    public function submittedReports(): HasMany
+    {
+        return $this->hasMany(CommunityReport::class, 'reporter_id');
+    }
+
+    public function receivedReports(): HasMany
+    {
+        return $this->hasMany(CommunityReport::class, 'reported_user_id');
+    }
+
+    public function blockedUsers(): HasMany
+    {
+        return $this->hasMany(UserBlock::class, 'blocker_id');
+    }
+
+    public function blockedByUsers(): HasMany
+    {
+        return $this->hasMany(UserBlock::class, 'blocked_id');
+    }
+
+    public function hasBlocked(User $user): bool
+    {
+        return $this->blockedUsers()->where('blocked_id', $user->id)->exists();
+    }
+
+    public function isBlockedBy(User $user): bool
+    {
+        return $this->blockedByUsers()->where('blocker_id', $user->id)->exists();
     }
 
     public function achievements(): BelongsToMany

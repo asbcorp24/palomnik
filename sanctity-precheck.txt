@@ -1,0 +1,11 @@
+OK | app/Models/Sanctity.php | 'use Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany;\n'
+OK | app/Models/Sanctity.php | "        'description',\n    ];"
+OK | app/Http/Controllers/Admin/DirectoryController.php | "        $data = $this->validated($request, $resource);\n        $data['slug'] = $this->makeUniqueSlug"
+OK | app/Http/Controllers/Admin/DirectoryController.php | "        $data = $this->validated($request, $resource, $item);\n        $data['slug'] = $this->makeUni"
+OK | resources/views/admin/directories/form.blade.php | '<form method="POST" action="{{ $item->exists ? route(\'admin.directories.update\', [$resource, $item->'
+OK | app/Http/Controllers/Api/V1/DirectoryController.php | "            ->limit(100)\n            ->get(['id', 'name', 'slug', 'type']);"
+OK | app/Http/Resources/PilgrimageObjectResource.php | "                        'type' => $sanctity->type,\n                        'note' => $sanctity->pivo"
+OK | database/seeders/DemoSeeder.php | '            [$vicariates, $deaneries, $sanctities] = $this->seedDirectories();\n            $images ='
+OK | database/seeders/DemoSeeder.php | '    private function seedDirectories(): array'
+OK | database/seeders/DemoSeeder.php | "                array_merge($row, ['description' => 'Демонстрационное описание святыни для каталога "
+OK | mobile/lib/src/screens/user_features.dart | "return Chip(label: Text('${data['name'] ?? ''}'));"

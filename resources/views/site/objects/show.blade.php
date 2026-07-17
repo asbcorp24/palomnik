@@ -78,7 +78,7 @@
                 @endif
 
                 @if($object->sanctities->isNotEmpty())
-                    <section class="mb-5"><div class="section-kicker mb-2">Главное</div><h2 class="h2 mb-4">Святыни</h2><div class="row g-3">@foreach($object->sanctities as $sanctity)<div class="col-md-6"><div class="info-card h-100 d-flex gap-3"><span class="info-icon flex-shrink-0"><i class="bi bi-star"></i></span><div><h3 class="h6 mb-2">{{ $sanctity->name }}</h3>@if($sanctity->pivot->note)<div class="small text-secondary">{{ $sanctity->pivot->note }}</div>@endif</div></div></div>@endforeach</div></section>
+                    <section class="mb-5"><div class="section-kicker mb-2">Главное</div><h2 class="h2 mb-4">Святыни</h2><div class="row g-3">@foreach($object->sanctities as $sanctity)<div class="col-md-6"><div class="info-card h-100 overflow-hidden p-0">@if($sanctity->image_url)<img src="{{ $sanctity->image_url }}" alt="{{ $sanctity->name }}" class="w-100 offline-asset" style="height:190px;object-fit:cover" loading="lazy">@endif<div class="p-4 d-flex gap-3"><span class="info-icon flex-shrink-0"><i class="bi bi-star"></i></span><div><h3 class="h6 mb-2">{{ $sanctity->name }}</h3>@if($sanctity->description)<div class="small text-secondary mb-2">{{ $sanctity->description }}</div>@endif@if($sanctity->pivot->note)<div class="small text-secondary">{{ $sanctity->pivot->note }}</div>@endif</div></div></div></div>@endforeach</div></section>
                 @endif
 
                 @if($officialImages->isNotEmpty())

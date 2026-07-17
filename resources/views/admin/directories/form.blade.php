@@ -13,7 +13,7 @@
     </div>
 </div>
 
-<form method="POST" action="{{ $item->exists ? route('admin.directories.update', [$resource, $item->id]) : route('admin.directories.store', $resource) }}">
+<form method="POST" enctype="multipart/form-data" action="{{ $item->exists ? route('admin.directories.update', [$resource, $item->id]) : route('admin.directories.store', $resource) }}">
     @csrf
     @if($item->exists) @method('PUT') @endif
 
@@ -46,6 +46,20 @@
                     <label class="form-label" for="type">Тип святыни</label>
                     <input class="form-control" id="type" name="type" value="{{ old('type', $item->type) }}" maxlength="64" placeholder="икона, мощи, источник...">
                 </div>
+                <div class="col-lg-6">
+                    <label class="form-label" for="image">Фотография святыни</label>
+                    <input class="form-control" id="image" type="file" name="image" accept="image/jpeg,image/png,image/webp">
+                    <div class="form-text">JPG, PNG или WebP, до 5 МБ.</div>
+                </div>
+                @if($item->image_url)
+                    <div class="col-12">
+                        <img src="{{ $item->image_url }}" alt="{{ $item->name }}" class="rounded-4 border" style="width:240px;height:160px;object-fit:cover">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" id="remove_image" type="checkbox" name="remove_image" value="1">
+                            <label class="form-check-label" for="remove_image">Удалить текущую фотографию</label>
+                        </div>
+                    </div>
+                @endif
             @endif
 
             @if($resource === 'object-types')

@@ -37,8 +37,8 @@ class DemoSeeder extends Seeder
 
         DB::transaction(function () {
             $users = $this->seedUsers();
-            [$vicariates, $deaneries, $sanctities] = $this->seedDirectories();
             $images = $this->seedImages();
+            [$vicariates, $deaneries, $sanctities] = $this->seedDirectories($images);
             $objects = $this->seedObjects($vicariates, $deaneries, $sanctities, $images);
             [$routes, $trips] = $this->seedRoutesAndTrips($objects, $images);
             $this->seedCalendar($objects, $routes, $trips, $users);
@@ -111,7 +111,7 @@ class DemoSeeder extends Seeder
         return compact('demo', 'organizer', 'participant');
     }
 
-    private function seedDirectories(): array
+    private function seedDirectories(array $images): array
     {
         $vicariateRows = [
             'central' => ['name' => 'Центральное викариатство', 'slug' => 'central', 'description' => 'Храмы и монастыри исторического центра Москвы.'],
@@ -146,19 +146,22 @@ class DemoSeeder extends Seeder
         }
 
         $sanctityRows = [
-            'iveron-icon' => ['name' => 'Иверская икона Божией Матери', 'slug' => 'iveron-icon', 'type' => 'icon'],
-            'kazan-icon' => ['name' => 'Казанская икона Божией Матери', 'slug' => 'kazan-icon', 'type' => 'icon'],
-            'relics-sergius' => ['name' => 'Святыни, связанные с преподобным Сергием Радонежским', 'slug' => 'relics-sergius', 'type' => 'relics'],
-            'relics-alexy' => ['name' => 'Святыни, связанные со святителем Алексием', 'slug' => 'relics-alexy', 'type' => 'relics'],
-            'life-giving-cross' => ['name' => 'Крест и распятие', 'slug' => 'life-giving-cross', 'type' => 'relic'],
-            'holy-spring' => ['name' => 'Святой источник', 'slug' => 'holy-spring', 'type' => 'spring'],
+            'iveron-icon' => ['name' => 'Иверская икона Божией Матери', 'slug' => 'iveron-icon', 'type' => 'icon', 'image' => 'sanctity-iveron'],
+            'kazan-icon' => ['name' => 'Казанская икона Божией Матери', 'slug' => 'kazan-icon', 'type' => 'icon', 'image' => 'sanctity-kazan'],
+            'relics-sergius' => ['name' => 'Святыни, связанные с преподобным Сергием Радонежским', 'slug' => 'relics-sergius', 'type' => 'relics', 'image' => 'sanctity-sergius'],
+            'relics-alexy' => ['name' => 'Святыни, связанные со святителем Алексием', 'slug' => 'relics-alexy', 'type' => 'relics', 'image' => 'sanctity-alexy'],
+            'life-giving-cross' => ['name' => 'Крест и распятие', 'slug' => 'life-giving-cross', 'type' => 'relic', 'image' => 'sanctity-cross'],
+            'holy-spring' => ['name' => 'Святой источник', 'slug' => 'holy-spring', 'type' => 'spring', 'image' => 'sanctity-spring'],
         ];
 
         $sanctities = [];
         foreach ($sanctityRows as $key => $row) {
             $sanctities[$key] = Sanctity::query()->updateOrCreate(
                 ['slug' => $row['slug']],
-                array_merge($row, ['description' => 'Демонстрационное описание святыни для каталога и поиска.'])
+                array_merge($row, [
+                    'description' => 'Демонстрационное описание святыни для каталога и поиска.',
+                    'image_path' => $images[$row['image']],
+                ])
             );
         }
 
@@ -183,6 +186,12 @@ class DemoSeeder extends Seeder
             'route-region' => ['demo/route-region.svg', 'Дорога к преподобному Сергию', 'Маршрут по Подмосковью', '#2d5667', '#d0ae5f'],
             'community-one' => ['demo/community-one.svg', 'Путевые заметки', 'Впечатления паломника', '#3c5144', '#c7a45e'],
             'community-two' => ['demo/community-two.svg', 'Семейное паломничество', 'Полезные советы', '#6a4d3c', '#d5b66e'],
+            'sanctity-iveron' => ['demo/sanctity-iveron.svg', 'Иверская икона', 'Святыня', '#4e382d', '#c49a53'],
+            'sanctity-kazan' => ['demo/sanctity-kazan.svg', 'Казанская икона', 'Святыня', '#65402f', '#d2aa63'],
+            'sanctity-sergius' => ['demo/sanctity-sergius.svg', 'Преподобный Сергий', 'Святые мощи', '#294d43', '#c4a45f'],
+            'sanctity-alexy' => ['demo/sanctity-alexy.svg', 'Святитель Алексий', 'Святые мощи', '#354a64', '#c8a75b'],
+            'sanctity-cross' => ['demo/sanctity-cross.svg', 'Животворящий Крест', 'Святыня', '#53352f', '#b88d4d'],
+            'sanctity-spring' => ['demo/sanctity-spring.svg', 'Святой источник', 'Талеж', '#246173', '#8dc4ce'],
         ];
 
         foreach ($images as [$path, $title, $subtitle, $from, $to]) {

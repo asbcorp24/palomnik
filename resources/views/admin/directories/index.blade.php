@@ -50,6 +50,7 @@
                         <th>Викариатство</th>
                     @endif
                     @if($resource === 'sanctities')
+                        <th style="width:92px">Фото</th>
                         <th>Тип святыни</th>
                     @endif
                     @if($resource === 'object-types')
@@ -74,6 +75,7 @@
                             <td>{{ optional($item->vicariate)->name ?? '—' }}</td>
                         @endif
                         @if($resource === 'sanctities')
+                            <td>@if($item->image_url)<img src="{{ $item->image_url }}" alt="" class="rounded-3 border" style="width:64px;height:48px;object-fit:cover">@else<span class="text-secondary">—</span>@endif</td>
                             <td>{{ $item->type ?: '—' }}</td>
                         @endif
                         @if($resource === 'object-types')

@@ -65,7 +65,15 @@ class DirectoryController extends Controller
             })
             ->orderBy('name')
             ->limit(100)
-            ->get(['id', 'name', 'slug', 'type']);
+            ->get(['id', 'name', 'slug', 'type', 'description', 'image_path'])
+            ->map(fn (Sanctity $sanctity) => [
+                'id' => $sanctity->id,
+                'name' => $sanctity->name,
+                'slug' => $sanctity->slug,
+                'type' => $sanctity->type,
+                'description' => $sanctity->description,
+                'image_url' => $sanctity->image_url,
+            ]); 
 
         return response()->json(['data' => $sanctities]);
     }

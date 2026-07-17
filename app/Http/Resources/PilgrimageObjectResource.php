@@ -66,6 +66,8 @@ class PilgrimageObjectResource extends JsonResource
                         'name' => $sanctity->name,
                         'slug' => $sanctity->slug,
                         'type' => $sanctity->type,
+                        'description' => $sanctity->description,
+                        'image_url' => $sanctity->image_url,
                         'note' => $sanctity->pivot->note,
                     ];
                 })->values();

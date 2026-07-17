@@ -177,14 +177,26 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
                       if (_text(item['history']) != null) FeatureSection(title: 'История', text: '${item['history']}'),
                       if (sanctities.isNotEmpty) ...[
                         const FeatureHeading('Святыни'),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: sanctities.map((value) {
-                            final data = _map(value);
-                            return Chip(label: Text('${data['name'] ?? ''}'));
-                          }).toList(),
-                        ),
+                        ...sanctities.map((value) {
+                          final data = _map(value);
+                          final imageUrl = data['image_url'];
+                          return Card(
+                            clipBehavior: Clip.antiAlias,
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              if (imageUrl != null)
+                                Image.network('$imageUrl', height: 180, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Text('${data['name'] ?? ''}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                                  if (_text(data['description']) != null) ...[const SizedBox(height: 6), Text('${data['description']}', style: const TextStyle(color: Colors.black54))],
+                                  if (_text(data['note']) != null) ...[const SizedBox(height: 6), Text('${data['note']}', style: const TextStyle(color: Colors.black54))],
+                                ]),
+                              ),
+                            ]),
+                          );
+                        }),
                       ],
                       if (_text(item['schedule']) != null) FeatureSection(title: 'Расписание богослужений', text: '${item['schedule']}', icon: Icons.schedule),
                       if (_text(amenities['parking']) != null) FeatureSection(title: 'Парковка', text: '${amenities['parking']}', icon: Icons.local_parking),

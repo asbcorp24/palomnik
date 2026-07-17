@@ -10,6 +10,7 @@ use App\Models\Vicariate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -57,6 +58,7 @@ class DirectoryController extends Controller
     {
         $config = $this->config($resource);
         $data = $this->validated($request, $resource);
+        $data = $this->handleSanctityImage($request, $resource, $data);
         $data['slug'] = $this->makeUniqueSlug($config['model'], $data['slug'] ?? null, $data['name']);
 
         $config['model']::query()->create($data);
@@ -86,6 +88,7 @@ class DirectoryController extends Controller
         $config = $this->config($resource);
         $item = $config['model']::query()->findOrFail($id);
         $data = $this->validated($request, $resource, $item);
+        $data = $this->handleSanctityImage($request, $resource, $data, $item);
         $data['slug'] = $this->makeUniqueSlug($config['model'], $data['slug'] ?? null, $data['name'], $item->getKey());
         $item->update($data);
 
@@ -109,6 +112,10 @@ class DirectoryController extends Controller
 
         if ($resource === 'deaneries' && $item->pilgrimageObjects()->withTrashed()->exists()) {
             return back()->with('error', 'Благочиние используется в объектах, включая архивные, и не может быть удалено.');
+        }
+
+        if ($resource === 'sanctities' && $item->image_path) {
+            Storage::disk('public')->delete($item->image_path);
         }
 
         $item->delete();
@@ -149,12 +156,37 @@ class DirectoryController extends Controller
 
         if ($resource === 'sanctities') {
             $rules['type'] = ['nullable', 'string', 'max:64'];
+            $rules['image'] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'];
+            $rules['remove_image'] = ['nullable', 'boolean'];
         }
 
         $data = $request->validate($rules);
 
         if ($resource === 'object-types') {
             $data['sort_order'] = (int) ($data['sort_order'] ?? 0);
+        }
+
+        return $data;
+    }
+
+    private function handleSanctityImage(Request $request, string $resource, array $data, ?Model $item = null): array
+    {
+        if ($resource !== 'sanctities') {
+            return $data;
+        }
+
+        unset($data['image'], $data['remove_image']);
+
+        if ($request->boolean('remove_image') && $item?->image_path) {
+            Storage::disk('public')->delete($item->image_path);
+            $data['image_path'] = null;
+        }
+
+        if ($request->hasFile('image')) {
+            if ($item?->image_path) {
+                Storage::disk('public')->delete($item->image_path);
+            }
+            $data['image_path'] = $request->file('image')->store('sanctities', 'public');
         }
 
         return $data;

@@ -144,6 +144,9 @@
             <a class="sidebar-link {{ request()->is('admin/moderation/bookings*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'bookings') }}">
                 <i class="bi bi-ticket-perforated"></i><span>Бронирования и билеты</span>
             </a>
+            <a class="sidebar-link {{ request()->routeIs('admin.together.*') ? 'active' : '' }}" href="{{ route('admin.together.index') }}">
+                <i class="bi bi-people-fill"></i><span>Паломничество вместе</span>
+            </a>
 
             <div class="sidebar-label">Геймификация</div>
             <a class="sidebar-link {{ request()->is('admin/modules/achievements*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'achievements') }}">

@@ -15,38 +15,28 @@
             <aside class="col-lg-3">
                 <div class="profile-sidebar">
                     <div class="d-flex align-items-center gap-3">
-                        <div class="profile-avatar">
-                            @if(auth()->user()->avatar_url)
-                                <img src="{{ auth()->user()->avatar_url }}" alt="{{ auth()->user()->name }}">
-                            @else
-                                {{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}
-                            @endif
-                        </div>
-                        <div class="min-w-0">
-                            <div class="pm-serif fs-5 text-truncate">{{ auth()->user()->name }}</div>
-                            <div class="small text-secondary text-truncate">{{ auth()->user()->email }}</div>
-                        </div>
+                        <div class="profile-avatar">@if(auth()->user()->avatar_url)<img src="{{ auth()->user()->avatar_url }}" alt="{{ auth()->user()->name }}">@else{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}@endif</div>
+                        <div class="min-w-0"><div class="pm-serif fs-5 text-truncate">{{ auth()->user()->name }}</div><div class="small text-secondary text-truncate">{{ auth()->user()->email }}</div>@if(auth()->user()->is_verified_organizer)<span class="badge rounded-pill text-bg-success mt-2"><i class="bi bi-patch-check-fill me-1"></i>Проверенный организатор</span>@endif</div>
                     </div>
 
                     <nav class="profile-nav">
                         <a class="{{ request()->routeIs('profile.dashboard') ? 'active' : '' }}" href="{{ route('profile.dashboard') }}"><i class="bi bi-grid"></i>Обзор</a>
+                        <a class="{{ request()->routeIs('notifications.*') ? 'active' : '' }}" href="{{ route('notifications.index') }}"><i class="bi bi-bell"></i>Уведомления @if(auth()->user()->unreadNotifications()->count())<span class="badge text-bg-danger ms-auto">{{ auth()->user()->unreadNotifications()->count() }}</span>@endif</a>
                         <a class="{{ request()->routeIs('profile.favorites') ? 'active' : '' }}" href="{{ route('profile.favorites') }}"><i class="bi bi-heart"></i>Избранное</a>
                         <a class="{{ request()->routeIs('profile.bookings') ? 'active' : '' }}" href="{{ route('profile.bookings') }}"><i class="bi bi-ticket-perforated"></i>Бронирования</a>
                         <a class="{{ request()->routeIs('profile.achievements') ? 'active' : '' }}" href="{{ route('profile.achievements') }}"><i class="bi bi-trophy"></i>Достижения</a>
                         <a class="{{ request()->routeIs('route-plans.*') ? 'active' : '' }}" href="{{ route('route-plans.index') }}"><i class="bi bi-signpost-split"></i>Мои маршруты</a>
+                        <a class="{{ request()->routeIs('together.my') ? 'active' : '' }}" href="{{ route('together.my') }}"><i class="bi bi-people"></i>Совместные поездки</a>
                         <a class="{{ request()->routeIs('profile.activity') ? 'active' : '' }}" href="{{ route('profile.activity') }}"><i class="bi bi-activity"></i>Моя активность</a>
+                        <a class="{{ request()->routeIs('profile.blocked-users') ? 'active' : '' }}" href="{{ route('profile.blocked-users') }}"><i class="bi bi-person-slash"></i>Заблокированные</a>
                         <a class="{{ request()->routeIs('profile.settings') ? 'active' : '' }}" href="{{ route('profile.settings') }}"><i class="bi bi-sliders"></i>Настройки</a>
                     </nav>
 
-                    @if(auth()->user()->isAdmin())
-                        <hr>
-                        <a class="btn btn-outline-pm w-100" href="{{ route('admin.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>Админ-панель</a>
-                    @endif
+                    @if(auth()->user()->canManageObjects())<hr><a class="btn btn-outline-pm w-100 mb-2" href="{{ route('service.dashboard') }}"><i class="bi bi-building-check me-2"></i>Кабинет представителя</a>@endif
+                    @if(auth()->user()->isAdmin())<a class="btn btn-outline-pm w-100" href="{{ route('admin.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>Админ-панель</a>@endif
                 </div>
             </aside>
-            <div class="col-lg-9">
-                @yield('profile_content')
-            </div>
+            <div class="col-lg-9">@yield('profile_content')</div>
         </div>
     </div>
 </section>

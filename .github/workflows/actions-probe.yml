@@ -1,0 +1,25 @@
+name: Actions probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/actions-probe.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: |
+          echo "GitHub Actions executed at $(date -u +%FT%TZ)" > actions-probe.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add actions-probe.txt
+          git commit -m "ci: confirm Actions execution"
+          git push origin HEAD:main

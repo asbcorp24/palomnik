@@ -1,0 +1,44 @@
+
+lib/src/screens/maplibre_map.dart:3:1: Error: 'Position' is imported from both 'package:geobase/src/coordinates/base/position.dart' and 'package:geolocator_platform_interface/src/models/position.dart'.
+import 'package:maplibre/maplibre.dart';
+^^^^^^^^
+lib/src/screens/app_sections.dart:61:28: Error: Cannot invoke a non-'const' constructor where a const expression is expected.
+Try using a constructor or factory that is 'const'.
+              return const ListView(children: [SizedBox(height: 320), Center(child: CircularProgressIndicator())]);
+                           ^^^^^^^^
+::group::❌ loading /home/runner/work/palomnik/palomnik/mobile/test/app_smoke_test.dart (failed)
+Failed to load "/home/runner/work/palomnik/palomnik/mobile/test/app_smoke_test.dart":
+Compilation failed for testPath=/home/runner/work/palomnik/palomnik/mobile/test/app_smoke_test.dart: lib/src/screens/maplibre_map.dart:3:1: Error: 'Position' is imported from both 'package:geobase/src/coordinates/base/position.dart' and 'package:geolocator_platform_interface/src/models/position.dart'.
+import 'package:maplibre/maplibre.dart';
+^^^^^^^^
+lib/src/screens/app_sections.dart:61:28: Error: Cannot invoke a non-'const' constructor where a const expression is expected.
+Try using a constructor or factory that is 'const'.
+              return const ListView(children: [SizedBox(height: 320), Center(child: CircularProgressIndicator())]);
+                           ^^^^^^^^
+.
+
+::endgroup::
+::group::❌ loading /home/runner/work/palomnik/palomnik/mobile/test/app_smoke_test.dart (failed after test completion)
+Error: The Dart compiler exited unexpectedly.
+package:flutter_tools/src/base/common.dart 34:3  throwToolExit
+package:flutter_tools/src/compile.dart 1009:11   DefaultResidentCompiler._compile.<fn>
+dart:async/zone_root.dart 48:47                  _rootRunUnary
+dart:async/zone.dart 733:19                      _CustomZone.runUnary
+dart:async/future_impl.dart 948:45               Future._propagateToListeners.handleValueCallback
+dart:async/future_impl.dart 977:13               Future._propagateToListeners
+dart:async/future_impl.dart 862:9                Future._propagateToListeners
+dart:async/future_impl.dart 720:5                Future._completeWithValue
+dart:async/future_impl.dart 804:7                Future._asyncCompleteWithValue.<fn>
+dart:async/zone_root.dart 35:13                  _rootRun
+dart:async/zone.dart 726:19                      _CustomZone.run
+dart:async/zone.dart 625:7                       _CustomZone.runGuarded
+dart:async/zone.dart 666:23                      _CustomZone.bindCallbackGuarded.<fn>
+dart:async/schedule_microtask.dart 40:35         _microtaskLoop
+dart:async/schedule_microtask.dart 49:5          _startMicrotaskLoop
+dart:isolate-patch/isolate_patch.dart 127:13     _runPendingImmediateCallback
+dart:isolate-patch/isolate_patch.dart 193:5      _RawReceivePort._handleMessage
+::endgroup::
+✅ /home/runner/work/palomnik/palomnik/mobile/test/app_theme_test.dart: application theme renders the pilgrim shell
+✅ /home/runner/work/palomnik/palomnik/mobile/test/app_theme_test.dart: dark theme is configured
+
+::error::2 tests passed, 1 failed.

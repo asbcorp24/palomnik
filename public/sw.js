@@ -1,8 +1,8 @@
-const CACHE_VERSION = 'palomnik-v2';
+const CACHE_VERSION = 'palomnik-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_CACHE = `${CACHE_VERSION}-offline`;
 const STATIC_URLS = [
-  '/offline',
+  '/offline.html',
   '/css/pilgrim-site.css',
   '/css/pilgrim-account.css',
   '/manifest.webmanifest',
@@ -33,7 +33,7 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() =>
-        caches.match(request).then(response => response || caches.match('/offline'))
+        caches.match(request).then(response => response || caches.match('/offline.html'))
       )
     );
     return;

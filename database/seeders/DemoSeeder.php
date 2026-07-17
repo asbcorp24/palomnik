@@ -86,7 +86,7 @@ class DemoSeeder extends Seeder
                 'password' => Hash::make(self::PASSWORD),
                 'role' => User::ROLE_PILGRIM,
                 'birth_date' => '1985-09-22',
-                'preferences' => [...$commonPreferences, 'interests' => ['routes', 'community', 'youth']],
+                'preferences' => array_merge($commonPreferences, ['interests' => ['routes', 'community', 'youth']]),
                 'is_active' => true,
                 'is_verified_organizer' => true,
                 'verified_organizer_at' => now()->subMonths(3),
@@ -102,7 +102,7 @@ class DemoSeeder extends Seeder
                 'password' => Hash::make(self::PASSWORD),
                 'role' => User::ROLE_PILGRIM,
                 'birth_date' => '1992-02-08',
-                'preferences' => [...$commonPreferences, 'privacy' => 'friends'],
+                'preferences' => array_merge($commonPreferences, ['privacy' => 'friends']),
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]
@@ -158,7 +158,7 @@ class DemoSeeder extends Seeder
         foreach ($sanctityRows as $key => $row) {
             $sanctities[$key] = Sanctity::query()->updateOrCreate(
                 ['slug' => $row['slug']],
-                [...$row, 'description' => 'Демонстрационное описание святыни для каталога и поиска.']
+                array_merge($row, ['description' => 'Демонстрационное описание святыни для каталога и поиска.'])
             );
         }
 
@@ -521,7 +521,7 @@ class DemoSeeder extends Seeder
         foreach ($rows as $slug => $row) {
             $event = CalendarEvent::withTrashed()->updateOrCreate(
                 ['slug' => $slug],
-                [...$row, 'is_published' => true, 'published_at' => now()->subDay()]
+                array_merge($row, ['is_published' => true, 'published_at' => now()->subDay()])
             );
             if ($event->trashed()) {
                 $event->restore();

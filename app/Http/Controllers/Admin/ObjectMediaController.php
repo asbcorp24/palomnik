@@ -35,10 +35,7 @@ class ObjectMediaController extends Controller
         $hasCover = $object->media()->where('is_cover', true)->exists();
 
         foreach ($files as $file) {
-            $mime = (string) $file->getMimeType();
-            $type = Str::startsWith($mime, 'image/') ? 'image'
-                : (Str::startsWith($mime, 'video/') ? 'video'
-                    : (Str::startsWith($mime, 'audio/') ? 'audio' : 'document'));
+            $type = $this->detectType((string) $file->getMimeType());
 
             $object->media()->create([
                 'type' => $type,
@@ -54,13 +51,15 @@ class ObjectMediaController extends Controller
         }
 
         if (! empty($data['external_url'])) {
+            $externalType = $data['external_type'] ?? 'image';
+
             $object->media()->create([
-                'type' => $data['external_type'] ?? 'image',
+                'type' => $externalType,
                 'external_url' => $data['external_url'],
                 'title' => $data['title'] ?? null,
                 'description' => $data['description'] ?? null,
                 'sort_order' => ++$sortOrder,
-                'is_cover' => ! $hasCover && ($data['external_type'] ?? 'image') === 'image',
+                'is_cover' => ! $hasCover && $externalType === 'image',
             ]);
         }
 
@@ -81,10 +80,22 @@ class ObjectMediaController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'external_url' => ['nullable', 'url', 'max:1000'],
+            'replacement_file' => ['nullable', 'file', 'max:51200', 'mimes:jpg,jpeg,png,webp,gif,mp3,wav,m4a,mp4,mov,avi,pdf,doc,docx'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:100000'],
             'is_cover' => ['nullable', 'boolean'],
         ]);
 
+        $replacement = $request->file('replacement_file');
+        $oldPath = $media->path;
+        $wasCover = $media->is_cover;
+
+        if ($replacement) {
+            $data['path'] = $replacement->store('objects/'.$media->pilgrimage_object_id, 'public');
+            $data['type'] = $this->detectType((string) $replacement->getMimeType());
+            $data['external_url'] = null;
+        }
+
+        unset($data['replacement_file']);
         $makeCover = $request->boolean('is_cover') && $data['type'] === 'image';
 
         DB::transaction(function () use ($media, $data, $makeCover) {
@@ -98,6 +109,23 @@ class ObjectMediaController extends Controller
             $data['is_cover'] = $makeCover;
             $media->update($data);
         });
+
+        if ($replacement && $oldPath && $oldPath !== $media->path) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        if ($wasCover && ! $makeCover) {
+            $nextCover = ObjectMedia::query()
+                ->where('pilgrimage_object_id', $media->pilgrimage_object_id)
+                ->where('id', '<>', $media->id)
+                ->where('type', 'image')
+                ->orderBy('sort_order')
+                ->first();
+
+            if ($nextCover) {
+                $nextCover->update(['is_cover' => true]);
+            }
+        }
 
         return redirect()
             ->route('admin.objects.edit', $media->pilgrimageObject)
@@ -125,5 +153,22 @@ class ObjectMediaController extends Controller
         return redirect()
             ->route('admin.objects.edit', $object)
             ->with('success', 'Медиаматериал удалён.');
+    }
+
+    private function detectType(string $mime): string
+    {
+        if (Str::startsWith($mime, 'image/')) {
+            return 'image';
+        }
+
+        if (Str::startsWith($mime, 'video/')) {
+            return 'video';
+        }
+
+        if (Str::startsWith($mime, 'audio/')) {
+            return 'audio';
+        }
+
+        return 'document';
     }
 }

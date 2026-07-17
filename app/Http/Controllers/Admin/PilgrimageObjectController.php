@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Deanery;
-use App\Models\ObjectMedia;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use App\Models\Sanctity;
@@ -151,10 +150,16 @@ class PilgrimageObjectController extends Controller
             $slugRule->ignore($object->id);
         }
 
+        $deaneryRule = Rule::exists('deaneries', 'id');
+        if ($request->filled('vicariate_id')) {
+            $vicariateId = (int) $request->input('vicariate_id');
+            $deaneryRule->where(fn ($query) => $query->where('vicariate_id', $vicariateId));
+        }
+
         return $request->validate([
             'object_type_id' => ['required', 'integer', 'exists:object_types,id'],
-            'vicariate_id' => ['nullable', 'integer', 'exists:vicariates,id'],
-            'deanery_id' => ['nullable', 'integer', 'exists:deaneries,id'],
+            'vicariate_id' => ['nullable', 'required_with:deanery_id', 'integer', 'exists:vicariates,id'],
+            'deanery_id' => ['nullable', 'integer', $deaneryRule],
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', $slugRule],
             'short_description' => ['nullable', 'string', 'max:2000'],

@@ -47,6 +47,7 @@
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('map') ? 'active' : '' }}" href="{{ route('map') }}">Карта</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('objects.*') ? 'active' : '' }}" href="{{ route('objects.index') }}">Храмы и святыни</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('routes.*') ? 'active' : '' }}" href="{{ route('routes.index') }}">Маршруты</a></li>
+                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('together.*') ? 'active' : '' }}" href="{{ route('together.index') }}">Паломничество вместе</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('community.*') ? 'active' : '' }}" href="{{ route('community.index') }}">Сообщество</a></li>
                 </ul>
                 <div class="d-flex align-items-center gap-2">
@@ -60,6 +61,7 @@
                                 <li><a class="dropdown-item rounded-3" href="{{ route('profile.dashboard') }}"><i class="bi bi-grid me-2"></i>Личный кабинет</a></li>
                                 <li><a class="dropdown-item rounded-3" href="{{ route('profile.favorites') }}"><i class="bi bi-heart me-2"></i>Избранное</a></li>
                                 <li><a class="dropdown-item rounded-3" href="{{ route('route-plans.index') }}"><i class="bi bi-signpost-split me-2"></i>Мои маршруты</a></li>
+                                <li><a class="dropdown-item rounded-3" href="{{ route('together.my') }}"><i class="bi bi-people me-2"></i>Мои совместные поездки</a></li>
                                 @if(auth()->user()->isAdmin())<li><a class="dropdown-item rounded-3" href="{{ route('admin.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>Админ-панель</a></li>@endif
                                 <li><hr class="dropdown-divider"></li>
                                 <li><form method="POST" action="{{ route('logout') }}">@csrf<button class="dropdown-item rounded-3 text-danger" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Выйти</button></form></li>
@@ -90,10 +92,10 @@
         <div class="row g-4">
             <div class="col-lg-4">
                 <div class="d-flex align-items-center gap-3 mb-3"><span class="brand-mark"><i class="bi bi-cross"></i></span><div><div class="pm-serif fs-5 text-white">Московский паломник</div><div class="small opacity-75">Единая цифровая платформа паломничества</div></div></div>
-                <p class="small mb-0">Храмы, монастыри, святыни, готовые и персональные маршруты по Москве и Московской области.</p>
+                <p class="small mb-0">Храмы, монастыри, святыни, готовые, персональные и совместные маршруты по Москве и Московской области.</p>
             </div>
-            <div class="col-6 col-lg-2"><div class="text-white fw-semibold mb-3">Разделы</div><div class="d-flex flex-column gap-2 small"><a class="footer-link" href="{{ route('map') }}">Карта</a><a class="footer-link" href="{{ route('objects.index') }}">Объекты</a><a class="footer-link" href="{{ route('routes.index') }}">Маршруты</a><a class="footer-link" href="{{ route('community.index') }}">Сообщество</a></div></div>
-            <div class="col-6 col-lg-3"><div class="text-white fw-semibold mb-3">Личный кабинет</div><div class="d-flex flex-column gap-2 small">@auth<a class="footer-link" href="{{ route('profile.dashboard') }}">Профиль</a><a class="footer-link" href="{{ route('profile.bookings') }}">Бронирования</a><a class="footer-link" href="{{ route('profile.achievements') }}">Достижения</a><a class="footer-link" href="{{ route('route-plans.index') }}">Мои маршруты</a>@else<a class="footer-link" href="{{ route('login') }}">Вход</a><a class="footer-link" href="{{ route('register') }}">Регистрация</a>@endauth</div></div>
+            <div class="col-6 col-lg-2"><div class="text-white fw-semibold mb-3">Разделы</div><div class="d-flex flex-column gap-2 small"><a class="footer-link" href="{{ route('map') }}">Карта</a><a class="footer-link" href="{{ route('objects.index') }}">Объекты</a><a class="footer-link" href="{{ route('routes.index') }}">Маршруты</a><a class="footer-link" href="{{ route('together.index') }}">Паломничество вместе</a><a class="footer-link" href="{{ route('community.index') }}">Сообщество</a></div></div>
+            <div class="col-6 col-lg-3"><div class="text-white fw-semibold mb-3">Личный кабинет</div><div class="d-flex flex-column gap-2 small">@auth<a class="footer-link" href="{{ route('profile.dashboard') }}">Профиль</a><a class="footer-link" href="{{ route('profile.bookings') }}">Бронирования</a><a class="footer-link" href="{{ route('profile.achievements') }}">Достижения</a><a class="footer-link" href="{{ route('route-plans.index') }}">Мои маршруты</a><a class="footer-link" href="{{ route('together.my') }}">Мои группы</a>@else<a class="footer-link" href="{{ route('login') }}">Вход</a><a class="footer-link" href="{{ route('register') }}">Регистрация</a>@endauth</div></div>
             <div class="col-lg-3"><div class="text-white fw-semibold mb-3">Работа без сети</div><p class="small mb-3">Карточку выбранного объекта можно сохранить в кэш браузера. Полные офлайн-карты будут реализованы в мобильном приложении.</p><button class="btn btn-sm btn-outline-light" id="installAppButton" type="button" hidden>Установить приложение</button></div>
         </div>
         <hr class="border-light border-opacity-10 my-4">
@@ -107,8 +109,8 @@
 <nav class="mobile-bottom-nav" aria-label="Мобильная навигация">
     <a class="{{ request()->routeIs('home') ? 'active' : '' }}" href="{{ route('home') }}"><i class="bi bi-house"></i><span>Главная</span></a>
     <a class="{{ request()->routeIs('map') ? 'active' : '' }}" href="{{ route('map') }}"><i class="bi bi-map"></i><span>Карта</span></a>
+    <a class="{{ request()->routeIs('together.*') ? 'active' : '' }}" href="{{ route('together.index') }}"><i class="bi bi-people-fill"></i><span>Вместе</span></a>
     <a class="{{ request()->routeIs('routes.*') ? 'active' : '' }}" href="{{ route('routes.index') }}"><i class="bi bi-signpost-split"></i><span>Маршруты</span></a>
-    <a class="{{ request()->routeIs('community.*') ? 'active' : '' }}" href="{{ route('community.index') }}"><i class="bi bi-people"></i><span>Сообщество</span></a>
     <a class="{{ request()->routeIs('profile.*') || request()->routeIs('route-plans.*') ? 'active' : '' }}" href="{{ auth()->check() ? route('profile.dashboard') : route('login') }}"><i class="bi bi-person"></i><span>Профиль</span></a>
 </nav>
 

@@ -26,6 +26,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', SiteHomeController::class)->name('home');
 Route::view('/offline', 'site.offline')->name('offline');
+Route::view('/privacy', 'site.legal.privacy')->name('privacy');
+Route::view('/terms', 'site.legal.terms')->name('terms');
 Route::get('/map', SiteMapController::class)->name('map');
 Route::get('/objects', [SiteObjectController::class, 'index'])->name('objects.index');
 Route::get('/objects/{object:slug}', [SiteObjectController::class, 'show'])->name('objects.show');

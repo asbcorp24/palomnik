@@ -157,6 +157,16 @@ class ProfileController extends Controller
         return view('site.profile.achievements', compact('achievements', 'earned'));
     }
 
+    public function blockedUsers(Request $request): View
+    {
+        $blocks = $request->user()->blockedUsers()
+            ->with('blocked')
+            ->latest()
+            ->paginate(20);
+
+        return view('site.profile.blocked-users', compact('blocks'));
+    }
+
     public function activity(Request $request): View
     {
         $user = $request->user();

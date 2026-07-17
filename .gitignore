@@ -2,6 +2,7 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/app/firebase/*.json
 /vendor
 .env
 .env.backup
@@ -13,3 +14,13 @@ npm-debug.log
 yarn-error.log
 /.idea
 /.vscode
+
+/mobile/.dart_tool/
+/mobile/.flutter-plugins
+/mobile/.flutter-plugins-dependencies
+/mobile/.packages
+/mobile/build/
+/mobile/android/app/google-services.json
+/mobile/ios/Runner/GoogleService-Info.plist
+/mobile/ios/Pods/
+/mobile/ios/.symlinks/

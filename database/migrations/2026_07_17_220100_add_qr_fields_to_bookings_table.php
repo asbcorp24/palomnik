@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::table('bookings', function (Blueprint $table) {
             $table->string('ticket_token', 64)->nullable()->unique()->after('ticket_code');
             $table->timestamp('checked_in_at')->nullable()->after('ticket_token');
-            $table->foreignId('checked_in_by')->nullable()->after('checked_in_at')->constrained('users')->nullOnDelete();
+            $table->unsignedBigInteger('checked_in_by')->nullable()->after('checked_in_at');
             $table->unsignedSmallInteger('checked_in_participants')->default(0)->after('checked_in_by');
         });
 
@@ -27,7 +27,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('bookings', function (Blueprint $table) {
-            $table->dropForeign(['checked_in_by']);
             $table->dropUnique(['ticket_token']);
             $table->dropColumn([
                 'ticket_token',

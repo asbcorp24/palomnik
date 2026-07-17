@@ -81,7 +81,7 @@
                 });
 
                 const clusterer = new ymaps.Clusterer({
-                    preset: 'islands#invertedGoldClusterIcons',
+                    preset: 'islands#invertedVioletClusterIcons',
                     groupByCoordinates: false,
                     clusterDisableClickZoom: false,
                     clusterOpenBalloonOnClick: true
@@ -104,7 +104,8 @@
                             balloonContent: content
                         },
                         {
-                            preset: 'islands#goldIcon'
+                            preset: 'islands#circleIcon',
+                            iconColor: object.marker_color || '#b58a32'
                         }
                     );
                 });

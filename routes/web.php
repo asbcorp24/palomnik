@@ -35,9 +35,12 @@ Route::get('/objects', [SiteObjectController::class, 'index'])->name('objects.in
 Route::get('/objects/{object:slug}', [SiteObjectController::class, 'show'])->name('objects.show');
 Route::get('/routes', [SiteRouteController::class, 'index'])->name('routes.index');
 Route::get('/routes/{pilgrimageRoute:slug}', [SiteRouteController::class, 'show'])->name('routes.show');
-Route::get('/together', [SiteTogetherController::class, 'index'])->name('together.index');
+
 Route::get('/community', [SiteCommunityController::class, 'index'])->name('community.index');
+Route::get('/community/together', [SiteTogetherController::class, 'index'])->name('together.index');
 Route::get('/community/{post:slug}', [SiteCommunityController::class, 'show'])->name('community.show');
+
+Route::redirect('/together', '/community/together', 301);
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [SiteAuthController::class, 'showLoginForm'])->name('login');
@@ -77,6 +80,17 @@ Route::middleware('auth')->group(function () {
     Route::post('/community/media', [SiteUserMediaController::class, 'store'])->name('community.media.store');
     Route::delete('/community/media/{media}', [SiteUserMediaController::class, 'destroy'])->name('community.media.destroy');
 
+    Route::get('/community/together/my', [SiteTogetherController::class, 'my'])->name('together.my');
+    Route::get('/community/together/create', [SiteTogetherController::class, 'create'])->name('together.create');
+    Route::post('/community/together', [SiteTogetherController::class, 'store'])->name('together.store');
+    Route::get('/community/together/{jointPilgrimage}/edit', [SiteTogetherController::class, 'edit'])->name('together.edit');
+    Route::put('/community/together/{jointPilgrimage}', [SiteTogetherController::class, 'update'])->name('together.update');
+    Route::delete('/community/together/{jointPilgrimage}', [SiteTogetherController::class, 'destroy'])->name('together.destroy');
+    Route::post('/community/together/{jointPilgrimage}/join', [SiteTogetherController::class, 'join'])->name('together.join');
+    Route::delete('/community/together/{jointPilgrimage}/leave', [SiteTogetherController::class, 'leave'])->name('together.leave');
+    Route::put('/community/together/{jointPilgrimage}/members/{member}', [SiteTogetherController::class, 'updateMember'])->name('together.members.update');
+    Route::post('/community/together/{jointPilgrimage}/messages', [SiteTogetherController::class, 'storeMessage'])->name('together.messages.store');
+
     Route::resource('my-routes', SiteRoutePlanController::class)
         ->parameters(['my-routes' => 'plan'])
         ->names([
@@ -88,20 +102,9 @@ Route::middleware('auth')->group(function () {
             'update' => 'route-plans.update',
             'destroy' => 'route-plans.destroy',
         ]);
-
-    Route::get('/together/my', [SiteTogetherController::class, 'my'])->name('together.my');
-    Route::get('/together/create', [SiteTogetherController::class, 'create'])->name('together.create');
-    Route::post('/together', [SiteTogetherController::class, 'store'])->name('together.store');
-    Route::get('/together/{jointPilgrimage}/edit', [SiteTogetherController::class, 'edit'])->name('together.edit');
-    Route::put('/together/{jointPilgrimage}', [SiteTogetherController::class, 'update'])->name('together.update');
-    Route::delete('/together/{jointPilgrimage}', [SiteTogetherController::class, 'destroy'])->name('together.destroy');
-    Route::post('/together/{jointPilgrimage}/join', [SiteTogetherController::class, 'join'])->name('together.join');
-    Route::delete('/together/{jointPilgrimage}/leave', [SiteTogetherController::class, 'leave'])->name('together.leave');
-    Route::put('/together/{jointPilgrimage}/members/{member}', [SiteTogetherController::class, 'updateMember'])->name('together.members.update');
-    Route::post('/together/{jointPilgrimage}/messages', [SiteTogetherController::class, 'storeMessage'])->name('together.messages.store');
 });
 
-Route::get('/together/{jointPilgrimage:slug}', [SiteTogetherController::class, 'show'])->name('together.show');
+Route::get('/community/together/{jointPilgrimage:slug}', [SiteTogetherController::class, 'show'])->name('together.show');
 
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
 Route::post('/admin/login', [AdminAuthController::class, 'login'])

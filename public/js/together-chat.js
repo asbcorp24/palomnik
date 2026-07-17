@@ -8,6 +8,8 @@
     }
 
     const feedUrl = window.location.pathname.replace(/\/$/, '') + '/messages-feed';
+    const reportedUserInput = document.getElementById('reportedUserId');
+    const defaultReportedUserId = reportedUserInput?.value || '';
     let firstLoad = true;
     let requestInProgress = false;
 
@@ -23,7 +25,7 @@
                 const userInput = document.getElementById('reportedUserId');
 
                 if (messageInput) messageInput.value = button.dataset.messageId || '';
-                if (userInput) userInput.value = button.dataset.userId || '';
+                if (userInput) userInput.value = button.dataset.userId || defaultReportedUserId;
             });
         });
     }
@@ -116,7 +118,9 @@
 
     document.getElementById('reportModal')?.addEventListener('hidden.bs.modal', () => {
         const messageInput = document.getElementById('reportedMessageId');
+        const userInput = document.getElementById('reportedUserId');
         if (messageInput) messageInput.value = '';
+        if (userInput) userInput.value = defaultReportedUserId;
     });
 
     bindReportButtons();

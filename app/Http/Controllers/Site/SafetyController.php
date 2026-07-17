@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Controller;
 use App\Models\CommunityReport;
-use App\Models\JointPilgrimage;
 use App\Models\JointPilgrimageMessage;
 use App\Models\User;
 use App\Models\UserBlock;
@@ -64,7 +63,8 @@ class SafetyController extends Controller
             'blocked_id' => $user->id,
         ]);
 
-        return back()->with('success', 'Пользователь заблокирован. Его предложения и сообщения будут скрыты для вас.');
+        return redirect()->route('together.index')
+            ->with('success', 'Пользователь заблокирован. Его предложения и сообщения скрыты для вас.');
     }
 
     public function unblock(Request $request, User $user): RedirectResponse

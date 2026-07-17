@@ -29,6 +29,7 @@ use App\Http\Controllers\Site\RouteController as SiteRouteController;
 use App\Http\Controllers\Site\RoutePlanController as SiteRoutePlanController;
 use App\Http\Controllers\Site\SafetyController as SiteSafetyController;
 use App\Http\Controllers\Site\TogetherController as SiteTogetherController;
+use App\Http\Controllers\Site\TogetherMessageController as SiteTogetherMessageController;
 use App\Http\Controllers\Site\UserMediaController as SiteUserMediaController;
 use App\Http\Controllers\Site\VisitController as SiteVisitController;
 use Illuminate\Support\Facades\Route;
@@ -100,6 +101,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/community/together/{jointPilgrimage}/join', [SiteTogetherController::class, 'join'])->name('together.join');
     Route::delete('/community/together/{jointPilgrimage}/leave', [SiteTogetherController::class, 'leave'])->name('together.leave');
     Route::put('/community/together/{jointPilgrimage}/members/{member}', [SiteTogetherController::class, 'updateMember'])->name('together.members.update');
+    Route::get('/community/together/{jointPilgrimage}/messages-feed', [SiteTogetherMessageController::class, 'index'])->name('together.messages.index');
     Route::post('/community/together/{jointPilgrimage}/messages', [SiteTogetherController::class, 'storeMessage'])->name('together.messages.store');
 
     Route::post('/safety/reports', [SiteSafetyController::class, 'report'])->name('safety.reports.store');

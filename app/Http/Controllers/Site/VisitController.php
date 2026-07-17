@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Controller;
 use App\Models\PilgrimageObject;
+use App\Services\AchievementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class VisitController extends Controller
 {
-    public function store(Request $request, PilgrimageObject $object): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        PilgrimageObject $object,
+        AchievementService $achievementService
+    ): RedirectResponse {
         $data = $request->validate([
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -34,12 +38,13 @@ class VisitController extends Controller
                 (float) $object->longitude
             )
             : null;
+        $verified = $distance !== null && $distance <= 250;
 
         $request->user()->visits()->create([
             'pilgrimage_object_id' => $object->id,
             'visited_at' => now(),
             'verification_method' => $hasCoordinates ? 'geolocation' : 'manual',
-            'status' => $distance !== null && $distance <= 250 ? 'verified' : 'pending',
+            'status' => $verified ? 'verified' : 'pending',
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
             'notes' => $distance !== null
@@ -47,9 +52,16 @@ class VisitController extends Controller
                 : 'Отметка без передачи геолокации.',
         ]);
 
-        $message = $distance !== null && $distance <= 250
+        $message = $verified
             ? 'Посещение подтверждено по геолокации.'
             : 'Отметка сохранена и отправлена на проверку.';
+
+        if ($verified) {
+            $awarded = $achievementService->evaluate($request->user());
+            if ($awarded) {
+                $message .= ' Новое достижение: '.implode(', ', $awarded).'.';
+            }
+        }
 
         return back()->with('success', $message);
     }

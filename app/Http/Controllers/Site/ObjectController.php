@@ -69,7 +69,7 @@ class ObjectController extends Controller
         $similarObjects = PilgrimageObject::query()
             ->published()
             ->where('object_type_id', $object->object_type_id)
-            ->whereKeyNot($object->id)
+            ->where('id', '<>', $object->id)
             ->with(['objectType', 'coverMedia'])
             ->orderByDesc('published_at')
             ->limit(3)

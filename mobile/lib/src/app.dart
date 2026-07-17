@@ -16,10 +16,20 @@ class MoscowPilgrimApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {
+        final preferences = session.user?['preferences'];
+        final theme = preferences is Map ? '${preferences['theme'] ?? 'system'}' : 'system';
+        final themeMode = switch (theme) {
+          'light' => ThemeMode.light,
+          'dark' => ThemeMode.dark,
+          _ => ThemeMode.system,
+        };
+
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Московский паломник',
           theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          themeMode: themeMode,
           locale: const Locale('ru'),
           supportedLocales: const [Locale('ru')],
           localizationsDelegates: const [

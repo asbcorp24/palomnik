@@ -4,6 +4,7 @@ namespace Tests\Feature\Site;
 
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
+use App\Models\PilgrimageRoute;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -87,5 +88,27 @@ class PublicSiteTest extends TestCase
         $this->get('/map')
             ->assertOk()
             ->assertSee('Карта подготовлена к подключению');
+    }
+
+    public function test_published_route_is_visible_on_site(): void
+    {
+        PilgrimageRoute::query()->create([
+            'title' => 'Сергиев путь',
+            'slug' => 'sergius-route-test',
+            'category' => 'thematic',
+            'difficulty' => 'easy',
+            'duration_days' => 1,
+            'short_description' => 'Тематический маршрут.',
+            'is_published' => true,
+            'published_at' => now()->subMinute(),
+        ]);
+
+        $this->get('/routes')
+            ->assertOk()
+            ->assertSee('Сергиев путь');
+
+        $this->get('/routes/sergius-route-test')
+            ->assertOk()
+            ->assertSee('Тематический маршрут.');
     }
 }

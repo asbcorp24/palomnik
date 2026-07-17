@@ -11,6 +11,20 @@ use Illuminate\Validation\Rule;
 
 class MapController extends Controller
 {
+    public function config(): JsonResponse
+    {
+        return response()->json([
+            'data' => [
+                'style_url' => config('palomnik.maps.style_url') ?: route('api.v1.map.style'),
+                'provider' => config('palomnik.maps.openmaptiles_tiles') ? 'openmaptiles' : 'raster-fallback',
+                'offline_enabled' => (bool) config('palomnik.maps.offline_enabled'),
+                'offline_tile_limit' => (int) config('palomnik.maps.offline_tile_limit', 100000),
+                'routing_enabled' => filled(config('palomnik.maps.valhalla_url')),
+                'attribution' => config('palomnik.maps.attribution', '© OpenStreetMap contributors'),
+            ],
+        ]);
+    }
+
     public function style(): JsonResponse
     {
         $vectorTiles = config('palomnik.maps.openmaptiles_tiles');

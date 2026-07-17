@@ -10,7 +10,6 @@ use App\Models\Vicariate;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -170,7 +169,7 @@ class DirectoryController extends Controller
 
         while ($modelClass::query()
             ->where('slug', $candidate)
-            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId))
+            ->when($ignoreId, fn ($query) => $query->where('id', '<>', $ignoreId))
             ->exists()) {
             $candidate = $base.'-'.$counter++;
         }

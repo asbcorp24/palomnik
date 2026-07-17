@@ -1,64 +1,76 @@
 # Мобильное приложение «Московский паломник»
 
-Flutter-приложение для Android и iOS. Оно использует тот же Laravel API и ту же базу данных, что и основной сайт. Административная панель в приложение не переносится.
+Flutter-приложение для Android и iOS. Оно использует тот же Laravel API и ту же базу данных, что и основной сайт. Административная панель остаётся только на сайте.
 
 ## Реализовано
 
 - регистрация и вход через Laravel Sanctum;
-- безопасное хранение токена в системном хранилище устройства;
-- восстановление сессии после перезапуска;
-- главная страница с объектами, маршрутами и событиями;
-- каталог храмов, монастырей, часовен и святых источников;
-- подробная карточка объекта: история, святыни, расписание, контакты, доступность и медиа;
-- добавление объекта в избранное;
-- отметка о посещении;
-- отправка отзыва на модерацию;
-- построение пути через Яндекс Карты;
-- интерактивная карта с фильтрами через мобильное представление сайта;
-- каталог и подробная страница паломнических маршрутов;
-- просмотр дат групповых поездок;
-- бронирование поездки с контролем свободных мест;
-- личный список бронирований;
-- QR-билет и код билета;
-- отмена бронирования;
-- добавление поездки в календарь;
-- календарь богослужений, праздников и мероприятий;
-- подробная карточка события и экспорт `.ics`;
-- сообщество и чтение путевых заметок;
-- раздел «Паломничество вместе»;
-- создание совместного паломничества;
-- вступление, выход и закрытое обсуждение группы;
-- уведомления и отметка о прочтении;
-- статистика и достижения;
-- персональные маршруты;
-- редактирование профиля, приватности, уведомлений, темы и размера текста;
-- светлая, тёмная и системная тема;
-- кэш публичных каталогов, карточек, маршрутов, календаря и сообщества для чтения без сети.
+- безопасное хранение токена и восстановление сессии;
+- главная страница, каталог храмов и подробные карточки;
+- нативная карта MapLibre;
+- единый стиль OpenMapTiles для сайта и приложения;
+- собственные маркеры храмов и святынь;
+- поиск объектов на карте;
+- определение местоположения;
+- построение маршрутов через Laravel-прокси к Valhalla;
+- пешие, автомобильные, велосипедные, автобусные и мультимодальные маршруты;
+- сохранение карточек объектов в SQLite;
+- загрузка офлайн-регионов MapLibre при подключённом лицензированном TileServer;
+- календарь событий;
+- каталог маршрутов и бронирование поездок;
+- QR-билеты;
+- сообщество и «Паломничество вместе»;
+- закрытый групповой чат;
+- отзывы и отметки посещений с геолокацией;
+- избранное;
+- достижения и статистика;
+- конструктор персональных маршрутов;
+- загрузка фотографий и видео;
+- Firebase push-уведомления после добавления конфигурационных файлов Firebase;
+- светлая, тёмная и системная темы.
 
-## Структура
+## Картографический стек
 
 ```text
-mobile/
-├── lib/
-│   ├── main.dart
-│   └── src/
-│       ├── app.dart
-│       ├── core/
-│       │   ├── api_client.dart
-│       │   └── session_controller.dart
-│       ├── screens/
-│       │   ├── auth_screen.dart
-│       │   ├── root_shell.dart
-│       │   └── user_features.dart
-│       └── theme/app_theme.dart
-├── test/
-├── assets/
-└── pubspec.yaml
+Flutter UI              MapLibre Flutter
+Векторные данные        OpenMapTiles
+Сервер тайлов           собственный TileServer GL или совместимый провайдер
+Маршрутизация           Valhalla
+Объекты платформы       Laravel API + MySQL
+Офлайн-регионы          MapLibre OfflineManager
+Офлайн-карточки         SQLite
 ```
+
+По умолчанию приложение получает стиль карты с Laravel:
+
+```text
+GET /api/v1/map/style.json
+```
+
+Информация о доступности офлайн-карт:
+
+```text
+GET /api/v1/map/config
+```
+
+Маршрутизация:
+
+```text
+POST /api/v1/map/route
+```
+
+## Требования
+
+- Flutter stable с Dart 3.10 или новее;
+- Android 7 / API 24 или новее;
+- iOS 13 или новее;
+- Laravel-сервер с HTTPS для рабочей версии;
+- для полноценной production-карты — собственный или лицензированный сервер векторных тайлов;
+- для офлайн-пакетов — `MAP_OFFLINE_ENABLED=true` только после подключения такого сервера.
 
 ## Создание Android и iOS проектов
 
-Исходный Flutter-код уже находится в `mobile`. Платформенные папки генерируются один раз установленным Flutter SDK:
+Платформенные папки создаются один раз установленным Flutter SDK:
 
 ```bash
 cd mobile
@@ -66,11 +78,53 @@ flutter create . --platforms=android,ios --org ru.mospalomnik
 flutter pub get
 ```
 
-Команда сохранит существующие файлы `lib` и добавит стандартные проекты `android` и `ios`. Перед выполнением рекомендуется сделать `git pull` и убедиться, что рабочая копия чистая.
+После `flutter create` проверьте, что существующие `lib`, `pubspec.yaml` и тесты не были заменены.
 
-## Запуск Laravel для эмулятора
+## Android
 
-В корне Laravel-проекта:
+В `android/app/src/main/AndroidManifest.xml` нужны разрешения:
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+```
+
+Для локальной разработки по HTTP временно добавьте в `<application>`:
+
+```xml
+android:usesCleartextTraffic="true"
+```
+
+В release-сборке используйте HTTPS и удалите разрешение cleartext-трафика.
+
+Для Firebase положите:
+
+```text
+android/app/google-services.json
+```
+
+## iOS
+
+В `ios/Runner/Info.plist` добавьте описание геолокации:
+
+```xml
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Геолокация используется для показа пользователя на карте, построения маршрута и подтверждения посещения.</string>
+```
+
+Для Firebase положите:
+
+```text
+ios/Runner/GoogleService-Info.plist
+```
+
+Для локального HTTP потребуется временное исключение App Transport Security. В рабочей версии используйте HTTPS.
+
+## Запуск Laravel
+
+В корне проекта:
 
 ```bash
 php artisan optimize:clear
@@ -79,14 +133,22 @@ php artisan storage:link
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-Android Emulator обращается к компьютеру через `10.0.2.2`, поэтому для него достаточно:
+## Android Emulator
 
 ```bash
 cd mobile
-flutter run
+flutter run \
+  --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1 \
+  --dart-define=SITE_BASE_URL=http://10.0.2.2:8000
 ```
 
-Для физического телефона укажите IP компьютера в локальной сети:
+Стиль будет загружен автоматически с:
+
+```text
+http://10.0.2.2:8000/api/v1/map/style.json
+```
+
+## Физический Android-телефон
 
 ```bash
 flutter run \
@@ -94,55 +156,20 @@ flutter run \
   --dart-define=SITE_BASE_URL=http://192.168.1.100:8000
 ```
 
-Телефон и компьютер должны находиться в одной сети. Windows Firewall должен разрешать входящие подключения к порту `8000`.
+Телефон и компьютер должны находиться в одной сети. Windows Firewall должен разрешать порт `8000`.
 
-## Запуск на iOS Simulator
+## Внешний style.json
 
-Для симулятора iOS сервер на Mac обычно доступен по `127.0.0.1`:
+Вместо Laravel-стиля можно передать URL напрямую:
 
 ```bash
 flutter run \
-  --dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1 \
-  --dart-define=SITE_BASE_URL=http://127.0.0.1:8000
+  --dart-define=API_BASE_URL=https://palomnik.example/api/v1 \
+  --dart-define=SITE_BASE_URL=https://palomnik.example \
+  --dart-define=MAP_STYLE_URL=https://maps.example/styles/palomnik/style.json
 ```
 
-## Android: локальный HTTP
-
-В `android/app/src/main/AndroidManifest.xml` должно быть разрешение:
-
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-```
-
-Для разработки по обычному HTTP временно добавьте в `<application>`:
-
-```xml
-android:usesCleartextTraffic="true"
-```
-
-В релизной версии необходимо использовать HTTPS и удалить разрешение cleartext-трафика.
-
-## iOS: локальный HTTP
-
-Для локальной разработки по HTTP потребуется временное исключение App Transport Security в `ios/Runner/Info.plist`. На рабочем сервере должен использоваться HTTPS.
-
-## Релизная сборка Android
-
-```bash
-flutter build appbundle --release \
-  --dart-define=API_BASE_URL=https://ваш-домен.ru/api/v1 \
-  --dart-define=SITE_BASE_URL=https://ваш-домен.ru
-```
-
-APK для внутреннего тестирования:
-
-```bash
-flutter build apk --release \
-  --dart-define=API_BASE_URL=https://ваш-домен.ru/api/v1 \
-  --dart-define=SITE_BASE_URL=https://ваш-домен.ru
-```
-
-## Проверка кода
+## Проверка проекта
 
 ```bash
 flutter pub get
@@ -150,12 +177,27 @@ flutter analyze
 flutter test
 ```
 
-Для `main` добавлен отдельный GitHub Actions workflow `.github/workflows/flutter.yml`.
+## Release Android
 
-## Важные ограничения текущей версии
+```bash
+flutter build appbundle --release \
+  --dart-define=API_BASE_URL=https://palomnik.example/api/v1 \
+  --dart-define=SITE_BASE_URL=https://palomnik.example
+```
 
-- карта встроена через `WebView` и показывает существующий веб-модуль Яндекс Карт;
-- реальные платежи пока не подключены, бронирование получает статус «не оплачено»;
-- push-уведомления ещё не подключены, внутри приложения доступны серверные уведомления;
-- публикация пользовательских статей и загрузка фото/видео пока выполняются через сайт;
-- платформенные папки Android/iOS создаются локальной командой `flutter create`, поскольку они зависят от установленной версии Flutter SDK.
+APK для внутреннего тестирования:
+
+```bash
+flutter build apk --release \
+  --dart-define=API_BASE_URL=https://palomnik.example/api/v1 \
+  --dart-define=SITE_BASE_URL=https://palomnik.example
+```
+
+## Важные ограничения
+
+- публичный `tile.openstreetmap.org` используется только как резервный слой разработки;
+- офлайн-загрузка отключена по умолчанию, чтобы приложение не скачивало публичные OSM-тайлы массово;
+- для production и офлайн-карт нужно подключить OpenMapTiles/TileServer и установить `MAP_OFFLINE_ENABLED=true`;
+- демонстрационный публичный Valhalla подходит для разработки, но рабочий сервис должен использовать собственный или гарантированный маршрутизатор;
+- старый неиспользуемый Yandex MapKit-класс пока сохранён в исходниках совместимости и не подключён к нижней навигации; после успешной сборки и проверки MapLibre его можно удалить вместе с зависимостью `yandex_mapkit`;
+- реальные платежи пока не подключены.

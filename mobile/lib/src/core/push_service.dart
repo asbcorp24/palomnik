@@ -29,7 +29,6 @@ class PushService {
 
     try {
       await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
       const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosSettings = DarwinInitializationSettings();

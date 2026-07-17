@@ -1,15 +1,15 @@
 @extends('site.layouts.app')
 
 @section('title', 'Паломничество вместе — Московский паломник')
-@section('meta_description', 'Найдите попутчиков, создайте совместное паломничество и договоритесь о поездке внутри платформы.')
+@section('meta_description', 'Найдите попутчиков, создайте совместное паломничество и договоритесь о поездке внутри сообщества.')
 
 @section('content')
 <section class="page-hero">
     <div class="container">
-        <nav aria-label="breadcrumb"><ol class="breadcrumb small mb-3"><li class="breadcrumb-item"><a href="{{ route('home') }}">Главная</a></li><li class="breadcrumb-item active">Паломничество вместе</li></ol></nav>
+        <nav aria-label="breadcrumb"><ol class="breadcrumb small mb-3"><li class="breadcrumb-item"><a href="{{ route('home') }}">Главная</a></li><li class="breadcrumb-item"><a href="{{ route('community.index') }}">Сообщество</a></li><li class="breadcrumb-item active">Паломничество вместе</li></ol></nav>
         <div class="row align-items-end g-4">
             <div class="col-lg-8">
-                <div class="section-kicker mb-2">Найдите единомышленников</div>
+                <div class="section-kicker mb-2">Раздел сообщества</div>
                 <h1 class="section-title mb-3">Паломничество вместе</h1>
                 <p class="section-lead mb-0">Создайте предложение о совместной поездке, соберите группу, согласуйте место встречи и обсудите детали в закрытом чате участников.</p>
             </div>

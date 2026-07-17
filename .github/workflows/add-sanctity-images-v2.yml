@@ -1,0 +1,86 @@
+name: Add sanctity images v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-sanctity-images-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply source changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/add-sanctity-images.yml').read_text(encoding='utf-8')
+          marker = "          python - <<'PY'\n"
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index("\n          PY", start)
+          script = textwrap.dedent(workflow[start:end])
+          script = script.replace(
+              "replace('mobile/lib/src/screens/user_features.dart', old_flutter, new_flutter)",
+              "pass",
+          )
+          exec(compile(script, 'sanctity-image-patch', 'exec'), {})
+
+          path = Path('mobile/lib/src/screens/user_features.dart')
+          text = path.read_text(encoding='utf-8')
+          block_start = text.index("                      if (sanctities.isNotEmpty) ...[")
+          block_end = text.index("                      if (_text(item['schedule'])", block_start)
+          new_block = "\n".join([
+              "                      if (sanctities.isNotEmpty) ...[",
+              "                        const FeatureHeading('Святыни'),",
+              "                        ...sanctities.map((value) {",
+              "                          final data = _map(value);",
+              "                          final imageUrl = data['image_url'];",
+              "                          return Card(",
+              "                            clipBehavior: Clip.antiAlias,",
+              "                            margin: const EdgeInsets.only(bottom: 12),",
+              "                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [",
+              "                              if (imageUrl != null)",
+              "                                Image.network('$imageUrl', height: 180, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink()),",
+              "                              Padding(",
+              "                                padding: const EdgeInsets.all(16),",
+              "                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [",
+              "                                  Text('${data['name'] ?? ''}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),",
+              "                                  if (_text(data['description']) != null) ...[const SizedBox(height: 6), Text('${data['description']}', style: const TextStyle(color: Colors.black54))],",
+              "                                  if (_text(data['note']) != null) ...[const SizedBox(height: 6), Text('${data['note']}', style: const TextStyle(color: Colors.black54))],",
+              "                                ]),",
+              "                              ),",
+              "                            ]),",
+              "                          );",
+              "                        }),",
+              "                      ],",
+              "",
+          ])
+          path.write_text(text[:block_start] + new_block + text[block_end:], encoding='utf-8')
+          PY
+
+      - name: Validate PHP syntax
+        run: |
+          php -l app/Models/Sanctity.php
+          php -l app/Http/Controllers/Admin/DirectoryController.php
+          php -l app/Http/Controllers/Api/V1/DirectoryController.php
+          php -l app/Http/Resources/PilgrimageObjectResource.php
+          php -l database/seeders/DemoSeeder.php
+          php -l database/migrations/2026_07_17_120000_add_image_path_to_sanctities_table.php
+          php -l tests/Feature/Api/SanctityImageTest.php
+
+      - name: Commit source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app database resources mobile tests
+          git commit -m "feat(sanctities): add photos across web API admin and mobile"
+          git push origin HEAD:main

@@ -94,6 +94,11 @@ class User extends Authenticatable
         return $this->hasMany(UserRoutePlan::class);
     }
 
+    public function consents(): HasMany
+    {
+        return $this->hasMany(UserConsent::class);
+    }
+
     public function achievements(): BelongsToMany
     {
         return $this->belongsToMany(Achievement::class, 'user_achievements')

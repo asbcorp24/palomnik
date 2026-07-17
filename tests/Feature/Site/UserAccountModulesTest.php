@@ -8,8 +8,10 @@ use App\Models\PilgrimageObject;
 use App\Models\PilgrimageRoute;
 use App\Models\Trip;
 use App\Models\User;
+use App\Models\UserRoutePlan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class UserAccountModulesTest extends TestCase
@@ -107,10 +109,10 @@ class UserAccountModulesTest extends TestCase
             'notes' => 'Тестовый персональный маршрут.',
         ]);
 
-        $planId = (int) \DB::table('user_route_plans')->value('id');
-        $response->assertRedirect('/my-routes/'.$planId);
+        $plan = UserRoutePlan::query()->firstOrFail();
+        $response->assertRedirect('/my-routes/'.$plan->id);
         $this->assertDatabaseHas('user_route_plans', [
-            'id' => $planId,
+            'id' => $plan->id,
             'user_id' => $user->id,
             'transport_mode' => 'walk',
         ]);
@@ -154,7 +156,7 @@ class UserAccountModulesTest extends TestCase
             'trip_id' => $trip->id,
             'user_id' => $user->id,
             'participants_count' => 2,
-            'total_amount' => 3000,
+            'total_amount' => '3000.00',
             'status' => 'pending',
             'payment_status' => 'unpaid',
         ]);
@@ -168,7 +170,7 @@ class UserAccountModulesTest extends TestCase
     {
         return User::query()->create([
             'name' => 'Пользователь',
-            'email' => uniqid('user', true).'@example.test',
+            'email' => Str::lower(Str::random(12)).'@example.test',
             'phone' => null,
             'password' => bcrypt('Password123'),
             'role' => User::ROLE_PILGRIM,

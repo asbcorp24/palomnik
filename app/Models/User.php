@@ -158,6 +158,11 @@ class User extends Authenticatable
         return $this->hasMany(UserBlock::class, 'blocked_id');
     }
 
+    public function pushDevices(): HasMany
+    {
+        return $this->hasMany(PushDevice::class);
+    }
+
     public function hasBlocked(User $user): bool
     {
         return $this->blockedUsers()->where('blocked_id', $user->id)->exists();

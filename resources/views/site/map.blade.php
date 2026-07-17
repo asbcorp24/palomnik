@@ -459,8 +459,8 @@
     }
 
     async function buildPublishedRoute(route) {
-        const requestId = ++routeRequestId;
         clearRoute(false);
+        const requestId = ++routeRequestId;
         showRouteStops(route);
 
         summary.className = 'map-route-summary alert alert-light border shadow-sm mb-0';
@@ -499,8 +499,8 @@
     }
 
     async function buildRoute(item) {
-        const requestId = ++routeRequestId;
         clearRoute(false);
+        const requestId = ++routeRequestId;
         summary.className = 'map-route-summary alert alert-light border shadow-sm mb-0';
         summary.innerHTML = '<div class="d-flex align-items-center gap-2"><span class="spinner-border spinner-border-sm"></span>Определяем местоположение и строим маршрут…</div>';
 

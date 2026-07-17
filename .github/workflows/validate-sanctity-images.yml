@@ -1,0 +1,80 @@
+name: Validate sanctity images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-sanctity-images.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup PHP 8.0
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, sqlite3, pdo_sqlite, fileinfo
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run sanctity API test
+        id: php_test
+        continue-on-error: true
+        run: php artisan test --filter=SanctityImageTest
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        id: flutter_pub
+        continue-on-error: true
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Analyze Flutter
+        id: flutter_analyze
+        continue-on-error: true
+        working-directory: mobile
+        run: flutter analyze
+
+      - name: Test Flutter
+        id: flutter_test
+        continue-on-error: true
+        working-directory: mobile
+        run: flutter test
+
+      - name: Record validation
+        run: |
+          cat > sanctity-validation.txt <<EOF
+          php_test=${{ steps.php_test.outcome }}
+          flutter_pub=${{ steps.flutter_pub.outcome }}
+          flutter_analyze=${{ steps.flutter_analyze.outcome }}
+          flutter_test=${{ steps.flutter_test.outcome }}
+          EOF
+          cat sanctity-validation.txt
+
+      - name: Commit validation result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sanctity-validation.txt
+          git commit -m "ci: record sanctity image validation"
+          git push origin HEAD:main

@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\V1\DirectoryController;
 use App\Http\Controllers\Api\V1\MobileActionController;
 use App\Http\Controllers\Api\V1\MobileBookingController;
 use App\Http\Controllers\Api\V1\MobileController;
+use App\Http\Controllers\Api\V1\MobileProfileController;
+use App\Http\Controllers\Api\V1\MobileTogetherController;
 use App\Http\Controllers\Api\V1\PilgrimageObjectController;
 use Illuminate\Support\Facades\Route;
 
@@ -46,11 +48,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/community', [MobileController::class, 'community'])->name('community.index');
         Route::get('/community/{post:slug}', [MobileController::class, 'post'])->name('community.show');
         Route::get('/together', [MobileController::class, 'together'])->name('together.index');
-        Route::get('/together/{jointPilgrimage:slug}', [MobileController::class, 'joint'])->name('together.show');
+        Route::get('/together/{jointPilgrimage:slug}', [MobileTogetherController::class, 'show'])->name('together.show');
 
         Route::middleware('auth:sanctum')->group(function () {
-            Route::get('/profile', [MobileController::class, 'profile'])->name('profile');
-            Route::post('/profile', [MobileController::class, 'updateProfile'])->name('profile.update');
+            Route::get('/profile', [MobileProfileController::class, 'show'])->name('profile');
+            Route::post('/profile', [MobileProfileController::class, 'update'])->name('profile.update');
             Route::get('/favorites', [MobileController::class, 'favorites'])->name('favorites.index');
             Route::post('/favorites/{pilgrimageObject}', [MobileController::class, 'toggleFavorite'])->name('favorites.toggle');
 

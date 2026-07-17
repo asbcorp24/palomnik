@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DirectoryController;
 use App\Http\Controllers\Api\V1\MobileActionController;
 use App\Http\Controllers\Api\V1\MobileBookingController;
+use App\Http\Controllers\Api\V1\MobileContentController;
 use App\Http\Controllers\Api\V1\MobileController;
 use App\Http\Controllers\Api\V1\MobileProfileController;
 use App\Http\Controllers\Api\V1\MobileTogetherController;
@@ -64,6 +65,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::put('/notifications/{notification}/read', [MobileController::class, 'readNotification'])->name('notifications.read');
             Route::post('/visits', [MobileController::class, 'storeVisit'])->name('visits.store');
             Route::post('/reviews', [MobileController::class, 'storeReview'])->name('reviews.store');
+
+            Route::get('/posts', [MobileContentController::class, 'posts'])->name('posts.index');
+            Route::post('/posts', [MobileContentController::class, 'storePost'])->name('posts.store');
+            Route::put('/posts/{post}', [MobileContentController::class, 'updatePost'])->name('posts.update');
+            Route::delete('/posts/{post}', [MobileContentController::class, 'destroyPost'])->name('posts.destroy');
 
             Route::get('/together/my', [MobileActionController::class, 'myJointPilgrimages'])->name('together.my');
             Route::post('/together', [MobileController::class, 'createJoint'])->name('together.store');

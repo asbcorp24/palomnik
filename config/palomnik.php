@@ -21,6 +21,10 @@ return [
         'valhalla_timeout' => (int) env('VALHALLA_TIMEOUT', 20),
     ],
 
+    'demo' => [
+        'enabled' => (bool) env('DEMO_DATA_ENABLED', false),
+    ],
+
     'privacy' => [
         'policy_version' => env('PRIVACY_POLICY_VERSION', '1.0'),
     ],

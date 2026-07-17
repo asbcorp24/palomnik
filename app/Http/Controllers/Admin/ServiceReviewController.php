@@ -23,10 +23,11 @@ class ServiceReviewController extends Controller
         ]);
 
         $status = $filters['status'] ?? 'pending';
+        $type = $filters['type'] ?? null;
 
         $updates = ObjectUpdateRequest::query()
             ->with(['pilgrimageObject', 'user'])
-            ->when($filters['type'] === 'media', fn ($query) => $query->whereRaw('1 = 0'))
+            ->when($type === 'media', fn ($query) => $query->whereRaw('1 = 0'))
             ->where('status', $status)
             ->latest()
             ->paginate(15, ['*'], 'updates_page')
@@ -34,7 +35,7 @@ class ServiceReviewController extends Controller
 
         $media = ObjectMediaSubmission::query()
             ->with(['pilgrimageObject', 'user'])
-            ->when($filters['type'] === 'updates', fn ($query) => $query->whereRaw('1 = 0'))
+            ->when($type === 'updates', fn ($query) => $query->whereRaw('1 = 0'))
             ->where('status', $status)
             ->latest()
             ->paginate(20, ['*'], 'media_page')

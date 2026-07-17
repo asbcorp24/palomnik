@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#26443b">
+  <title>Нет подключения — Московский паломник</title>
+  <style>
+    :root{--green:#26443b;--gold:#b58a32;--cream:#f7f0e6;--ink:#211d19}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 20% 15%,rgba(181,138,50,.18),transparent 30%),var(--cream);color:var(--ink);font-family:Arial,sans-serif;text-align:center}
+    main{max-width:650px;padding:44px;background:#fffdf9;border:1px solid rgba(111,77,55,.15);border-radius:26px;box-shadow:0 20px 60px rgba(60,45,30,.12)}
+    .mark{width:100px;height:100px;margin:0 auto 26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--green);color:#fff;font-size:44px}
+    h1{font-family:Georgia,serif;font-size:clamp(30px,5vw,48px);margin:0 0 18px}p{color:#6f675f;line-height:1.7;margin:0 0 26px}.button{display:inline-block;padding:13px 24px;border:0;border-radius:12px;background:var(--gold);color:#fff;font-weight:700;cursor:pointer}
+  </style>
+</head>
+<body>
+<main>
+  <div class="mark">✚</div>
+  <h1>Нет подключения к интернету</h1>
+  <p>Ранее сохранённые карточки объектов можно открыть из истории браузера. Для карты и получения новых данных необходимо подключение к сети.</p>
+  <button class="button" type="button" onclick="location.reload()">Повторить</button>
+</main>
+</body>
+</html>

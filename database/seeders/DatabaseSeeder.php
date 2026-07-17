@@ -8,10 +8,16 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([
+        $seeders = [
             CatalogSeeder::class,
             AchievementSeeder::class,
             AdminUserSeeder::class,
-        ]);
+        ];
+
+        if (config('palomnik.demo.enabled')) {
+            $seeders[] = DemoSeeder::class;
+        }
+
+        $this->call($seeders);
     }
 }

@@ -11,13 +11,15 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Site\HomeController as SiteHomeController;
 use App\Http\Controllers\Site\MapController as SiteMapController;
 use App\Http\Controllers\Site\ObjectController as SiteObjectController;
+use App\Http\Controllers\Site\RouteController as SiteRouteController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', SiteHomeController::class)->name('home');
 Route::get('/map', SiteMapController::class)->name('map');
 Route::get('/objects', [SiteObjectController::class, 'index'])->name('objects.index');
 Route::get('/objects/{object:slug}', [SiteObjectController::class, 'show'])->name('objects.show');
-Route::view('/routes', 'site.routes.index')->name('routes.index');
+Route::get('/routes', [SiteRouteController::class, 'index'])->name('routes.index');
+Route::get('/routes/{pilgrimageRoute:slug}', [SiteRouteController::class, 'show'])->name('routes.show');
 
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('login');
 Route::post('/admin/login', [AdminAuthController::class, 'login'])

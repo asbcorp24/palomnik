@@ -97,7 +97,10 @@
             <div class="col-lg-3"><div class="text-white fw-semibold mb-3">Работа без сети</div><p class="small mb-3">Карточку выбранного объекта можно сохранить в кэш браузера. Полные офлайн-карты будут реализованы в мобильном приложении.</p><button class="btn btn-sm btn-outline-light" id="installAppButton" type="button" hidden>Установить приложение</button></div>
         </div>
         <hr class="border-light border-opacity-10 my-4">
-        <div class="small opacity-75">© {{ date('Y') }} Московский паломник</div>
+        <div class="d-flex flex-wrap justify-content-between gap-3 small opacity-75">
+            <span>© {{ date('Y') }} Московский паломник</span>
+            <span class="d-flex flex-wrap gap-3"><a class="footer-link" href="{{ route('privacy') }}">Персональные данные</a><a class="footer-link" href="{{ route('terms') }}">Правила сервиса</a></span>
+        </div>
     </div>
 </footer>
 

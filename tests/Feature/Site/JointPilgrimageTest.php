@@ -88,6 +88,11 @@ class JointPilgrimageTest extends TestCase
             'body' => 'Во сколько встречаемся у метро?',
             'is_system' => false,
         ]);
+
+        $this->actingAs($participant)
+            ->get('/community/together/'.$item->slug.'/messages-feed')
+            ->assertOk()
+            ->assertSee('Во сколько встречаемся у метро?');
     }
 
     public function test_admin_can_publish_joint_pilgrimage(): void

@@ -93,6 +93,26 @@ class PilgrimageObject extends Model
             ->orderBy('id');
     }
 
+    public function representatives(): HasMany
+    {
+        return $this->hasMany(ObjectRepresentative::class);
+    }
+
+    public function approvedRepresentatives(): HasMany
+    {
+        return $this->representatives()->where('status', 'approved');
+    }
+
+    public function updateRequests(): HasMany
+    {
+        return $this->hasMany(ObjectUpdateRequest::class);
+    }
+
+    public function mediaSubmissions(): HasMany
+    {
+        return $this->hasMany(ObjectMediaSubmission::class);
+    }
+
     public function visits(): HasMany
     {
         return $this->hasMany(Visit::class);

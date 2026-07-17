@@ -52,7 +52,7 @@
                                 <div class="col-12">
                                     <div class="form-check">
                                         <input class="form-check-input @error('consent') is-invalid @enderror" id="consent" name="consent" type="checkbox" value="1" @checked(old('consent')) required>
-                                        <label class="form-check-label small" for="consent">Я согласен на обработку персональных данных и принимаю правила сервиса.</label>
+                                        <label class="form-check-label small" for="consent">Я согласен с <a href="{{ route('privacy') }}" target="_blank">политикой обработки персональных данных</a> и принимаю <a href="{{ route('terms') }}" target="_blank">правила сервиса</a>.</label>
                                         @error('consent')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
                                 </div>

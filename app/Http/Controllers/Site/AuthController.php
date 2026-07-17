@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
@@ -44,27 +45,39 @@ class AuthController extends Controller
             'consent.accepted' => 'Необходимо согласиться с обработкой персональных данных.',
         ]);
 
-        $user = User::query()->create([
-            'name' => $data['name'],
-            'email' => mb_strtolower($data['email']),
-            'phone' => ! empty($data['phone']) ? $data['phone'] : null,
-            'password' => Hash::make($data['password']),
-            'role' => User::ROLE_PILGRIM,
-            'is_active' => true,
-            'preferences' => [
-                'notifications' => true,
-                'privacy' => 'private',
-                'theme' => 'light',
-                'font_size' => 'normal',
-                'interests' => [],
-            ],
-        ]);
+        $user = DB::transaction(function () use ($request, $data) {
+            $user = User::query()->create([
+                'name' => $data['name'],
+                'email' => mb_strtolower($data['email']),
+                'phone' => ! empty($data['phone']) ? $data['phone'] : null,
+                'password' => Hash::make($data['password']),
+                'role' => User::ROLE_PILGRIM,
+                'is_active' => true,
+                'preferences' => [
+                    'notifications' => true,
+                    'privacy' => 'private',
+                    'theme' => 'light',
+                    'font_size' => 'normal',
+                    'interests' => [],
+                ],
+            ]);
 
-        FavoriteList::query()->create([
-            'user_id' => $user->id,
-            'name' => 'Избранное',
-            'is_default' => true,
-        ]);
+            FavoriteList::query()->create([
+                'user_id' => $user->id,
+                'name' => 'Избранное',
+                'is_default' => true,
+            ]);
+
+            $user->consents()->create([
+                'type' => 'personal_data_processing',
+                'policy_version' => config('palomnik.privacy.policy_version', '1.0'),
+                'accepted_at' => now(),
+                'ip_address' => $request->ip(),
+                'user_agent' => mb_substr((string) $request->userAgent(), 0, 2000),
+            ]);
+
+            return $user;
+        });
 
         Auth::login($user);
         $request->session()->regenerate();

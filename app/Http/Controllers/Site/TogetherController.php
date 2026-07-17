@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\JointPilgrimage;
 use App\Models\JointPilgrimageMember;
 use App\Models\PilgrimageRoute;
+use App\Models\User;
+use App\Notifications\PlatformNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -24,11 +27,24 @@ class TogetherController extends Controller
             'date' => ['nullable', 'date'],
         ]);
 
-        $items = JointPilgrimage::query()
+        $query = JointPilgrimage::query()
             ->published()
             ->upcoming()
             ->with(['organizer', 'pilgrimageRoute'])
-            ->withCount(['members as approved_members_count' => fn (Builder $query) => $query->where('status', 'approved')])
+            ->withCount(['members as approved_members_count' => fn (Builder $query) => $query->where('status', 'approved')]);
+
+        if ($request->user()) {
+            $hiddenOrganizerIds = $request->user()->blockedUsers()->pluck('blocked_id')
+                ->merge($request->user()->blockedByUsers()->pluck('blocker_id'))
+                ->unique()
+                ->values();
+
+            if ($hiddenOrganizerIds->isNotEmpty()) {
+                $query->whereNotIn('organizer_id', $hiddenOrganizerIds);
+            }
+        }
+
+        $items = $query
             ->when($filters['q'] ?? null, function (Builder $query, string $term) {
                 $term = trim($term);
                 $query->where(function (Builder $query) use ($term) {
@@ -87,6 +103,14 @@ class TogetherController extends Controller
             'status' => 'pending',
         ]);
 
+        $admins = User::query()->whereIn('role', [User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN])->where('is_active', true)->get();
+        Notification::send($admins, new PlatformNotification(
+            'Новое совместное паломничество',
+            $request->user()->name.' отправил предложение «'.$item->title.'» на модерацию.',
+            route('admin.together.index'),
+            'bi-people-fill'
+        ));
+
         return redirect()->route('together.show', $item)
             ->with('success', 'Предложение создано и отправлено на модерацию. После публикации другие паломники смогут присоединиться.');
     }
@@ -109,9 +133,21 @@ class TogetherController extends Controller
             'members as approved_members_count' => fn (Builder $query) => $query->where('status', 'approved'),
         ]);
 
+        $blockedIds = collect();
+        $isOrganizerBlocked = false;
+        if ($user && ! $canManage) {
+            $blockedIds = $user->blockedUsers()->pluck('blocked_id')
+                ->merge($user->blockedByUsers()->pluck('blocker_id'))
+                ->unique();
+            $isOrganizerBlocked = $blockedIds->contains($jointPilgrimage->organizer_id);
+            abort_if($isOrganizerBlocked, 404);
+        }
+
         $canDiscuss = $user && ($canManage || optional($membership)->status === 'approved');
         $messages = $canDiscuss
             ? $jointPilgrimage->messages()->with('user')->limit(200)->get()
+                ->reject(fn ($message) => $blockedIds->contains($message->user_id))
+                ->values()
             : collect();
 
         return view('site.together.show', [
@@ -120,6 +156,7 @@ class TogetherController extends Controller
             'canManage' => $canManage,
             'canDiscuss' => $canDiscuss,
             'messages' => $messages,
+            'isOrganizerBlocked' => $isOrganizerBlocked,
             'transportModes' => $this->transportModes(),
             'joinModes' => $this->joinModes(),
             'contactMethods' => $this->contactMethods(),
@@ -175,8 +212,9 @@ class TogetherController extends Controller
         ]);
 
         abort_if($jointPilgrimage->organizer_id === $request->user()->id, 422, 'Организатор уже участвует в паломничестве.');
+        abort_if($request->user()->hasBlocked($jointPilgrimage->organizer) || $request->user()->isBlockedBy($jointPilgrimage->organizer), 403, 'Вступление в эту группу недоступно.');
 
-        DB::transaction(function () use ($request, $jointPilgrimage, $data) {
+        $member = DB::transaction(function () use ($request, $jointPilgrimage, $data) {
             $item = JointPilgrimage::query()->lockForUpdate()->findOrFail($jointPilgrimage->id);
             abort_unless($item->status === 'published', 422, 'Набор участников пока недоступен.');
             abort_if($item->starts_at->isPast(), 422, 'Дата паломничества уже прошла.');
@@ -204,7 +242,16 @@ class TogetherController extends Controller
                     'is_system' => true,
                 ]);
             }
+
+            return $member;
         });
+
+        $jointPilgrimage->organizer->notify(new PlatformNotification(
+            $member->status === 'approved' ? 'Новый участник группы' : 'Новая заявка в группу',
+            $request->user()->name.($member->status === 'approved' ? ' присоединился к поездке.' : ' хочет присоединиться к поездке.'),
+            route('together.show', $jointPilgrimage),
+            'bi-person-plus'
+        ));
 
         $message = $jointPilgrimage->join_mode === 'auto'
             ? 'Вы присоединились. Теперь доступно обсуждение поездки.'
@@ -223,6 +270,13 @@ class TogetherController extends Controller
             'body' => $request->user()->name.' отказался от участия.',
             'is_system' => true,
         ]);
+
+        $jointPilgrimage->organizer->notify(new PlatformNotification(
+            'Участник вышел из группы',
+            $request->user()->name.' отказался от участия в «'.$jointPilgrimage->title.'».',
+            route('together.show', $jointPilgrimage),
+            'bi-person-dash'
+        ));
 
         return back()->with('success', 'Вы вышли из группы паломничества.');
     }
@@ -255,6 +309,13 @@ class TogetherController extends Controller
             'is_system' => true,
         ]);
 
+        $member->user->notify(new PlatformNotification(
+            $data['status'] === 'approved' ? 'Заявка одобрена' : 'Заявка отклонена',
+            'Организатор рассмотрел вашу заявку на «'.$jointPilgrimage->title.'».',
+            route('together.show', $jointPilgrimage),
+            $data['status'] === 'approved' ? 'bi-check-circle' : 'bi-x-circle'
+        ));
+
         return back()->with('success', 'Статус участника обновлён.');
     }
 
@@ -275,6 +336,30 @@ class TogetherController extends Controller
             'body' => $data['body'],
             'is_system' => false,
         ]);
+
+        $recipientIds = $jointPilgrimage->members()
+            ->where('status', 'approved')
+            ->where('user_id', '<>', $request->user()->id)
+            ->pluck('user_id')
+            ->push($jointPilgrimage->organizer_id)
+            ->unique()
+            ->filter(fn ($id) => (int) $id !== (int) $request->user()->id);
+
+        $blockedIds = $request->user()->blockedUsers()->pluck('blocked_id')
+            ->merge($request->user()->blockedByUsers()->pluck('blocker_id'))
+            ->unique();
+
+        $recipients = User::query()
+            ->whereIn('id', $recipientIds->diff($blockedIds))
+            ->where('is_active', true)
+            ->get();
+
+        Notification::send($recipients, new PlatformNotification(
+            'Новое сообщение в группе',
+            $request->user()->name.' написал в «'.$jointPilgrimage->title.'».',
+            route('together.show', $jointPilgrimage).'#discussion',
+            'bi-chat-dots'
+        ));
 
         return back()->with('success', 'Сообщение отправлено.');
     }

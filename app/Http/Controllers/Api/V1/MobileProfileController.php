@@ -80,17 +80,20 @@ class MobileProfileController extends Controller
             $user->avatar_path = $request->file('avatar')->store('avatars', 'public');
         }
 
+        $preferences = $user->preferences ?: [];
         $user->fill([
             'name' => $data['name'],
             'email' => mb_strtolower($data['email']),
-            'phone' => $data['phone'] ?: null,
-            'birth_date' => $data['birth_date'] ?: null,
+            'phone' => ($data['phone'] ?? null) ?: null,
+            'birth_date' => array_key_exists('birth_date', $data) ? ($data['birth_date'] ?: null) : $user->birth_date,
             'preferences' => [
-                'notifications' => $request->boolean('notifications'),
+                'notifications' => $request->has('notifications')
+                    ? $request->boolean('notifications')
+                    : (bool) ($preferences['notifications'] ?? true),
                 'privacy' => $data['privacy'],
                 'theme' => $data['theme'],
                 'font_size' => $data['font_size'],
-                'interests' => array_values($data['interests'] ?? []),
+                'interests' => array_values($data['interests'] ?? ($preferences['interests'] ?? [])),
             ],
         ]);
 

@@ -91,7 +91,7 @@ class ObjectMediaController extends Controller
             if ($makeCover) {
                 ObjectMedia::query()
                     ->where('pilgrimage_object_id', $media->pilgrimage_object_id)
-                    ->whereKeyNot($media->id)
+                    ->where('id', '<>', $media->id)
                     ->update(['is_cover' => false]);
             }
 

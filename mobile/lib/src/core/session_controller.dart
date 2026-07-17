@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'api_client.dart';
+import 'push_service.dart';
 
 class SessionController extends ChangeNotifier {
   static const _tokenKey = 'auth_token';
@@ -25,6 +26,7 @@ class SessionController extends ChangeNotifier {
       try {
         final response = await api.dio.get('/auth/me');
         _user = Map<String, dynamic>.from(response.data['user'] as Map);
+        await PushService.instance.initialize();
       } catch (_) {
         await _storage.delete(key: _tokenKey);
         _token = null;
@@ -73,7 +75,10 @@ class SessionController extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      if (isAuthenticated) await api.dio.post('/auth/logout');
+      if (isAuthenticated) {
+        await PushService.instance.unregister();
+        await api.dio.post('/auth/logout');
+      }
     } finally {
       await _storage.delete(key: _tokenKey);
       _token = null;
@@ -88,6 +93,7 @@ class SessionController extends ChangeNotifier {
     _user = Map<String, dynamic>.from(response['user'] as Map);
     await _storage.write(key: _tokenKey, value: _token);
     api.setToken(_token);
+    await PushService.instance.initialize();
     notifyListeners();
   }
 }

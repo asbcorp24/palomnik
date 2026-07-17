@@ -5,11 +5,16 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DirectoryController as AdminDirectoryController;
 use App\Http\Controllers\Admin\ObjectMediaController as AdminObjectMediaController;
 use App\Http\Controllers\Admin\PilgrimageObjectController as AdminPilgrimageObjectController;
+use App\Http\Controllers\Site\HomeController as SiteHomeController;
+use App\Http\Controllers\Site\MapController as SiteMapController;
+use App\Http\Controllers\Site\ObjectController as SiteObjectController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', SiteHomeController::class)->name('home');
+Route::get('/map', SiteMapController::class)->name('map');
+Route::get('/objects', [SiteObjectController::class, 'index'])->name('objects.index');
+Route::get('/objects/{object:slug}', [SiteObjectController::class, 'show'])->name('objects.show');
+Route::view('/routes', 'site.routes.index')->name('routes.index');
 
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('login');
 Route::post('/admin/login', [AdminAuthController::class, 'login'])

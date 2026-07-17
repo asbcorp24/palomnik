@@ -1,0 +1,11 @@
+OK | app/Http/Controllers/Admin/DirectoryController.php | 'use Illuminate\\Support\\Str;\n'
+OK | app/Http/Controllers/Admin/DirectoryController.php | '        $item->delete();\n\n        return redirect()'
+OK | app/Http/Controllers/Admin/DirectoryController.php | "        if ($resource === 'sanctities') {\n            $rules['type'] = ['nullable', 'string', 'max:64'];\n        }"
+OK | app/Http/Controllers/Admin/DirectoryController.php | '    private function makeUniqueSlug('
+OK | resources/views/admin/directories/form.blade.php | '                <div class="col-lg-6">\n                    <label class="form-label" for="type">Тип святыни</label>\n    '
+OK | resources/views/admin/directories/index.blade.php | "                    @if($resource === 'sanctities')\n                        <th>Тип святыни</th>\n                    @en"
+OK | resources/views/admin/directories/index.blade.php | "                        @if($resource === 'sanctities')\n                            <td>{{ $item->type ?: '—' }}</td>\n  "
+OK | resources/views/site/objects/show.blade.php | '                    <section class="mb-5"><div class="section-kicker mb-2">Главное</div><h2 class="h2 mb-4">Святыни</h2>'
+OK | database/seeders/DemoSeeder.php | "            'iveron-icon' => ['name' => 'Иверская икона Божией Матери', 'slug' => 'iveron-icon', 'type' => 'icon'],\n    "
+OK | database/seeders/DemoSeeder.php | "            'community-two' => ['demo/community-two.svg', 'Семейное паломничество', 'Полезные советы', '#6a4d3c', '#d5b6"
+MISSING | mobile/lib/src/screens/user_features.dart | "                      if (sanctities.isNotEmpty) ...[\n              const FeatureHeading('Святыни'),\n              Wrap("

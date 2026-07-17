@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ModerationController as AdminModerationController
 use App\Http\Controllers\Admin\ObjectMediaController as AdminObjectMediaController;
 use App\Http\Controllers\Admin\PilgrimageObjectController as AdminPilgrimageObjectController;
 use App\Http\Controllers\Admin\PlatformModuleController as AdminPlatformModuleController;
+use App\Http\Controllers\Admin\TogetherController as AdminTogetherController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Site\AuthController as SiteAuthController;
 use App\Http\Controllers\Site\BlogPostController as SiteBlogPostController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\Site\ProfileController as SiteProfileController;
 use App\Http\Controllers\Site\ReviewController as SiteReviewController;
 use App\Http\Controllers\Site\RouteController as SiteRouteController;
 use App\Http\Controllers\Site\RoutePlanController as SiteRoutePlanController;
+use App\Http\Controllers\Site\TogetherController as SiteTogetherController;
 use App\Http\Controllers\Site\UserMediaController as SiteUserMediaController;
 use App\Http\Controllers\Site\VisitController as SiteVisitController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +35,7 @@ Route::get('/objects', [SiteObjectController::class, 'index'])->name('objects.in
 Route::get('/objects/{object:slug}', [SiteObjectController::class, 'show'])->name('objects.show');
 Route::get('/routes', [SiteRouteController::class, 'index'])->name('routes.index');
 Route::get('/routes/{pilgrimageRoute:slug}', [SiteRouteController::class, 'show'])->name('routes.show');
+Route::get('/together', [SiteTogetherController::class, 'index'])->name('together.index');
 Route::get('/community', [SiteCommunityController::class, 'index'])->name('community.index');
 Route::get('/community/{post:slug}', [SiteCommunityController::class, 'show'])->name('community.show');
 
@@ -85,7 +88,20 @@ Route::middleware('auth')->group(function () {
             'update' => 'route-plans.update',
             'destroy' => 'route-plans.destroy',
         ]);
+
+    Route::get('/together/my', [SiteTogetherController::class, 'my'])->name('together.my');
+    Route::get('/together/create', [SiteTogetherController::class, 'create'])->name('together.create');
+    Route::post('/together', [SiteTogetherController::class, 'store'])->name('together.store');
+    Route::get('/together/{jointPilgrimage}/edit', [SiteTogetherController::class, 'edit'])->name('together.edit');
+    Route::put('/together/{jointPilgrimage}', [SiteTogetherController::class, 'update'])->name('together.update');
+    Route::delete('/together/{jointPilgrimage}', [SiteTogetherController::class, 'destroy'])->name('together.destroy');
+    Route::post('/together/{jointPilgrimage}/join', [SiteTogetherController::class, 'join'])->name('together.join');
+    Route::delete('/together/{jointPilgrimage}/leave', [SiteTogetherController::class, 'leave'])->name('together.leave');
+    Route::put('/together/{jointPilgrimage}/members/{member}', [SiteTogetherController::class, 'updateMember'])->name('together.members.update');
+    Route::post('/together/{jointPilgrimage}/messages', [SiteTogetherController::class, 'storeMessage'])->name('together.messages.store');
 });
+
+Route::get('/together/{jointPilgrimage:slug}', [SiteTogetherController::class, 'show'])->name('together.show');
 
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
 Route::post('/admin/login', [AdminAuthController::class, 'login'])
@@ -110,6 +126,10 @@ Route::prefix('admin')
             ->name('media.update');
         Route::delete('/media/{media}', [AdminObjectMediaController::class, 'destroy'])
             ->name('media.destroy');
+
+        Route::get('/together', [AdminTogetherController::class, 'index'])->name('together.index');
+        Route::put('/together/{jointPilgrimage}', [AdminTogetherController::class, 'update'])->name('together.update');
+        Route::delete('/together/{jointPilgrimage}', [AdminTogetherController::class, 'destroy'])->name('together.destroy');
 
         Route::get('/modules/{resource}', [AdminPlatformModuleController::class, 'index'])
             ->name('modules.index');

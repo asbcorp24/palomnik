@@ -24,7 +24,7 @@ class CalendarController extends Controller
         ]);
 
         $month = ! empty($filters['month'])
-            ? CarbonImmutable::createFromFormat('Y-m', $filters['month'])->startOfMonth()
+            ? CarbonImmutable::createFromFormat('Y-m-d', $filters['month'].'-01')->startOfMonth()
             : CarbonImmutable::now()->startOfMonth();
 
         $monthStart = $month->startOfMonth();
@@ -62,7 +62,6 @@ class CalendarController extends Controller
         $days = [];
 
         for ($day = $calendarStart; $day->lte($calendarEnd); $day = $day->addDay()) {
-            $dateKey = $day->format('Y-m-d');
             $days[] = [
                 'date' => $day,
                 'in_month' => $day->month === $month->month,
@@ -73,7 +72,7 @@ class CalendarController extends Controller
 
                     return $day->betweenIncluded($start, $end);
                 })->values(),
-                'key' => $dateKey,
+                'key' => $day->format('Y-m-d'),
             ];
         }
 

@@ -1,0 +1,61 @@
+name: Sanctity image patch precheck 2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sanctity-precheck-2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Check remaining source patterns
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          checks = [
+              ('app/Http/Controllers/Admin/DirectoryController.php', "use Illuminate\\Support\\Str;\n"),
+              ('app/Http/Controllers/Admin/DirectoryController.php', "        $item->delete();\n\n        return redirect()"),
+              ('app/Http/Controllers/Admin/DirectoryController.php', "        if ($resource === 'sanctities') {\n            $rules['type'] = ['nullable', 'string', 'max:64'];\n        }"),
+              ('app/Http/Controllers/Admin/DirectoryController.php', "    private function makeUniqueSlug("),
+              ('resources/views/admin/directories/form.blade.php', "                <div class=\"col-lg-6\">\n                    <label class=\"form-label\" for=\"type\">Тип святыни</label>\n                    <input class=\"form-control\" id=\"type\" name=\"type\" value=\"{{ old('type', $item->type) }}\" maxlength=\"64\" placeholder=\"икона, мощи, источник...\">\n                </div>"),
+              ('resources/views/admin/directories/index.blade.php', "                    @if($resource === 'sanctities')\n                        <th>Тип святыни</th>\n                    @endif"),
+              ('resources/views/admin/directories/index.blade.php', "                        @if($resource === 'sanctities')\n                            <td>{{ $item->type ?: '—' }}</td>\n                        @endif"),
+              ('resources/views/site/objects/show.blade.php', "                    <section class=\"mb-5\"><div class=\"section-kicker mb-2\">Главное</div><h2 class=\"h2 mb-4\">Святыни</h2><div class=\"row g-3\">@foreach($object->sanctities as $sanctity)<div class=\"col-md-6\"><div class=\"info-card h-100 d-flex gap-3\"><span class=\"info-icon flex-shrink-0\"><i class=\"bi bi-star\"></i></span><div><h3 class=\"h6 mb-2\">{{ $sanctity->name }}</h3>@if($sanctity->pivot->note)<div class=\"small text-secondary\">{{ $sanctity->pivot->note }}</div>@endif</div></div></div>@endforeach</div></section>"),
+              ('database/seeders/DemoSeeder.php', "            'iveron-icon' => ['name' => 'Иверская икона Божией Матери', 'slug' => 'iveron-icon', 'type' => 'icon'],\n            'kazan-icon' => ['name' => 'Казанская икона Божией Матери', 'slug' => 'kazan-icon', 'type' => 'icon'],\n            'relics-sergius' => ['name' => 'Святыни, связанные с преподобным Сергием Радонежским', 'slug' => 'relics-sergius', 'type' => 'relics'],\n            'relics-alexy' => ['name' => 'Святыни, связанные со святителем Алексием', 'slug' => 'relics-alexy', 'type' => 'relics'],\n            'life-giving-cross' => ['name' => 'Крест и распятие', 'slug' => 'life-giving-cross', 'type' => 'relic'],\n            'holy-spring' => ['name' => 'Святой источник', 'slug' => 'holy-spring', 'type' => 'spring'],"),
+              ('database/seeders/DemoSeeder.php', "            'community-two' => ['demo/community-two.svg', 'Семейное паломничество', 'Полезные советы', '#6a4d3c', '#d5b66e'],"),
+              ('mobile/lib/src/screens/user_features.dart', """                      if (sanctities.isNotEmpty) ...[
+                        const FeatureHeading('Святыни'),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: sanctities.map((value) {
+                            final data = _map(value);
+                            return Chip(label: Text('${data['name'] ?? ''}'));
+                          }).toList(),
+                        ),
+                      ],"""),
+          ]
+
+          lines = []
+          for path, pattern in checks:
+              text = Path(path).read_text(encoding='utf-8')
+              lines.append(f"{'OK' if pattern in text else 'MISSING'} | {path} | {pattern[:120]!r}")
+
+          Path('sanctity-precheck-2.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+      - name: Commit result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sanctity-precheck-2.txt
+          git commit -m "ci: record extended sanctity patch precheck"
+          git push origin HEAD:main

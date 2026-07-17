@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
@@ -29,13 +30,27 @@ class BookingController extends Controller
                 ->lockForUpdate()
                 ->findOrFail($trip->id);
 
-            abort_unless($lockedTrip->status === 'open', 422, 'Запись на эту поездку закрыта.');
-            abort_if($lockedTrip->starts_at->isPast(), 422, 'Дата поездки уже прошла.');
+            if ($lockedTrip->status !== 'open') {
+                throw ValidationException::withMessages(['trip' => 'Запись на эту поездку закрыта.']);
+            }
+            if ($lockedTrip->starts_at->isPast()) {
+                throw ValidationException::withMessages(['trip' => 'Дата поездки уже прошла.']);
+            }
+
+            $hasActiveBooking = Booking::query()
+                ->where('trip_id', $lockedTrip->id)
+                ->where('user_id', $request->user()->id)
+                ->whereNotIn('status', ['cancelled', 'refunded'])
+                ->exists();
+
+            if ($hasActiveBooking) {
+                throw ValidationException::withMessages(['trip' => 'У вас уже есть активное бронирование на эту поездку.']);
+            }
 
             $participants = (int) $data['participants_count'];
             if ($lockedTrip->capacity !== null
                 && $lockedTrip->booked_count + $participants > $lockedTrip->capacity) {
-                abort(422, 'Недостаточно свободных мест.');
+                throw ValidationException::withMessages(['participants_count' => 'Недостаточно свободных мест.']);
             }
 
             $unitPrice = $lockedTrip->price !== null
@@ -69,11 +84,16 @@ class BookingController extends Controller
     public function cancel(Request $request, Booking $booking): RedirectResponse
     {
         abort_unless($booking->user_id === $request->user()->id, 403);
-        abort_if(in_array($booking->status, ['cancelled', 'completed', 'refunded'], true), 422, 'Бронирование уже закрыто.');
+
+        if (in_array($booking->status, ['cancelled', 'completed', 'refunded'], true)) {
+            return back()->with('error', 'Бронирование уже закрыто.');
+        }
 
         DB::transaction(function () use ($booking) {
             $trip = Trip::query()->lockForUpdate()->findOrFail($booking->trip_id);
-            abort_if($trip->starts_at->isPast(), 422, 'Нельзя отменить прошедшую поездку.');
+            if ($trip->starts_at->isPast()) {
+                throw ValidationException::withMessages(['booking' => 'Нельзя отменить прошедшую поездку.']);
+            }
 
             $booking->update(['status' => 'cancelled']);
             $trip->booked_count = max(0, $trip->booked_count - $booking->participants_count);

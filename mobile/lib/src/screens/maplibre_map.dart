@@ -7,6 +7,7 @@ import '../data/cached_api.dart';
 import '../data/offline_store.dart';
 import '../theme/app_theme.dart';
 import 'advanced_features.dart';
+import 'offline_map_screen.dart';
 import 'user_features.dart';
 
 class MapLibreMapTab extends StatefulWidget {
@@ -22,7 +23,7 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
   final _search = TextEditingController();
   MapController? _controller;
   List<Map<String, dynamic>> _objects = const [];
-  LineString? _routeLine;
+  Feature<LineString>? _routeFeature;
   bool _loading = true;
   String? _error;
   String? _routeSummary;
@@ -256,7 +257,7 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
       final distance = ((data['distance_meters'] as num?)?.toDouble() ?? 0) / 1000;
       final minutes = (((data['duration_seconds'] as num?)?.toDouble() ?? 0) / 60).round();
       setState(() {
-        _routeLine = LineString(coordinates: coordinates);
+        _routeFeature = Feature<LineString>(geometry: LineString.from(coordinates));
         _routeSummary = '${object['name']} · ${distance.toStringAsFixed(1)} км · примерно $minutes мин.';
       });
 
@@ -322,6 +323,14 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
             icon: const Icon(Icons.directions),
           ),
           IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const OfflineMapScreen()),
+            ),
+            tooltip: 'Офлайн-карты',
+            icon: const Icon(Icons.download_for_offline_outlined),
+          ),
+          IconButton(
             onPressed: _showMyLocation,
             tooltip: 'Моё местоположение',
             icon: const Icon(Icons.my_location),
@@ -343,16 +352,16 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
             ),
             onMapCreated: (controller) => _controller = controller,
             layers: [
-              if (_routeLine != null)
+              if (_routeFeature != null)
                 PolylineLayer(
-                  polylines: [_routeLine!],
+                  polylines: [_routeFeature!],
                   color: AppTheme.gold,
                   width: 5,
                   blur: 1,
                 ),
             ],
             children: [
-              WidgetLayer(markers: markers),
+              WidgetLayer(markers: markers, allowInteraction: true),
               const SourceAttribution(),
               const MapCompass(),
               const MapControlButtons(),
@@ -397,7 +406,7 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
                       Expanded(child: Text(_routeSummary!)),
                       IconButton(
                         onPressed: () => setState(() {
-                          _routeLine = null;
+                          _routeFeature = null;
                           _routeSummary = null;
                         }),
                         icon: const Icon(Icons.close),

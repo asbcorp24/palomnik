@@ -99,16 +99,16 @@ class DirectoryController extends Controller
         $config = $this->config($resource);
         $item = $config['model']::query()->findOrFail($id);
 
-        if ($resource === 'object-types' && $item->pilgrimageObjects()->exists()) {
-            return back()->with('error', 'Тип используется в объектах и не может быть удалён.');
+        if ($resource === 'object-types' && $item->pilgrimageObjects()->withTrashed()->exists()) {
+            return back()->with('error', 'Тип используется в объектах, включая архивные, и не может быть удалён.');
         }
 
-        if ($resource === 'vicariates' && ($item->deaneries()->exists() || $item->pilgrimageObjects()->exists())) {
+        if ($resource === 'vicariates' && ($item->deaneries()->exists() || $item->pilgrimageObjects()->withTrashed()->exists())) {
             return back()->with('error', 'Викариатство связано с благочиниями или объектами. Сначала измените связанные записи.');
         }
 
-        if ($resource === 'deaneries' && $item->pilgrimageObjects()->exists()) {
-            return back()->with('error', 'Благочиние используется в объектах и не может быть удалено.');
+        if ($resource === 'deaneries' && $item->pilgrimageObjects()->withTrashed()->exists()) {
+            return back()->with('error', 'Благочиние используется в объектах, включая архивные, и не может быть удалено.');
         }
 
         $item->delete();

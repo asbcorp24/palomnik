@@ -21,81 +21,59 @@
     <div class="container">
         <div class="row g-5">
             <div class="col-lg-8">
-                @if($pilgrimageRoute->cover_url)
-                    <img class="detail-cover mb-5" src="{{ $pilgrimageRoute->cover_url }}" alt="{{ $pilgrimageRoute->title }}">
-                @else
-                    <div class="object-placeholder detail-placeholder mb-5"><i class="bi bi-signpost-split"></i></div>
-                @endif
+                @if($pilgrimageRoute->cover_url)<img class="detail-cover mb-5" src="{{ $pilgrimageRoute->cover_url }}" alt="{{ $pilgrimageRoute->title }}">@else<div class="object-placeholder detail-placeholder mb-5"><i class="bi bi-signpost-split"></i></div>@endif
 
-                @if($pilgrimageRoute->description)
-                    <section class="mb-5">
-                        <div class="section-kicker mb-2">О маршруте</div>
-                        <h2 class="h2 mb-4">Описание</h2>
-                        <div class="text-secondary lh-lg">{!! nl2br(e($pilgrimageRoute->description)) !!}</div>
-                    </section>
-                @endif
-
-                @if($pilgrimageRoute->program)
-                    <section class="mb-5">
-                        <div class="section-kicker mb-2">Поэтапно</div>
-                        <h2 class="h2 mb-4">Программа</h2>
-                        <div class="filter-card lh-lg">{!! nl2br(e($pilgrimageRoute->program)) !!}</div>
-                    </section>
-                @endif
+                @if($pilgrimageRoute->description)<section class="mb-5"><div class="section-kicker mb-2">О маршруте</div><h2 class="h2 mb-4">Описание</h2><div class="text-secondary lh-lg">{!! nl2br(e($pilgrimageRoute->description)) !!}</div></section>@endif
+                @if($pilgrimageRoute->program)<section class="mb-5"><div class="section-kicker mb-2">Поэтапно</div><h2 class="h2 mb-4">Программа</h2><div class="filter-card lh-lg">{!! nl2br(e($pilgrimageRoute->program)) !!}</div></section>@endif
 
                 <section>
-                    <div class="section-kicker mb-2">Точки пути</div>
-                    <h2 class="h2 mb-4">Объекты маршрута</h2>
+                    <div class="section-kicker mb-2">Точки пути</div><h2 class="h2 mb-4">Объекты маршрута</h2>
                     <div class="d-grid gap-3">
                         @forelse($pilgrimageRoute->objects as $index => $object)
-                            <article class="info-card">
-                                <div class="d-flex gap-3 align-items-start">
-                                    <div class="step-number flex-shrink-0">{{ $index + 1 }}</div>
-                                    <div class="flex-grow-1">
-                                        <div class="small text-secondary mb-1">{{ optional($object->objectType)->name }}</div>
-                                        <h3 class="h5 mb-2"><a class="text-decoration-none" href="{{ route('objects.show', $object) }}">{{ $object->name }}</a></h3>
-                                        <div class="small text-secondary mb-2"><i class="bi bi-geo-alt me-1"></i>{{ $object->address }}</div>
-                                        @if($object->pivot->stay_minutes)<div class="small"><i class="bi bi-clock me-1"></i>Остановка: {{ $object->pivot->stay_minutes }} мин.</div>@endif
-                                        @if($object->pivot->note)<div class="small text-secondary mt-2">{{ $object->pivot->note }}</div>@endif
-                                    </div>
-                                </div>
-                            </article>
-                        @empty
-                            <div class="filter-card text-secondary">Точки маршрута ещё не добавлены.</div>
-                        @endforelse
+                            <article class="info-card"><div class="d-flex gap-3 align-items-start"><div class="step-number flex-shrink-0">{{ $index + 1 }}</div>@if($object->coverMedia && $object->coverMedia->url)<img src="{{ $object->coverMedia->url }}" alt="{{ $object->name }}" style="width:92px;height:74px;object-fit:cover;border-radius:12px">@endif<div class="flex-grow-1"><div class="small text-secondary mb-1">{{ optional($object->objectType)->name }}</div><h3 class="h5 mb-2"><a class="text-decoration-none" href="{{ route('objects.show', $object) }}">{{ $object->name }}</a></h3><div class="small text-secondary mb-2"><i class="bi bi-geo-alt me-1"></i>{{ $object->address }}</div>@if($object->pivot->stay_minutes)<div class="small"><i class="bi bi-clock me-1"></i>Остановка: {{ $object->pivot->stay_minutes }} мин.</div>@endif @if($object->pivot->note)<div class="small text-secondary mt-2">{{ $object->pivot->note }}</div>@endif</div></div></article>
+                        @empty<div class="filter-card text-secondary">Точки маршрута ещё не добавлены.</div>@endforelse
                     </div>
                 </section>
             </div>
 
             <aside class="col-lg-4">
                 <div class="position-sticky d-grid gap-3" style="top:105px">
-                    <div class="info-card">
-                        <h2 class="h5 mb-4">Параметры</h2>
-                        <div class="d-grid gap-3 small">
-                            <div class="d-flex justify-content-between"><span class="text-secondary">Продолжительность</span><strong>{{ $pilgrimageRoute->duration_days }} дн.</strong></div>
-                            @if($pilgrimageRoute->duration_minutes)<div class="d-flex justify-content-between"><span class="text-secondary">Расчётное время</span><strong>{{ $pilgrimageRoute->duration_minutes }} мин.</strong></div>@endif
-                            <div class="d-flex justify-content-between"><span class="text-secondary">Сложность</span><strong>{{ $difficulties[$pilgrimageRoute->difficulty] ?? $pilgrimageRoute->difficulty }}</strong></div>
-                            <div class="d-flex justify-content-between"><span class="text-secondary">Количество точек</span><strong>{{ $pilgrimageRoute->objects->count() }}</strong></div>
-                            <div class="d-flex justify-content-between"><span class="text-secondary">Базовая стоимость</span><strong>{{ $pilgrimageRoute->base_price !== null ? number_format((float)$pilgrimageRoute->base_price, 0, ',', ' ').' ₽' : 'Бесплатно / уточняется' }}</strong></div>
-                        </div>
-                    </div>
+                    <div class="info-card"><h2 class="h5 mb-4">Параметры</h2><div class="d-grid gap-3 small"><div class="d-flex justify-content-between"><span class="text-secondary">Продолжительность</span><strong>{{ $pilgrimageRoute->duration_days }} дн.</strong></div>@if($pilgrimageRoute->duration_minutes)<div class="d-flex justify-content-between"><span class="text-secondary">Расчётное время</span><strong>{{ $pilgrimageRoute->duration_minutes }} мин.</strong></div>@endif<div class="d-flex justify-content-between"><span class="text-secondary">Сложность</span><strong>{{ $difficulties[$pilgrimageRoute->difficulty] ?? $pilgrimageRoute->difficulty }}</strong></div><div class="d-flex justify-content-between"><span class="text-secondary">Количество точек</span><strong>{{ $pilgrimageRoute->objects->count() }}</strong></div><div class="d-flex justify-content-between"><span class="text-secondary">Базовая стоимость</span><strong>{{ $pilgrimageRoute->base_price !== null ? number_format((float)$pilgrimageRoute->base_price, 0, ',', ' ').' ₽' : 'Бесплатно / уточняется' }}</strong></div></div></div>
 
                     <div class="info-card">
                         <h2 class="h5 mb-3">Ближайшие поездки</h2>
                         @forelse($pilgrimageRoute->trips as $trip)
+                            @php($remaining = $trip->capacity === null ? null : max(0, $trip->capacity - $trip->booked_count))
                             <div class="py-3 border-bottom">
                                 <div class="fw-semibold mb-1">{{ $trip->starts_at->format('d.m.Y H:i') }}</div>
                                 <div class="small text-secondary mb-2">{{ $trip->meeting_point ?: 'Место сбора уточняется' }}</div>
-                                <div class="d-flex justify-content-between small"><span>{{ $trip->status === 'open' ? 'Открыта запись' : 'Запланирована' }}</span><strong>{{ $trip->price !== null ? number_format((float)$trip->price, 0, ',', ' ').' ₽' : 'Цена уточняется' }}</strong></div>
+                                <div class="d-flex justify-content-between small mb-2"><span>{{ $trip->status === 'open' ? 'Открыта запись' : 'Запланирована' }}</span><strong>{{ $trip->price !== null ? number_format((float)$trip->price, 0, ',', ' ').' ₽' : 'Цена уточняется' }}</strong></div>
+                                @if($remaining !== null)<div class="small text-secondary mb-3">Свободно мест: {{ $remaining }}</div>@endif
+
+                                @if($trip->status === 'open' && ($remaining === null || $remaining > 0))
+                                    @auth
+                                        <button class="btn btn-pm-gold w-100" type="button" data-bs-toggle="collapse" data-bs-target="#bookingForm{{ $trip->id }}"><i class="bi bi-ticket-perforated me-2"></i>Записаться</button>
+                                        <div class="collapse mt-3" id="bookingForm{{ $trip->id }}">
+                                            <form class="p-3 bg-light rounded-4" method="POST" action="{{ route('bookings.store', $trip) }}">
+                                                @csrf
+                                                <div class="mb-2"><label class="form-label small">Количество участников</label><input class="form-control form-control-sm" name="participants_count" type="number" value="1" min="1" max="{{ $remaining !== null ? min(10, $remaining) : 10 }}" required></div>
+                                                <div class="mb-2"><label class="form-label small">Имя</label><input class="form-control form-control-sm" name="contact_name" value="{{ auth()->user()->name }}" required></div>
+                                                <div class="mb-2"><label class="form-label small">Email</label><input class="form-control form-control-sm" name="email" type="email" value="{{ auth()->user()->email }}" required></div>
+                                                <div class="mb-2"><label class="form-label small">Телефон</label><input class="form-control form-control-sm" name="phone" value="{{ auth()->user()->phone }}" required></div>
+                                                <div class="form-check mb-3"><input class="form-check-input" id="consent{{ $trip->id }}" name="consent" type="checkbox" value="1" required><label class="form-check-label small" for="consent{{ $trip->id }}">Согласен на обработку данных</label></div>
+                                                <button class="btn btn-pm-green w-100" type="submit">Создать бронирование</button>
+                                                <div class="form-text">Оплата будет подключена отдельным этапом. Сейчас создаётся неоплаченная заявка.</div>
+                                            </form>
+                                        </div>
+                                    @else
+                                        <a class="btn btn-pm-gold w-100" href="{{ route('login') }}">Войти и записаться</a>
+                                    @endauth
+                                @endif
                             </div>
-                        @empty
-                            <p class="small text-secondary mb-0">Даты организованных поездок пока не опубликованы. Маршрут можно пройти самостоятельно.</p>
-                        @endforelse
+                        @empty<p class="small text-secondary mb-0">Даты организованных поездок пока не опубликованы. Маршрут можно пройти самостоятельно.</p>@endforelse
                     </div>
 
-                    @if($pilgrimageRoute->trips->where('status', 'open')->isNotEmpty())
-                        <button class="btn btn-pm-gold py-3" type="button" disabled><i class="bi bi-ticket-perforated me-2"></i>Онлайн-запись подключается</button>
-                    @endif
+                    @auth<a class="btn btn-outline-pm py-3" href="{{ route('route-plans.create') }}"><i class="bi bi-plus-circle me-2"></i>Создать свой маршрут</a>@endauth
                     <a class="btn btn-outline-pm py-3" href="{{ route('map') }}"><i class="bi bi-map me-2"></i>Открыть карту</a>
                 </div>
             </aside>

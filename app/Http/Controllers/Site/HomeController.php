@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Controller;
+use App\Models\CalendarEvent;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use App\Models\PilgrimageRoute;
@@ -32,12 +33,20 @@ class HomeController extends Controller
             ->orderBy('name')
             ->get();
 
+        $upcomingEvents = CalendarEvent::query()
+            ->published()
+            ->upcoming()
+            ->with('pilgrimageObject')
+            ->orderBy('starts_at')
+            ->limit(6)
+            ->get();
+
         $stats = [
             'objects' => PilgrimageObject::query()->published()->count(),
             'sanctities' => Sanctity::query()->count(),
             'routes' => PilgrimageRoute::query()->published()->count(),
         ];
 
-        return view('site.home', compact('featuredObjects', 'types', 'stats'));
+        return view('site.home', compact('featuredObjects', 'types', 'upcomingEvents', 'stats'));
     }
 }

@@ -47,7 +47,7 @@ class AuthController extends Controller
         $user = User::query()->create([
             'name' => $data['name'],
             'email' => mb_strtolower($data['email']),
-            'phone' => $data['phone'] ?: null,
+            'phone' => ! empty($data['phone']) ? $data['phone'] : null,
             'password' => Hash::make($data['password']),
             'role' => User::ROLE_PILGRIM,
             'is_active' => true,

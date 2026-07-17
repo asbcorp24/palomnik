@@ -3,8 +3,11 @@
 use App\Http\Controllers\Admin\AuthController as AdminAuthController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DirectoryController as AdminDirectoryController;
+use App\Http\Controllers\Admin\ModerationController as AdminModerationController;
 use App\Http\Controllers\Admin\ObjectMediaController as AdminObjectMediaController;
 use App\Http\Controllers\Admin\PilgrimageObjectController as AdminPilgrimageObjectController;
+use App\Http\Controllers\Admin\PlatformModuleController as AdminPlatformModuleController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Site\HomeController as SiteHomeController;
 use App\Http\Controllers\Site\MapController as SiteMapController;
 use App\Http\Controllers\Site\ObjectController as SiteObjectController;
@@ -39,6 +42,35 @@ Route::prefix('admin')
             ->name('media.update');
         Route::delete('/media/{media}', [AdminObjectMediaController::class, 'destroy'])
             ->name('media.destroy');
+
+        Route::get('/modules/{resource}', [AdminPlatformModuleController::class, 'index'])
+            ->name('modules.index');
+        Route::get('/modules/{resource}/create', [AdminPlatformModuleController::class, 'create'])
+            ->name('modules.create');
+        Route::post('/modules/{resource}', [AdminPlatformModuleController::class, 'store'])
+            ->name('modules.store');
+        Route::get('/modules/{resource}/{id}/edit', [AdminPlatformModuleController::class, 'edit'])
+            ->whereNumber('id')
+            ->name('modules.edit');
+        Route::put('/modules/{resource}/{id}', [AdminPlatformModuleController::class, 'update'])
+            ->whereNumber('id')
+            ->name('modules.update');
+        Route::delete('/modules/{resource}/{id}', [AdminPlatformModuleController::class, 'destroy'])
+            ->whereNumber('id')
+            ->name('modules.destroy');
+
+        Route::get('/moderation/{resource}', [AdminModerationController::class, 'index'])
+            ->name('moderation.index');
+        Route::put('/moderation/{resource}/{id}', [AdminModerationController::class, 'update'])
+            ->whereNumber('id')
+            ->name('moderation.update');
+        Route::delete('/moderation/{resource}/{id}', [AdminModerationController::class, 'destroy'])
+            ->whereNumber('id')
+            ->name('moderation.destroy');
+
+        Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
+        Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
 
         Route::get('/directories/{resource}', [AdminDirectoryController::class, 'index'])
             ->name('directories.index');

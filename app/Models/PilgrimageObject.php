@@ -71,6 +71,13 @@ class PilgrimageObject extends Model
             ->withTimestamps();
     }
 
+    public function routes(): BelongsToMany
+    {
+        return $this->belongsToMany(PilgrimageRoute::class, 'pilgrimage_route_object')
+            ->withPivot(['sort_order', 'stay_minutes', 'note'])
+            ->withTimestamps();
+    }
+
     public function media(): HasMany
     {
         return $this->hasMany(ObjectMedia::class)
@@ -84,6 +91,27 @@ class PilgrimageObject extends Model
             ->where('is_cover', true)
             ->orderBy('sort_order')
             ->orderBy('id');
+    }
+
+    public function visits(): HasMany
+    {
+        return $this->hasMany(Visit::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function userMedia(): HasMany
+    {
+        return $this->hasMany(UserMedia::class);
+    }
+
+    public function favoriteLists(): BelongsToMany
+    {
+        return $this->belongsToMany(FavoriteList::class, 'favorite_list_object')
+            ->withTimestamps();
     }
 
     public function scopePublished(Builder $query): Builder

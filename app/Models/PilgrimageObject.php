@@ -113,6 +113,11 @@ class PilgrimageObject extends Model
         return $this->hasMany(ObjectMediaSubmission::class);
     }
 
+    public function calendarEvents(): HasMany
+    {
+        return $this->hasMany(CalendarEvent::class);
+    }
+
     public function visits(): HasMany
     {
         return $this->hasMany(Visit::class);

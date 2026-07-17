@@ -7,6 +7,7 @@ use App\Models\PilgrimageObject;
 use App\Models\UserRoutePlan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -38,7 +39,7 @@ class RoutePlanController extends Controller
         $plan = $request->user()->routePlans()->create([
             'name' => $data['name'],
             'transport_mode' => $data['transport_mode'],
-            'estimated_minutes' => count($data['object_ids']) * 45,
+            'estimated_minutes' => $this->estimateMinutes($data['object_ids'], $data['transport_mode']),
             'notes' => $data['notes'] ?? null,
         ]);
 
@@ -80,7 +81,7 @@ class RoutePlanController extends Controller
         $plan->update([
             'name' => $data['name'],
             'transport_mode' => $data['transport_mode'],
-            'estimated_minutes' => count($data['object_ids']) * 45,
+            'estimated_minutes' => $this->estimateMinutes($data['object_ids'], $data['transport_mode']),
             'notes' => $data['notes'] ?? null,
         ]);
         $this->syncObjects($plan, $data['object_ids']);
@@ -118,6 +119,64 @@ class RoutePlanController extends Controller
             ];
         }
         $plan->objects()->sync($sync);
+    }
+
+    private function estimateMinutes(array $objectIds, string $transportMode): int
+    {
+        $objects = PilgrimageObject::query()
+            ->whereIn('id', $objectIds)
+            ->get(['id', 'latitude', 'longitude'])
+            ->keyBy('id');
+
+        $ordered = collect($objectIds)
+            ->map(fn ($id) => $objects->get((int) $id))
+            ->filter()
+            ->values();
+
+        $distanceKm = $this->routeDistanceKm($ordered);
+        $speedKmH = match ($transportMode) {
+            'walk' => 4.5,
+            'public' => 18.0,
+            'car' => 30.0,
+            default => 20.0,
+        };
+
+        $travelMinutes = (int) ceil(($distanceKm / $speedKmH) * 60);
+        $stopsMinutes = $ordered->count() * 30;
+        $transferMinutes = $transportMode === 'public'
+            ? max(0, $ordered->count() - 1) * 8
+            : 0;
+
+        return max(1, $travelMinutes + $stopsMinutes + $transferMinutes);
+    }
+
+    private function routeDistanceKm(Collection $objects): float
+    {
+        $distance = 0.0;
+
+        for ($index = 1; $index < $objects->count(); $index++) {
+            $from = $objects[$index - 1];
+            $to = $objects[$index];
+            $distance += $this->distanceKm(
+                (float) $from->latitude,
+                (float) $from->longitude,
+                (float) $to->latitude,
+                (float) $to->longitude
+            );
+        }
+
+        return $distance;
+    }
+
+    private function distanceKm(float $lat1, float $lon1, float $lat2, float $lon2): float
+    {
+        $earthRadiusKm = 6371;
+        $latDelta = deg2rad($lat2 - $lat1);
+        $lonDelta = deg2rad($lon2 - $lon1);
+        $a = sin($latDelta / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($lonDelta / 2) ** 2;
+
+        return $earthRadiusKm * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     private function authorizeOwner(Request $request, UserRoutePlan $plan): void

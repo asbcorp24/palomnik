@@ -74,7 +74,7 @@
                     </div>
 
                     @auth<a class="btn btn-outline-pm py-3" href="{{ route('route-plans.create') }}"><i class="bi bi-plus-circle me-2"></i>Создать свой маршрут</a>@endauth
-                    <a class="btn btn-outline-pm py-3" href="{{ route('map') }}"><i class="bi bi-map me-2"></i>Открыть карту</a>
+                    <a class="btn btn-outline-pm py-3" href="{{ route('map', ['route' => $pilgrimageRoute->slug]) }}"><i class="bi bi-map me-2"></i>Показать маршрут на карте</a>
                 </div>
             </aside>
         </div>

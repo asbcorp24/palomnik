@@ -99,6 +99,21 @@ class User extends Authenticatable
         return $this->hasMany(UserConsent::class);
     }
 
+    public function organizedJointPilgrimages(): HasMany
+    {
+        return $this->hasMany(JointPilgrimage::class, 'organizer_id');
+    }
+
+    public function jointPilgrimageMemberships(): HasMany
+    {
+        return $this->hasMany(JointPilgrimageMember::class);
+    }
+
+    public function jointPilgrimageMessages(): HasMany
+    {
+        return $this->hasMany(JointPilgrimageMessage::class);
+    }
+
     public function achievements(): BelongsToMany
     {
         return $this->belongsToMany(Achievement::class, 'user_achievements')

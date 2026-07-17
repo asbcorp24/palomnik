@@ -39,7 +39,7 @@ class TogetherController extends Controller
                 });
             })
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
-            ->orderByRaw("FIELD(status, 'pending', 'published', 'rejected', 'cancelled', 'completed')")
+            ->orderByRaw("CASE status WHEN 'pending' THEN 1 WHEN 'published' THEN 2 WHEN 'rejected' THEN 3 WHEN 'cancelled' THEN 4 WHEN 'completed' THEN 5 ELSE 6 END")
             ->orderBy('starts_at')
             ->paginate(20)
             ->withQueryString();

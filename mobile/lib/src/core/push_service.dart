@@ -33,7 +33,9 @@ class PushService {
 
       const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosSettings = DarwinInitializationSettings();
-      await _local.initialize(const InitializationSettings(android: androidSettings, iOS: iosSettings));
+      await _local.initialize(
+        settings: const InitializationSettings(android: androidSettings, iOS: iosSettings),
+      );
 
       const channel = AndroidNotificationChannel(
         'pilgrim_notifications',
@@ -82,10 +84,10 @@ class PushService {
     if (notification == null) return;
 
     await _local.show(
-      message.hashCode,
-      notification.title,
-      notification.body,
-      const NotificationDetails(
+      id: message.hashCode,
+      title: notification.title,
+      body: notification.body,
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           'pilgrim_notifications',
           'Московский паломник',

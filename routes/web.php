@@ -8,20 +8,76 @@ use App\Http\Controllers\Admin\ObjectMediaController as AdminObjectMediaControll
 use App\Http\Controllers\Admin\PilgrimageObjectController as AdminPilgrimageObjectController;
 use App\Http\Controllers\Admin\PlatformModuleController as AdminPlatformModuleController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Site\AuthController as SiteAuthController;
+use App\Http\Controllers\Site\BlogPostController as SiteBlogPostController;
+use App\Http\Controllers\Site\BookingController as SiteBookingController;
+use App\Http\Controllers\Site\CommunityController as SiteCommunityController;
+use App\Http\Controllers\Site\FavoriteController as SiteFavoriteController;
 use App\Http\Controllers\Site\HomeController as SiteHomeController;
 use App\Http\Controllers\Site\MapController as SiteMapController;
 use App\Http\Controllers\Site\ObjectController as SiteObjectController;
+use App\Http\Controllers\Site\ProfileController as SiteProfileController;
+use App\Http\Controllers\Site\ReviewController as SiteReviewController;
 use App\Http\Controllers\Site\RouteController as SiteRouteController;
+use App\Http\Controllers\Site\RoutePlanController as SiteRoutePlanController;
+use App\Http\Controllers\Site\UserMediaController as SiteUserMediaController;
+use App\Http\Controllers\Site\VisitController as SiteVisitController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', SiteHomeController::class)->name('home');
+Route::view('/offline', 'site.offline')->name('offline');
 Route::get('/map', SiteMapController::class)->name('map');
 Route::get('/objects', [SiteObjectController::class, 'index'])->name('objects.index');
 Route::get('/objects/{object:slug}', [SiteObjectController::class, 'show'])->name('objects.show');
 Route::get('/routes', [SiteRouteController::class, 'index'])->name('routes.index');
 Route::get('/routes/{pilgrimageRoute:slug}', [SiteRouteController::class, 'show'])->name('routes.show');
+Route::get('/community', [SiteCommunityController::class, 'index'])->name('community.index');
+Route::get('/community/{post:slug}', [SiteCommunityController::class, 'show'])->name('community.show');
 
-Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('login');
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [SiteAuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [SiteAuthController::class, 'login'])->middleware('throttle:10,1')->name('login.submit');
+    Route::get('/register', [SiteAuthController::class, 'showRegisterForm'])->name('register');
+    Route::post('/register', [SiteAuthController::class, 'register'])->middleware('throttle:5,1')->name('register.submit');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [SiteAuthController::class, 'logout'])->name('logout');
+
+    Route::get('/profile', [SiteProfileController::class, 'dashboard'])->name('profile.dashboard');
+    Route::get('/profile/settings', [SiteProfileController::class, 'settings'])->name('profile.settings');
+    Route::put('/profile/settings', [SiteProfileController::class, 'update'])->name('profile.update');
+    Route::get('/profile/favorites', [SiteProfileController::class, 'favorites'])->name('profile.favorites');
+    Route::get('/profile/bookings', [SiteProfileController::class, 'bookings'])->name('profile.bookings');
+    Route::get('/profile/achievements', [SiteProfileController::class, 'achievements'])->name('profile.achievements');
+    Route::get('/profile/activity', [SiteProfileController::class, 'activity'])->name('profile.activity');
+
+    Route::post('/favorites/lists', [SiteFavoriteController::class, 'storeList'])->name('favorites.lists.store');
+    Route::delete('/favorites/lists/{favoriteList}', [SiteFavoriteController::class, 'destroyList'])->name('favorites.lists.destroy');
+    Route::post('/favorites/objects/{object}', [SiteFavoriteController::class, 'addObject'])->name('favorites.objects.add');
+    Route::delete('/favorites/lists/{favoriteList}/objects/{object}', [SiteFavoriteController::class, 'removeObject'])->name('favorites.objects.remove');
+
+    Route::post('/objects/{object}/reviews', [SiteReviewController::class, 'store'])->name('reviews.store');
+    Route::delete('/reviews/{review}', [SiteReviewController::class, 'destroy'])->name('reviews.destroy');
+    Route::post('/objects/{object}/visits', [SiteVisitController::class, 'store'])->name('visits.store');
+
+    Route::post('/trips/{trip}/bookings', [SiteBookingController::class, 'store'])->name('bookings.store');
+    Route::delete('/bookings/{booking}', [SiteBookingController::class, 'cancel'])->name('bookings.cancel');
+
+    Route::get('/community/posts/create', [SiteBlogPostController::class, 'create'])->name('community.posts.create');
+    Route::post('/community/posts', [SiteBlogPostController::class, 'store'])->name('community.posts.store');
+    Route::get('/community/posts/{post}/edit', [SiteBlogPostController::class, 'edit'])->name('community.posts.edit');
+    Route::put('/community/posts/{post}', [SiteBlogPostController::class, 'update'])->name('community.posts.update');
+    Route::delete('/community/posts/{post}', [SiteBlogPostController::class, 'destroy'])->name('community.posts.destroy');
+    Route::post('/community/media', [SiteUserMediaController::class, 'store'])->name('community.media.store');
+    Route::delete('/community/media/{media}', [SiteUserMediaController::class, 'destroy'])->name('community.media.destroy');
+
+    Route::resource('/my-routes', SiteRoutePlanController::class)
+        ->parameters(['my-routes' => 'plan'])
+        ->names('route-plans');
+});
+
+Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
 Route::post('/admin/login', [AdminAuthController::class, 'login'])
     ->middleware('throttle:10,1')
     ->name('admin.login.submit');

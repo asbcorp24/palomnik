@@ -12,18 +12,21 @@ class JointPilgrimageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_public_catalog_is_available(): void
+    public function test_public_catalog_is_available_inside_community(): void
     {
-        $this->get('/together')
+        $this->get('/community/together')
             ->assertOk()
             ->assertSee('Паломничество вместе');
+
+        $this->get('/together')
+            ->assertRedirect('/community/together');
     }
 
     public function test_user_can_create_joint_pilgrimage_for_moderation(): void
     {
         $organizer = $this->user('organizer@example.test');
 
-        $response = $this->actingAs($organizer)->post('/together', [
+        $response = $this->actingAs($organizer)->post('/community/together', [
             'title' => 'Вместе в Троице-Сергиеву лавру',
             'description' => 'Собираем небольшую группу для спокойной совместной паломнической поездки.',
             'starts_at' => now()->addDays(5)->format('Y-m-d H:i:s'),
@@ -37,7 +40,7 @@ class JointPilgrimageTest extends TestCase
         ]);
 
         $item = JointPilgrimage::query()->firstOrFail();
-        $response->assertRedirect('/together/'.$item->slug);
+        $response->assertRedirect('/community/together/'.$item->slug);
         $this->assertSame('pending', $item->status);
         $this->assertSame($organizer->id, $item->organizer_id);
     }
@@ -60,14 +63,14 @@ class JointPilgrimageTest extends TestCase
         ]);
 
         $this->actingAs($participant)
-            ->post('/together/'.$item->slug.'/join', ['message' => 'Хочу присоединиться.'])
+            ->post('/community/together/'.$item->slug.'/join', ['message' => 'Хочу присоединиться.'])
             ->assertRedirect();
 
         $member = JointPilgrimageMember::query()->firstOrFail();
         $this->assertSame('pending', $member->status);
 
         $this->actingAs($organizer)
-            ->put('/together/'.$item->slug.'/members/'.$member->id, ['status' => 'approved'])
+            ->put('/community/together/'.$item->slug.'/members/'.$member->id, ['status' => 'approved'])
             ->assertRedirect();
 
         $this->assertDatabaseHas('joint_pilgrimage_members', [
@@ -76,7 +79,7 @@ class JointPilgrimageTest extends TestCase
         ]);
 
         $this->actingAs($participant)
-            ->post('/together/'.$item->slug.'/messages', ['body' => 'Во сколько встречаемся у метро?'])
+            ->post('/community/together/'.$item->slug.'/messages', ['body' => 'Во сколько встречаемся у метро?'])
             ->assertRedirect();
 
         $this->assertDatabaseHas('joint_pilgrimage_messages', [

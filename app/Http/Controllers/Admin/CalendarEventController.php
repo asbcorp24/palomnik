@@ -68,6 +68,11 @@ class CalendarEventController extends Controller
             ->with('success', 'Событие создано.');
     }
 
+    public function show(CalendarEvent $calendarEvent): RedirectResponse
+    {
+        return redirect()->route('admin.calendar.edit', $calendarEvent);
+    }
+
     public function edit(CalendarEvent $calendarEvent): View
     {
         return $this->form($calendarEvent);

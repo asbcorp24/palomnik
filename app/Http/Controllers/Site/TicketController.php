@@ -63,7 +63,7 @@ class TicketController extends Controller
     private function authorizeAccess(Request $request, Booking $booking): void
     {
         $user = $request->user();
-        abort_unless($user && ($booking->user_id === $user->id || $user->isAdmin() || $user->canManageObjects()), 403);
+        abort_unless($user && ($booking->user_id === $user->id || $user->isAdmin()), 403);
     }
 
     private function escapeIcs(string $value): string

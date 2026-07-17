@@ -8,7 +8,15 @@ return [
     ],
 
     'maps' => [
-        'yandex_key' => env('YANDEX_MAPS_API_KEY'),
+        'style_url' => env('MAP_STYLE_URL'),
+        'openmaptiles_tiles' => env('OPENMAPTILES_TILE_URL'),
+        'glyphs_url' => env('MAP_GLYPHS_URL'),
+        'raster_tiles' => env('MAP_RASTER_TILE_URL', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+        'satellite_tiles' => env('MAP_SATELLITE_TILE_URL'),
+        'historic_tiles' => env('MAP_HISTORIC_TILE_URL'),
+        'attribution' => env('MAP_ATTRIBUTION', '© OpenStreetMap contributors'),
+        'valhalla_url' => env('VALHALLA_URL', 'https://valhalla.openstreetmap.de'),
+        'valhalla_timeout' => (int) env('VALHALLA_TIMEOUT', 20),
     ],
 
     'privacy' => [

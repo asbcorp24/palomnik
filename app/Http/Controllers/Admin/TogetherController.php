@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\JointPilgrimage;
+use App\Notifications\PlatformNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,6 +65,13 @@ class TogetherController extends Controller
             'moderated_by' => $request->user()->id,
             'moderated_at' => now(),
         ]);
+
+        $jointPilgrimage->organizer->notify(new PlatformNotification(
+            'Совместное паломничество: '.$this->statuses()[$data['status']],
+            'Предложение «'.$jointPilgrimage->title.'» рассмотрено. '.($data['moderation_note'] ?? ''),
+            route('together.show', $jointPilgrimage),
+            $data['status'] === 'published' ? 'bi-check-circle' : 'bi-info-circle'
+        ));
 
         return back()->with('success', 'Статус предложения обновлён.');
     }

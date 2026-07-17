@@ -32,11 +32,12 @@
         h1, h2, h3, .brand-title { font-family: Prata, Georgia, serif; }
         .admin-shell { min-height: 100vh; }
         .admin-sidebar {
-            width: 278px;
+            width: 294px;
             min-height: 100vh;
             position: fixed;
             inset: 0 auto 0 0;
             z-index: 1030;
+            overflow-y: auto;
             color: white;
             background:
                 radial-gradient(circle at 20% 10%, rgba(176, 138, 62, .22), transparent 27%),
@@ -51,17 +52,17 @@
         }
         .brand-title { font-size: 1.02rem; line-height: 1.25; }
         .brand-subtitle { font-size: .72rem; color: rgba(255,255,255,.62); letter-spacing: .08em; text-transform: uppercase; }
-        .sidebar-nav { padding: 18px 12px; }
+        .sidebar-nav { padding: 14px 12px 28px; }
         .sidebar-label { color: rgba(255,255,255,.45); font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; padding: 13px 14px 7px; }
         .sidebar-link {
             display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,.78);
-            text-decoration: none; padding: 10px 13px; border-radius: 11px; margin: 2px 0;
-            transition: .18s ease;
+            text-decoration: none; padding: 9px 13px; border-radius: 11px; margin: 2px 0;
+            transition: .18s ease; font-size: .91rem;
         }
         .sidebar-link:hover, .sidebar-link.active { color: #fff; background: rgba(255,255,255,.1); transform: translateX(2px); }
         .sidebar-link.active { box-shadow: inset 3px 0 var(--pilgrim-gold); }
         .sidebar-link i { color: #e0c578; font-size: 1.08rem; width: 22px; text-align: center; }
-        .admin-main { margin-left: 278px; min-height: 100vh; }
+        .admin-main { margin-left: 294px; min-height: 100vh; }
         .admin-topbar {
             min-height: 74px; display: flex; align-items: center; justify-content: space-between;
             padding: 12px 30px; background: rgba(255,253,249,.9); border-bottom: 1px solid var(--pilgrim-border);
@@ -74,6 +75,7 @@
             background: var(--pilgrim-paper); border: 1px solid var(--pilgrim-border);
             border-radius: 18px; box-shadow: 0 12px 35px rgba(47, 37, 28, .055);
         }
+        .info-card { padding: 18px; background: var(--pilgrim-paper); border: 1px solid var(--pilgrim-border); border-radius: 16px; }
         .stat-card { padding: 20px; height: 100%; position: relative; overflow: hidden; }
         .stat-card::after { content: ''; position: absolute; width: 88px; height: 88px; border-radius: 50%; right: -25px; top: -25px; background: rgba(176,138,62,.09); }
         .stat-icon { width: 45px; height: 45px; border-radius: 13px; display: flex; align-items: center; justify-content: center; color: var(--pilgrim-green); background: rgba(38,68,59,.09); font-size: 1.2rem; }
@@ -120,8 +122,49 @@
             <a class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
                 <i class="bi bi-grid-1x2"></i><span>Обзор</span>
             </a>
+            <a class="sidebar-link" href="{{ route('home') }}" target="_blank" rel="noopener">
+                <i class="bi bi-box-arrow-up-right"></i><span>Открыть сайт</span>
+            </a>
+
+            <div class="sidebar-label">Карта и объекты</div>
             <a class="sidebar-link {{ request()->routeIs('admin.objects.*') || request()->routeIs('admin.media.*') ? 'active' : '' }}" href="{{ route('admin.objects.index') }}">
                 <i class="bi bi-geo-alt"></i><span>Храмы и объекты</span>
+            </a>
+            <a class="sidebar-link" href="{{ route('map') }}" target="_blank" rel="noopener">
+                <i class="bi bi-map"></i><span>Интерактивная карта</span>
+            </a>
+
+            <div class="sidebar-label">Маршруты и поездки</div>
+            <a class="sidebar-link {{ request()->is('admin/modules/routes*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'routes') }}">
+                <i class="bi bi-signpost-split"></i><span>Маршруты</span>
+            </a>
+            <a class="sidebar-link {{ request()->is('admin/modules/trips*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'trips') }}">
+                <i class="bi bi-calendar3"></i><span>Расписание поездок</span>
+            </a>
+            <a class="sidebar-link {{ request()->is('admin/moderation/bookings*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'bookings') }}">
+                <i class="bi bi-ticket-perforated"></i><span>Бронирования и билеты</span>
+            </a>
+
+            <div class="sidebar-label">Геймификация</div>
+            <a class="sidebar-link {{ request()->is('admin/modules/achievements*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'achievements') }}">
+                <i class="bi bi-trophy"></i><span>Достижения и квесты</span>
+            </a>
+            <a class="sidebar-link {{ request()->is('admin/moderation/visits*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'visits') }}">
+                <i class="bi bi-geo-fill"></i><span>Посещения</span>
+            </a>
+
+            <div class="sidebar-label">Сообщество</div>
+            <a class="sidebar-link {{ request()->is('admin/moderation/reviews*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'reviews') }}">
+                <i class="bi bi-chat-square-text"></i><span>Отзывы</span>
+            </a>
+            <a class="sidebar-link {{ request()->is('admin/moderation/media*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'media') }}">
+                <i class="bi bi-camera"></i><span>Фото и видео</span>
+            </a>
+            <a class="sidebar-link {{ request()->is('admin/moderation/posts*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'posts') }}">
+                <i class="bi bi-journal-richtext"></i><span>Блог и заметки</span>
+            </a>
+            <a class="sidebar-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}">
+                <i class="bi bi-people"></i><span>Пользователи</span>
             </a>
 
             <div class="sidebar-label">Справочники</div>

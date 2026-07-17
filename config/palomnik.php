@@ -15,6 +15,8 @@ return [
         'satellite_tiles' => env('MAP_SATELLITE_TILE_URL'),
         'historic_tiles' => env('MAP_HISTORIC_TILE_URL'),
         'attribution' => env('MAP_ATTRIBUTION', '© OpenStreetMap contributors'),
+        'offline_enabled' => (bool) env('MAP_OFFLINE_ENABLED', false),
+        'offline_tile_limit' => (int) env('MAP_OFFLINE_TILE_LIMIT', 100000),
         'valhalla_url' => env('VALHALLA_URL', 'https://valhalla.openstreetmap.de'),
         'valhalla_timeout' => (int) env('VALHALLA_TIMEOUT', 20),
     ],

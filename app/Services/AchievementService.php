@@ -41,17 +41,6 @@ class AchievementService
                     'progress' => json_encode(['current' => $current, 'target' => $target]),
                 ]);
                 $awarded[] = $achievement->title;
-            } elseif (! $existing) {
-                $user->achievements()->syncWithoutDetaching([
-                    $achievement->id => [
-                        'awarded_at' => null,
-                        'progress' => json_encode(['current' => $current, 'target' => $target]),
-                    ],
-                ]);
-            } elseif ($user->achievements()->whereKey($achievement->id)->first()?->pivot->awarded_at === null) {
-                $user->achievements()->updateExistingPivot($achievement->id, [
-                    'progress' => json_encode(['current' => $current, 'target' => $target]),
-                ]);
             }
         }
 

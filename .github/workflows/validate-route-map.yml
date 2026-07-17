@@ -1,0 +1,61 @@
+name: Validate published route map
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-route-map.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Fix request sequence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('resources/views/site/map.blade.php')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              "    async function buildPublishedRoute(route) {\n        const requestId = ++routeRequestId;\n        clearRoute(false);",
+              "    async function buildPublishedRoute(route) {\n        clearRoute(false);\n        const requestId = ++routeRequestId;",
+          )
+          text = text.replace(
+              "    async function buildRoute(item) {\n        const requestId = ++routeRequestId;\n        clearRoute(false);",
+              "    async function buildRoute(item) {\n        clearRoute(false);\n        const requestId = ++routeRequestId;",
+          )
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, sqlite3, pdo_sqlite, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Compile Blade and check PHP
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php -l app/Http/Controllers/Site/MapController.php
+          php artisan view:clear
+          php artisan view:cache
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add resources/views/site/map.blade.php
+          git commit -m "fix(map): keep route requests active"
+          git push origin HEAD:main

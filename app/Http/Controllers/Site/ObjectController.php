@@ -26,6 +26,7 @@ class ObjectController extends Controller
         $objects = PilgrimageObject::query()
             ->published()
             ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'sanctities'])
+            ->withAvg(['reviews as published_rating' => fn ($query) => $query->where('status', 'published')], 'rating')
             ->search($filters['q'] ?? null)
             ->when($filters['type'] ?? null, function (Builder $query, string $slug) {
                 $query->whereHas('objectType', fn (Builder $query) => $query->where('slug', $slug));
@@ -64,6 +65,8 @@ class ObjectController extends Controller
             'coverMedia',
             'sanctities',
             'media',
+            'reviews' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
+            'userMedia' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
         ]);
 
         $similarObjects = PilgrimageObject::query()
@@ -75,6 +78,26 @@ class ObjectController extends Controller
             ->limit(3)
             ->get();
 
-        return view('site.objects.show', compact('object', 'similarObjects'));
+        $userReview = auth()->check()
+            ? auth()->user()->reviews()->where('pilgrimage_object_id', $object->id)->first()
+            : null;
+
+        $favoriteLists = auth()->check()
+            ? auth()->user()->favoriteLists()->orderByDesc('is_default')->orderBy('name')->get()
+            : collect();
+
+        $isFavorite = auth()->check()
+            && auth()->user()->favoriteLists()
+                ->whereHas('objects', fn ($query) => $query->whereKey($object->id))
+                ->exists();
+
+        return view('site.objects.show', [
+            'object' => $object,
+            'similarObjects' => $similarObjects,
+            'userReview' => $userReview,
+            'favoriteLists' => $favoriteLists,
+            'isFavorite' => $isFavorite,
+            'rating' => $object->reviews->avg('rating'),
+        ]);
     }
 }

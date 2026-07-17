@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class PilgrimageRoute extends Model
 {
@@ -38,9 +40,26 @@ class PilgrimageRoute extends Model
         'published_at' => 'datetime',
     ];
 
+    protected $appends = ['cover_url'];
+
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    public function getCoverUrlAttribute(): ?string
+    {
+        return $this->cover_path ? Storage::disk('public')->url($this->cover_path) : null;
+    }
+
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query
+            ->where('is_published', true)
+            ->where(function (Builder $query) {
+                $query->whereNull('published_at')
+                    ->orWhere('published_at', '<=', now());
+            });
     }
 
     public function objects(): BelongsToMany

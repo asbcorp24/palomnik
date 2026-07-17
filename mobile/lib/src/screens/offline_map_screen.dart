@@ -13,10 +13,12 @@ class OfflineMapScreen extends StatefulWidget {
 class _OfflineMapScreenState extends State<OfflineMapScreen> {
   static const _configuredStyle = String.fromEnvironment('MAP_STYLE_URL');
 
-  late final Future<OfflineManager> _managerFuture = OfflineManager.createInstance();
+  Future<OfflineManager>? _managerFuture;
   List<OfflineRegion> _regions = const [];
   bool _loading = true;
   bool _downloading = false;
+  bool _offlineEnabled = false;
+  int _tileLimit = 100000;
   double? _progress;
   String? _status;
 
@@ -27,19 +29,49 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
   @override
   void initState() {
     super.initState();
-    _loadRegions();
+    _initialize();
   }
 
   @override
   void dispose() {
-    _managerFuture.then((manager) => manager.dispose());
+    _managerFuture?.then((manager) => manager.dispose());
     super.dispose();
   }
 
-  Future<void> _loadRegions() async {
+  Future<void> _initialize() async {
     setState(() => _loading = true);
     try {
-      final manager = await _managerFuture;
+      final response = await ApiClient.instance.dio.get('/map/config');
+      final config = Map<String, dynamic>.from(response.data['data'] as Map);
+      _offlineEnabled = config['offline_enabled'] == true;
+      _tileLimit = (config['offline_tile_limit'] as num?)?.toInt() ?? 100000;
+
+      if (!OfflineManager.isSupported) {
+        _status = 'Офлайн-карты не поддерживаются на этой платформе.';
+        return;
+      }
+      if (!_offlineEnabled) {
+        _status = 'Загрузка отключена до подключения собственного или лицензированного сервера OpenMapTiles.';
+        return;
+      }
+
+      _managerFuture = OfflineManager.createInstance();
+      final manager = await _managerFuture!;
+      manager.setOfflineTileCountLimit(amount: _tileLimit);
+      _regions = await manager.listOfflineRegions();
+    } catch (error) {
+      _status = 'Не удалось подготовить офлайн-карты: $error';
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadRegions() async {
+    final managerFuture = _managerFuture;
+    if (managerFuture == null) return;
+    setState(() => _loading = true);
+    try {
+      final manager = await managerFuture;
       final regions = await manager.listOfflineRegions();
       if (mounted) setState(() => _regions = regions);
     } catch (error) {
@@ -50,7 +82,9 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
   }
 
   Future<void> _download(_OfflinePreset preset) async {
-    if (_downloading) return;
+    final managerFuture = _managerFuture;
+    if (_downloading || managerFuture == null || !_offlineEnabled) return;
+
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -65,7 +99,7 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
         ],
       ),
     );
-    if (accepted != true) return;
+    if (accepted != true || !mounted) return;
 
     setState(() {
       _downloading = true;
@@ -74,13 +108,14 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
     });
 
     try {
-      final manager = await _managerFuture;
+      final manager = await managerFuture;
+      final pixelDensity = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0).toDouble();
       final updates = manager.downloadRegion(
         mapStyleUrl: _styleUrl,
         bounds: preset.bounds,
         minZoom: preset.minZoom,
         maxZoom: preset.maxZoom,
-        pixelDensity: MediaQuery.devicePixelRatioOf(context).clamp(1, 3),
+        pixelDensity: pixelDensity,
         metadata: {'name': preset.name, 'preset': preset.id},
       );
 
@@ -102,6 +137,9 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
   }
 
   Future<void> _delete(OfflineRegion region) async {
+    final managerFuture = _managerFuture;
+    if (managerFuture == null) return;
+
     final name = '${region.metadata['name'] ?? 'Офлайн-карта'}';
     final accepted = await showDialog<bool>(
       context: context,
@@ -116,7 +154,7 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
     );
     if (accepted != true) return;
 
-    final manager = await _managerFuture;
+    final manager = await managerFuture;
     await manager.deleteRegion(regionId: region.id);
     await _loadRegions();
   }
@@ -128,18 +166,19 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Card(
+          Card(
             child: Padding(
-              padding: EdgeInsets.all(18),
+              padding: const EdgeInsets.all(18),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline),
-                  SizedBox(width: 12),
+                  Icon(_offlineEnabled ? Icons.info_outline : Icons.lock_outline),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Офлайн-пакеты используют тот же стиль OpenMapTiles, что сайт и обычная карта. '
-                      'Загрузка работает на Android и iOS и не использует публичный сервер tile.openstreetmap.org для массового скачивания, если настроен собственный TileServer.',
+                      _offlineEnabled
+                          ? 'Офлайн-пакеты используют тот же стиль OpenMapTiles, что сайт и обычная карта. Лимит этого приложения: $_tileLimit тайлов.'
+                          : 'Массовая загрузка с публичного сервера OpenStreetMap не выполняется. Администратор должен подключить собственный или лицензированный TileServer и включить MAP_OFFLINE_ENABLED.',
                     ),
                   ),
                 ],
@@ -157,12 +196,14 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
                 subtitle: Text('${preset.description}\nМасштабы ${preset.minZoom.toInt()}–${preset.maxZoom.toInt()}'),
                 isThreeLine: true,
                 trailing: FilledButton(
-                  onPressed: _downloading ? null : () => _download(preset),
+                  onPressed: !_offlineEnabled || _downloading ? null : () => _download(preset),
                   child: const Text('Скачать'),
                 ),
               ),
             ),
           ),
+          if (_loading)
+            const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator())),
           if (_downloading || _status != null) ...[
             const SizedBox(height: 16),
             Card(
@@ -183,12 +224,10 @@ class _OfflineMapScreenState extends State<OfflineMapScreen> {
           Row(
             children: [
               Expanded(child: Text('Сохранено на устройстве', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
-              IconButton(onPressed: _loadRegions, icon: const Icon(Icons.refresh)),
+              IconButton(onPressed: _managerFuture == null ? null : _loadRegions, icon: const Icon(Icons.refresh)),
             ],
           ),
-          if (_loading)
-            const Padding(padding: EdgeInsets.all(30), child: Center(child: CircularProgressIndicator()))
-          else if (_regions.isEmpty)
+          if (!_loading && _regions.isEmpty)
             const Card(child: Padding(padding: EdgeInsets.all(24), child: Text('Офлайн-карты пока не загружены.')))
           else
             ..._regions.map(

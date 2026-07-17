@@ -1,0 +1,4 @@
+php_test=success
+flutter_pub=success
+flutter_analyze=failure
+flutter_test=failure

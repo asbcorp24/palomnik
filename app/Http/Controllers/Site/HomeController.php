@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Site;
 use App\Http\Controllers\Controller;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
+use App\Models\PilgrimageRoute;
 use App\Models\Sanctity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\View\View;
@@ -34,7 +35,7 @@ class HomeController extends Controller
         $stats = [
             'objects' => PilgrimageObject::query()->published()->count(),
             'sanctities' => Sanctity::query()->count(),
-            'routes' => 0,
+            'routes' => PilgrimageRoute::query()->published()->count(),
         ];
 
         return view('site.home', compact('featuredObjects', 'types', 'stats'));

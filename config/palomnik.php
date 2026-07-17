@@ -10,4 +10,8 @@ return [
     'maps' => [
         'yandex_key' => env('YANDEX_MAPS_API_KEY'),
     ],
+
+    'privacy' => [
+        'policy_version' => env('PRIVACY_POLICY_VERSION', '1.0'),
+    ],
 ];

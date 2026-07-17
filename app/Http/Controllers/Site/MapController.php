@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Deanery;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
+use App\Models\PilgrimageRoute;
 use App\Models\Sanctity;
 use App\Models\Vicariate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class MapController extends Controller
@@ -22,6 +24,7 @@ class MapController extends Controller
             'vicariate' => ['nullable', 'string', 'max:255'],
             'deanery' => ['nullable', 'string', 'max:255'],
             'sanctity' => ['nullable', 'string', 'max:255'],
+            'route' => ['nullable', 'string', 'max:255'],
         ]);
 
         $query = PilgrimageObject::query()
@@ -52,6 +55,41 @@ class MapController extends Controller
             ];
         })->values();
 
+        $routes = PilgrimageRoute::query()
+            ->published()
+            ->withCount('objects')
+            ->orderBy('title')
+            ->get();
+
+        $selectedRoute = null;
+        if (! empty($filters['route'])) {
+            $route = PilgrimageRoute::query()
+                ->published()
+                ->where('slug', $filters['route'])
+                ->with(['objects' => function ($query) {
+                    $query->whereNotNull('latitude')
+                        ->whereNotNull('longitude');
+                }])
+                ->first();
+
+            if ($route) {
+                $points = $this->routePoints($route->objects);
+
+                if ($points->count() >= 2) {
+                    $selectedRoute = [
+                        'id' => $route->id,
+                        'slug' => $route->slug,
+                        'title' => $route->title,
+                        'category' => $route->category,
+                        'difficulty' => $route->difficulty,
+                        'duration_minutes' => $route->duration_minutes,
+                        'url' => route('routes.show', $route),
+                        'points' => $points,
+                    ];
+                }
+            }
+        }
+
         return view('site.map', [
             'objects' => $objects,
             'filters' => $filters,
@@ -59,6 +97,26 @@ class MapController extends Controller
             'vicariates' => Vicariate::query()->orderBy('name')->get(),
             'deaneries' => Deanery::query()->with('vicariate')->orderBy('name')->get(),
             'sanctities' => Sanctity::query()->orderBy('name')->limit(300)->get(),
+            'routes' => $routes,
+            'selectedRoute' => $selectedRoute,
         ]);
+    }
+
+    private function routePoints(Collection $objects): Collection
+    {
+        return $objects
+            ->filter(fn (PilgrimageObject $object) => is_numeric($object->latitude) && is_numeric($object->longitude))
+            ->values()
+            ->map(fn (PilgrimageObject $object, int $index) => [
+                'number' => $index + 1,
+                'id' => $object->id,
+                'name' => $object->name,
+                'address' => $object->address,
+                'latitude' => (float) $object->latitude,
+                'longitude' => (float) $object->longitude,
+                'stay_minutes' => $object->pivot->stay_minutes,
+                'note' => $object->pivot->note,
+                'url' => route('objects.show', $object),
+            ]);
     }
 }

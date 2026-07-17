@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DirectoryController;
+use App\Http\Controllers\Api\V1\MobileBookingController;
 use App\Http\Controllers\Api\V1\MobileController;
 use App\Http\Controllers\Api\V1\PilgrimageObjectController;
 use Illuminate\Support\Facades\Route;
@@ -52,6 +53,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/favorites', [MobileController::class, 'favorites'])->name('favorites.index');
             Route::post('/favorites/{pilgrimageObject}', [MobileController::class, 'toggleFavorite'])->name('favorites.toggle');
             Route::get('/bookings', [MobileController::class, 'bookings'])->name('bookings.index');
+            Route::post('/trips/{trip}/bookings', [MobileBookingController::class, 'store'])->name('bookings.store');
+            Route::delete('/bookings/{booking}', [MobileBookingController::class, 'cancel'])->name('bookings.cancel');
             Route::get('/notifications', [MobileController::class, 'notifications'])->name('notifications.index');
             Route::put('/notifications/{notification}/read', [MobileController::class, 'readNotification'])->name('notifications.read');
             Route::post('/visits', [MobileController::class, 'storeVisit'])->name('visits.store');

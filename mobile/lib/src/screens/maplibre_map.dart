@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart' as geo;
 import 'package:maplibre/maplibre.dart';
 
 import '../core/api_client.dart';
@@ -190,19 +190,19 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
     }
   }
 
-  Future<Position> _position() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  Future<geo.Position> _position() async {
+    final serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) throw Exception('Включите геолокацию на устройстве.');
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+    var permission = await geo.Geolocator.checkPermission();
+    if (permission == geo.LocationPermission.denied) {
+      permission = await geo.Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    if (permission == geo.LocationPermission.denied || permission == geo.LocationPermission.deniedForever) {
       throw Exception('Разрешение на геолокацию не предоставлено.');
     }
 
-    return Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return geo.Geolocator.getCurrentPosition(desiredAccuracy: geo.LocationAccuracy.high);
   }
 
   Future<void> _showMyLocation() async {

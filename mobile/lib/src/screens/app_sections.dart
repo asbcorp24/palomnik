@@ -58,7 +58,7 @@ class _HomeTabState extends State<HomeTab> {
           future: _future,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const ListView(children: [SizedBox(height: 320), Center(child: CircularProgressIndicator())]);
+              return ListView(children: const [SizedBox(height: 320), Center(child: CircularProgressIndicator())]);
             }
             if (snapshot.hasError) {
               return ListView(children: [SizedBox(height: 500, child: ErrorPane(error: snapshot.error!, onRetry: () => setState(() => _future = _load(refresh: true))))]);

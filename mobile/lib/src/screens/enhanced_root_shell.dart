@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../core/session_controller.dart';
 import '../theme/app_theme.dart';
+import 'advanced_features.dart';
+import 'app_sections.dart';
 import 'content_features.dart';
-import 'root_shell.dart';
+import 'maplibre_map.dart';
 import 'user_features.dart';
 
 class EnhancedRootShell extends StatefulWidget {
@@ -21,7 +23,7 @@ class _EnhancedRootShellState extends State<EnhancedRootShell> {
   late final List<Widget> _pages = [
     HomeTab(session: widget.session),
     const CatalogTab(),
-    const MapTab(),
+    const MapLibreMapTab(),
     const CalendarTab(),
     EnhancedProfileTab(session: widget.session),
   ];

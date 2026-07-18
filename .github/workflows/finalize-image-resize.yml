@@ -1,0 +1,74 @@
+name: Finalize image resizing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finalize-image-resize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Add image settings to env example
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.env.example')
+          text = path.read_text(encoding='utf-8')
+          marker = 'DEMO_DATA_ENABLED=false\n'
+          block = '''DEMO_DATA_ENABLED=false
+
+          # Автоматическое пропорциональное уменьшение всех загружаемых изображений.
+          # Маленькие изображения не увеличиваются. Значения задают максимальный прямоугольник.
+          IMAGE_RESIZE_ENABLED=true
+          IMAGE_MAX_WIDTH=1920
+          IMAGE_MAX_HEIGHT=1080
+          IMAGE_JPEG_QUALITY=85
+          IMAGE_WEBP_QUALITY=85
+          IMAGE_PNG_COMPRESSION=8
+          '''
+          block = '\n'.join(line.strip() for line in block.splitlines()) + '\n'
+
+          if 'IMAGE_MAX_WIDTH=' not in text:
+              if marker not in text:
+                  raise SystemExit('DEMO_DATA_ENABLED marker not found')
+              text = text.replace(marker, block, 1)
+              path.write_text(text, encoding='utf-8')
+          PY
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Validate PHP syntax
+        run: |
+          php -l app/Services/ImageResizeService.php
+          php -l app/Http/Middleware/ResizeUploadedImages.php
+          php -l app/Http/Kernel.php
+          php -l config/palomnik.php
+          php -l tests/Unit/ImageResizeServiceTest.php
+
+      - name: Run image resize tests
+        run: php artisan test --filter=ImageResizeServiceTest
+
+      - name: Commit env example
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .env.example
+          git commit -m "docs(env): add uploaded image resize settings"
+          git push origin HEAD:main

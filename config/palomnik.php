@@ -7,6 +7,15 @@ return [
         'password' => env('ADMIN_PASSWORD'),
     ],
 
+    'images' => [
+        'resize_enabled' => (bool) env('IMAGE_RESIZE_ENABLED', true),
+        'max_width' => (int) env('IMAGE_MAX_WIDTH', 1920),
+        'max_height' => (int) env('IMAGE_MAX_HEIGHT', 1080),
+        'jpeg_quality' => (int) env('IMAGE_JPEG_QUALITY', 85),
+        'webp_quality' => (int) env('IMAGE_WEBP_QUALITY', 85),
+        'png_compression' => (int) env('IMAGE_PNG_COMPRESSION', 8),
+    ],
+
     'maps' => [
         'style_url' => env('MAP_STYLE_URL'),
         'openmaptiles_tiles' => env('OPENMAPTILES_TILE_URL'),

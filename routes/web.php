@@ -42,6 +42,7 @@ Route::get('/', SiteHomeController::class)->name('home');
 Route::view('/offline', 'site.offline')->name('offline');
 Route::view('/privacy', 'site.legal.privacy')->name('privacy');
 Route::view('/terms', 'site.legal.terms')->name('terms');
+Route::view('/help', 'site.help')->name('help');
 Route::get('/map', SiteMapController::class)->name('map');
 Route::get('/objects', [SiteObjectController::class, 'index'])->name('objects.index');
 Route::get('/objects/{object:slug}', [SiteObjectController::class, 'show'])->name('objects.show');
@@ -158,6 +159,7 @@ Route::prefix('admin')
     ->group(function () {
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
         Route::get('/', AdminDashboardController::class)->name('dashboard');
+        Route::redirect('/help', '/help?section=admin')->name('help');
 
         Route::resource('calendar', AdminCalendarEventController::class)
             ->parameters(['calendar' => 'calendarEvent']);

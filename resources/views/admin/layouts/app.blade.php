@@ -65,6 +65,7 @@
         <nav class="sidebar-nav">
             <div class="sidebar-label">Главное</div>
             <a class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}"><i class="bi bi-grid-1x2"></i><span>Обзор</span></a>
+            <a class="sidebar-link" href="{{ route('admin.help') }}"><i class="bi bi-question-circle"></i><span>Справка</span></a>
             <a class="sidebar-link" href="{{ route('home') }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i><span>Открыть сайт</span></a>
 
             <div class="sidebar-label">Карта и объекты</div>

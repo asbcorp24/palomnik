@@ -17,15 +17,15 @@ class AuthenticationFlowTest extends TestCase
     public function test_registration_rejects_wrong_captcha(): void
     {
         $this->withSession(['registration_captcha_answer' => 7])
-  ->post('/register', [
-      'name' => 'Тестовый паломник',
-      'email' => 'captcha@example.test',
-      'password' => 'password123',
-      'password_confirmation' => 'password123',
-      'captcha' => 6,
-      'consent' => 1,
-  ])
-  ->assertSessionHasErrors('captcha');
+            ->post('/register', [
+                'name' => 'Тестовый паломник',
+                'email' => 'captcha@example.test',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+                'captcha' => 6,
+                'consent' => 1,
+            ])
+            ->assertSessionHasErrors('captcha');
 
         $this->assertDatabaseMissing('users', ['email' => 'captcha@example.test']);
     }
@@ -35,17 +35,18 @@ class AuthenticationFlowTest extends TestCase
         Notification::fake();
 
         $this->withSession(['registration_captcha_answer' => 7])
-  ->post('/register', [
-      'name' => 'Тестовый паломник',
-      'email' => 'pilgrim@example.test',
-      'password' => 'password123',
-      'password_confirmation' => 'password123',
-      'captcha' => 7,
-      'consent' => 1,
-  ])
-  ->assertRedirect(route('verification.notice'));
+            ->post('/register', [
+                'name' => 'Тестовый паломник',
+                'email' => 'pilgrim@example.test',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+                'captcha' => 7,
+                'consent' => 1,
+            ])
+            ->assertRedirect(route('verification.notice'));
 
         $user = User::query()->where('email', 'pilgrim@example.test')->firstOrFail();
+
         $this->assertNull($user->email_verified_at);
         Notification::assertSentTo($user, VerifyEmailNotification::class);
     }
@@ -54,8 +55,8 @@ class AuthenticationFlowTest extends TestCase
     {
         $user = User::factory()->unverified()->create();
         $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(5), [
-  'id' => $user->id,
-  'hash' => sha1($user->email),
+            'id' => $user->id,
+            'hash' => sha1($user->email),
         ]);
 
         $this->get($url)->assertRedirect(route('login'));
@@ -65,13 +66,13 @@ class AuthenticationFlowTest extends TestCase
     public function test_unverified_user_is_sent_to_verification_notice_after_login(): void
     {
         $user = User::factory()->unverified()->create([
-  'password' => bcrypt('password123'),
-  'is_active' => true,
+            'password' => bcrypt('password123'),
+            'is_active' => true,
         ]);
 
         $this->post('/login', [
-  'email' => $user->email,
-  'password' => 'password123',
+            'email' => $user->email,
+            'password' => 'password123',
         ])->assertRedirect(route('verification.notice'));
     }
 
@@ -81,7 +82,7 @@ class AuthenticationFlowTest extends TestCase
         $user = User::factory()->create();
 
         $this->post('/forgot-password', ['email' => $user->email])
-  ->assertSessionHas('success');
+            ->assertSessionHas('success');
 
         Notification::assertSentTo($user, ResetPasswordNotification::class);
     }
@@ -92,7 +93,30 @@ class AuthenticationFlowTest extends TestCase
         config()->set('services.vkid.client_secret', null);
 
         $this->get('/auth/vk')
-  ->assertRedirect(route('login'))
-  ->assertSessionHas('error');
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('error');
+    }
+
+    public function test_vk_login_redirect_uses_oauth_21_pkce_parameters(): void
+    {
+        config()->set('services.vkid.client_id', '123456');
+        config()->set('services.vkid.client_secret', 'test-secret');
+        config()->set('services.vkid.redirect', 'https://palom.example.test/auth/vk/callback');
+        config()->set('services.vkid.scopes', ['email']);
+
+        $response = $this->get('/auth/vk')->assertRedirect();
+        $location = (string) $response->headers->get('Location');
+        $parts = parse_url($location);
+
+        parse_str($parts['query'] ?? '', $query);
+
+        $this->assertSame('id.vk.ru', $parts['host'] ?? null);
+        $this->assertSame('/authorize', $parts['path'] ?? null);
+        $this->assertSame('123456', $query['client_id'] ?? null);
+        $this->assertSame('code', $query['response_type'] ?? null);
+        $this->assertSame('S256', $query['code_challenge_method'] ?? null);
+        $this->assertNotEmpty($query['code_challenge'] ?? null);
+        $this->assertNotEmpty($query['state'] ?? null);
+        $this->assertSame('email', $query['scope'] ?? null);
     }
 }

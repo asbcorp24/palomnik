@@ -1,0 +1,1049 @@
+name: Complete email and VK authentication
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/complete-auth-email-vk-captcha.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite, curl, json
+          coverage: none
+
+      - name: Implement authentication flows
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          def write(path, content):
+              p = Path(path)
+              p.parent.mkdir(parents=True, exist_ok=True)
+              p.write_text(content, encoding='utf-8')
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Pattern not found in {path}: {old[:180]!r}')
+              p.write_text(text.replace(old, new, count), encoding='utf-8')
+
+          composer_path = Path('composer.json')
+          composer = json.loads(composer_path.read_text(encoding='utf-8'))
+          composer['require']['laravel/socialite'] = '^5.6'
+          composer['require']['socialiteproviders/manager'] = '^4.4'
+          composer['require']['movemoveapp/vkid'] = '^1.0'
+          composer['require'] = dict(sorted(composer['require'].items()))
+          composer_path.write_text(json.dumps(composer, ensure_ascii=False, indent=4) + '\n', encoding='utf-8')
+
+          write('database/migrations/2026_07_22_120000_add_vk_fields_to_users_table.php', '''<?php
+
+          use Illuminate\\Database\\Migrations\\Migration;
+          use Illuminate\\Database\\Schema\\Blueprint;
+          use Illuminate\\Support\\Facades\\Schema;
+
+          return new class extends Migration
+          {
+              public function up(): void
+              {
+                  Schema::table('users', function (Blueprint $table) {
+                      $table->string('vk_id')->nullable()->unique()->after('email');
+                      $table->string('vk_avatar_url', 2048)->nullable()->after('avatar_path');
+                  });
+              }
+
+              public function down(): void
+              {
+                  Schema::table('users', function (Blueprint $table) {
+                      $table->dropUnique(['vk_id']);
+                      $table->dropColumn(['vk_id', 'vk_avatar_url']);
+                  });
+              }
+          };
+          '''.replace('          ', ''))
+
+          write('app/Notifications/VerifyEmailNotification.php', '''<?php
+
+          namespace App\\Notifications;
+
+          use Illuminate\\Bus\\Queueable;
+          use Illuminate\\Notifications\\Messages\\MailMessage;
+          use Illuminate\\Notifications\\Notification;
+          use Illuminate\\Support\\Carbon;
+          use Illuminate\\Support\\Facades\\URL;
+
+          class VerifyEmailNotification extends Notification
+          {
+              use Queueable;
+
+              public function via($notifiable): array
+              {
+                  return ['mail'];
+              }
+
+              public function toMail($notifiable): MailMessage
+              {
+                  $url = URL::temporarySignedRoute(
+                      'verification.verify',
+                      Carbon::now()->addMinutes((int) config('auth.verification.expire', 60)),
+                      [
+                          'id' => $notifiable->getKey(),
+                          'hash' => sha1($notifiable->getEmailForVerification()),
+                      ]
+                  );
+
+                  return (new MailMessage)
+                      ->subject('Подтверждение email — Московский паломник')
+                      ->greeting('Здравствуйте, '.$notifiable->name.'!')
+                      ->line('Подтвердите адрес электронной почты, чтобы пользоваться личным кабинетом, бронированиями и сообществом.')
+                      ->action('Подтвердить email', $url)
+                      ->line('Ссылка действует ограниченное время. Если вы не создавали аккаунт, просто проигнорируйте письмо.');
+              }
+          }
+          '''.replace('          ', ''))
+
+          write('app/Notifications/ResetPasswordNotification.php', '''<?php
+
+          namespace App\\Notifications;
+
+          use Illuminate\\Bus\\Queueable;
+          use Illuminate\\Notifications\\Messages\\MailMessage;
+          use Illuminate\\Notifications\\Notification;
+
+          class ResetPasswordNotification extends Notification
+          {
+              use Queueable;
+
+              public function __construct(private string $token)
+              {
+              }
+
+              public function via($notifiable): array
+              {
+                  return ['mail'];
+              }
+
+              public function toMail($notifiable): MailMessage
+              {
+                  $url = route('password.reset', [
+                      'token' => $this->token,
+                      'email' => $notifiable->getEmailForPasswordReset(),
+                  ]);
+
+                  return (new MailMessage)
+                      ->subject('Восстановление пароля — Московский паломник')
+                      ->greeting('Здравствуйте, '.$notifiable->name.'!')
+                      ->line('Получен запрос на восстановление пароля вашего аккаунта.')
+                      ->action('Задать новый пароль', $url)
+                      ->line('Ссылка действует ограниченное время. Если запрос отправили не вы, пароль менять не нужно.');
+              }
+          }
+          '''.replace('          ', ''))
+
+          write('app/Http/Controllers/Site/EmailVerificationController.php', '''<?php
+
+          namespace App\\Http\\Controllers\\Site;
+
+          use App\\Http\\Controllers\\Controller;
+          use App\\Models\\User;
+          use Illuminate\\Auth\\Events\\Verified;
+          use Illuminate\\Http\\RedirectResponse;
+          use Illuminate\\Http\\Request;
+          use Illuminate\\Support\\Facades\\Auth;
+          use Illuminate\\View\\View;
+
+          class EmailVerificationController extends Controller
+          {
+              public function notice(Request $request): View|RedirectResponse
+              {
+                  if ($request->user()->hasVerifiedEmail()) {
+                      return redirect()->route('profile.dashboard');
+                  }
+
+                  return view('site.auth.verify-email');
+              }
+
+              public function verify(Request $request, int $id, string $hash): RedirectResponse
+              {
+                  $user = User::query()->findOrFail($id);
+
+                  abort_unless(hash_equals(sha1($user->getEmailForVerification()), $hash), 403);
+
+                  if (! $user->hasVerifiedEmail() && $user->markEmailAsVerified()) {
+                      event(new Verified($user));
+                  }
+
+                  if (Auth::check() && Auth::id() === $user->id) {
+                      return redirect()->route('profile.dashboard')
+                          ->with('success', 'Email подтверждён. Все возможности личного кабинета доступны.');
+                  }
+
+                  return redirect()->route('login')
+                      ->with('success', 'Email подтверждён. Теперь можно войти в аккаунт.');
+              }
+
+              public function resend(Request $request): RedirectResponse
+              {
+                  if ($request->user()->hasVerifiedEmail()) {
+                      return redirect()->route('profile.dashboard');
+                  }
+
+                  $request->user()->sendEmailVerificationNotification();
+
+                  return back()->with('success', 'Новое письмо с подтверждением отправлено.');
+              }
+          }
+          '''.replace('          ', ''))
+
+          write('app/Http/Controllers/Site/PasswordResetController.php', '''<?php
+
+          namespace App\\Http\\Controllers\\Site;
+
+          use App\\Http\\Controllers\\Controller;
+          use Illuminate\\Auth\\Events\\PasswordReset;
+          use Illuminate\\Http\\RedirectResponse;
+          use Illuminate\\Http\\Request;
+          use Illuminate\\Support\\Facades\\Hash;
+          use Illuminate\\Support\\Facades\\Password;
+          use Illuminate\\Support\\Str;
+          use Illuminate\\Validation\\Rules\\Password as PasswordRule;
+          use Illuminate\\View\\View;
+
+          class PasswordResetController extends Controller
+          {
+              public function requestForm(): View
+              {
+                  return view('site.auth.forgot-password');
+              }
+
+              public function sendLink(Request $request): RedirectResponse
+              {
+                  $data = $request->validate(['email' => ['required', 'email']]);
+                  Password::sendResetLink(['email' => mb_strtolower($data['email'])]);
+
+                  return back()->with('success', 'Если такой email зарегистрирован, на него отправлена ссылка для восстановления пароля.');
+              }
+
+              public function resetForm(Request $request, string $token): View
+              {
+                  return view('site.auth.reset-password', [
+                      'token' => $token,
+                      'email' => $request->string('email')->toString(),
+                  ]);
+              }
+
+              public function reset(Request $request): RedirectResponse
+              {
+                  $data = $request->validate([
+                      'token' => ['required', 'string'],
+                      'email' => ['required', 'email'],
+                      'password' => ['required', 'confirmed', PasswordRule::min(8)],
+                  ]);
+
+                  $status = Password::reset(
+                      [
+                          'email' => mb_strtolower($data['email']),
+                          'password' => $data['password'],
+                          'password_confirmation' => $request->input('password_confirmation'),
+                          'token' => $data['token'],
+                      ],
+                      function ($user, string $password) {
+                          $user->forceFill([
+                              'password' => Hash::make($password),
+                          ])->setRememberToken(Str::random(60));
+                          $user->save();
+                          event(new PasswordReset($user));
+                      }
+                  );
+
+                  if ($status !== Password::PASSWORD_RESET) {
+                      return back()->withInput($request->only('email'))
+                          ->withErrors(['email' => 'Ссылка недействительна или устарела. Запросите восстановление ещё раз.']);
+                  }
+
+                  return redirect()->route('login')->with('success', 'Пароль изменён. Войдите с новым паролем.');
+              }
+          }
+          '''.replace('          ', ''))
+
+          write('app/Http/Controllers/Site/VkAuthController.php', '''<?php
+
+          namespace App\\Http\\Controllers\\Site;
+
+          use App\\Http\\Controllers\\Controller;
+          use App\\Models\\FavoriteList;
+          use App\\Models\\User;
+          use Illuminate\\Http\\RedirectResponse;
+          use Illuminate\\Http\\Request;
+          use Illuminate\\Support\\Facades\\Auth;
+          use Illuminate\\Support\\Facades\\DB;
+          use Illuminate\\Support\\Facades\\Hash;
+          use Illuminate\\Support\\Str;
+          use Laravel\\Socialite\\Facades\\Socialite;
+          use Laravel\\Socialite\\Two\\InvalidStateException;
+          use Throwable;
+
+          class VkAuthController extends Controller
+          {
+              public function redirect(): RedirectResponse
+              {
+                  if (! config('services.vkid.client_id') || ! config('services.vkid.client_secret')) {
+                      return redirect()->route('login')
+                          ->with('error', 'Вход через VK пока не настроен администратором.');
+                  }
+
+                  return Socialite::driver('vkid')->scopes(['email'])->redirect();
+              }
+
+              public function callback(Request $request): RedirectResponse
+              {
+                  if ($request->filled('error')) {
+                      return redirect()->route('login')
+                          ->with('error', 'Авторизация VK была отменена или завершилась ошибкой.');
+                  }
+
+                  try {
+                      $vkUser = Socialite::driver('vkid')->user();
+                      $vkId = trim((string) $vkUser->getId());
+
+                      if ($vkId === '') {
+                          throw new \\RuntimeException('VK ID did not return user id.');
+                      }
+
+                      $email = mb_strtolower(trim((string) ($vkUser->getEmail() ?? '')));
+                      if ($email !== '' && ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                          $email = '';
+                      }
+
+                      $name = trim((string) ($vkUser->getName() ?? '')) ?: 'Пользователь VK';
+                      $avatar = trim((string) ($vkUser->getAvatar() ?? '')) ?: null;
+                      $phone = trim((string) ($vkUser->user['phone'] ?? '')) ?: null;
+
+                      $user = DB::transaction(function () use ($request, $vkId, $email, $name, $avatar, $phone) {
+                          $user = User::query()->where('vk_id', $vkId)->first();
+
+                          if (! $user && $email !== '') {
+                              $user = User::query()->where('email', $email)->first();
+                          }
+
+                          if ($user && $user->vk_id && $user->vk_id !== $vkId) {
+                              throw new \\RuntimeException('Email is already linked to another VK account.');
+                          }
+
+                          if (! $user) {
+                              $localEmail = $email !== '' ? $email : 'vk_'.$vkId.'@users.palomnik.invalid';
+
+                              $user = User::query()->create([
+                                  'name' => $name,
+                                  'email' => $localEmail,
+                                  'email_verified_at' => now(),
+                                  'phone' => $phone,
+                                  'password' => Hash::make(Str::random(64)),
+                                  'vk_id' => $vkId,
+                                  'vk_avatar_url' => $avatar,
+                                  'role' => User::ROLE_PILGRIM,
+                                  'is_active' => true,
+                                  'preferences' => [
+                                      'notifications' => true,
+                                      'privacy' => 'private',
+                                      'theme' => 'system',
+                                      'font_size' => 'normal',
+                                      'interests' => [],
+                                  ],
+                              ]);
+
+                              FavoriteList::query()->create([
+                                  'user_id' => $user->id,
+                                  'name' => 'Избранное',
+                                  'is_default' => true,
+                              ]);
+
+                              $user->consents()->create([
+                                  'type' => 'personal_data_processing',
+                                  'policy_version' => config('palomnik.privacy.policy_version', '1.0'),
+                                  'accepted_at' => now(),
+                                  'ip_address' => $request->ip(),
+                                  'user_agent' => mb_substr((string) $request->userAgent(), 0, 2000),
+                              ]);
+                          } else {
+                              $updates = [
+                                  'vk_id' => $vkId,
+                                  'vk_avatar_url' => $avatar ?: $user->vk_avatar_url,
+                              ];
+
+                              if ($email !== '' && hash_equals(mb_strtolower($user->email), $email) && ! $user->email_verified_at) {
+                                  $updates['email_verified_at'] = now();
+                              }
+
+                              if (! $user->phone && $phone) {
+                                  $updates['phone'] = $phone;
+                              }
+
+                              $user->forceFill($updates)->save();
+                          }
+
+                          return $user->fresh();
+                      });
+
+                      if (! $user->is_active) {
+                          return redirect()->route('login')->with('error', 'Учётная запись заблокирована.');
+                      }
+
+                      Auth::login($user, true);
+                      $request->session()->regenerate();
+
+                      return redirect()->intended(route('profile.dashboard'))
+                          ->with('success', 'Вы вошли через VK ID.');
+                  } catch (InvalidStateException $exception) {
+                      return redirect()->route('login')
+                          ->with('error', 'Сессия VK ID устарела. Повторите вход.');
+                  } catch (Throwable $exception) {
+                      report($exception);
+
+                      return redirect()->route('login')
+                          ->with('error', 'Не удалось войти через VK ID. Повторите попытку позднее.');
+                  }
+              }
+          }
+          '''.replace('          ', ''))
+
+          write('resources/views/site/auth/verify-email.blade.php', '''@extends('site.layouts.app')
+
+          @section('title', 'Подтверждение email — Московский паломник')
+
+          @section('content')
+          <section class="auth-section">
+              <div class="container">
+                  <div class="auth-card mx-auto" style="max-width:720px">
+                      <div class="auth-form text-center">
+                          <div class="display-5 text-success mb-3"><i class="bi bi-envelope-check"></i></div>
+                          <h1 class="h3 mb-3">Подтвердите электронную почту</h1>
+                          <p class="text-secondary mb-4">Мы отправили письмо на <strong>{{ auth()->user()->email }}</strong>. Перейдите по ссылке из письма, чтобы открыть все возможности аккаунта.</p>
+
+                          <form method="POST" action="{{ route('verification.send') }}">
+                              @csrf
+                              <button class="btn btn-pm-gold px-4" type="submit">Отправить письмо повторно</button>
+                          </form>
+
+                          <div class="small text-secondary mt-4">Проверьте папки «Спам» и «Рассылки». Ссылка действует ограниченное время.</div>
+                      </div>
+                  </div>
+              </div>
+          </section>
+          @endsection
+          '''.replace('          ', ''))
+
+          write('resources/views/site/auth/forgot-password.blade.php', '''@extends('site.layouts.app')
+
+          @section('title', 'Восстановление пароля — Московский паломник')
+
+          @section('content')
+          <section class="auth-section">
+              <div class="container">
+                  <div class="auth-card mx-auto" style="max-width:720px">
+                      <div class="auth-form">
+                          <h1 class="h3 mb-2">Восстановление пароля</h1>
+                          <p class="text-secondary mb-4">Укажите email аккаунта. Мы отправим ссылку для создания нового пароля.</p>
+
+                          <form method="POST" action="{{ route('password.email') }}">
+                              @csrf
+                              <label class="form-label" for="email">Email</label>
+                              <input class="form-control @error('email') is-invalid @enderror" id="email" name="email" type="email" value="{{ old('email') }}" required autofocus autocomplete="email">
+                              @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                              <button class="btn btn-pm-gold w-100 py-3 mt-4" type="submit">Отправить ссылку</button>
+                          </form>
+
+                          <div class="text-center mt-4"><a href="{{ route('login') }}">Вернуться ко входу</a></div>
+                      </div>
+                  </div>
+              </div>
+          </section>
+          @endsection
+          '''.replace('          ', ''))
+
+          write('resources/views/site/auth/reset-password.blade.php', '''@extends('site.layouts.app')
+
+          @section('title', 'Новый пароль — Московский паломник')
+
+          @section('content')
+          <section class="auth-section">
+              <div class="container">
+                  <div class="auth-card mx-auto" style="max-width:720px">
+                      <div class="auth-form">
+                          <h1 class="h3 mb-2">Задайте новый пароль</h1>
+                          <p class="text-secondary mb-4">Пароль должен содержать не менее восьми символов.</p>
+
+                          <form method="POST" action="{{ route('password.update') }}">
+                              @csrf
+                              <input name="token" type="hidden" value="{{ $token }}">
+
+                              <div class="mb-3">
+                                  <label class="form-label" for="email">Email</label>
+                                  <input class="form-control @error('email') is-invalid @enderror" id="email" name="email" type="email" value="{{ old('email', $email) }}" required autocomplete="email">
+                                  @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label" for="password">Новый пароль</label>
+                                  <input class="form-control @error('password') is-invalid @enderror" id="password" name="password" type="password" required autocomplete="new-password">
+                                  @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                              </div>
+
+                              <div class="mb-3">
+                                  <label class="form-label" for="password_confirmation">Повторите пароль</label>
+                                  <input class="form-control" id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password">
+                              </div>
+
+                              <button class="btn btn-pm-gold w-100 py-3" type="submit">Сохранить новый пароль</button>
+                          </form>
+                      </div>
+                  </div>
+              </div>
+          </section>
+          @endsection
+          '''.replace('          ', ''))
+
+          write('app/Http/Controllers/Site/AuthController.php', '''<?php
+
+          namespace App\\Http\\Controllers\\Site;
+
+          use App\\Http\\Controllers\\Controller;
+          use App\\Models\\FavoriteList;
+          use App\\Models\\User;
+          use Illuminate\\Auth\\Events\\Registered;
+          use Illuminate\\Http\\RedirectResponse;
+          use Illuminate\\Http\\Request;
+          use Illuminate\\Support\\Facades\\Auth;
+          use Illuminate\\Support\\Facades\\DB;
+          use Illuminate\\Support\\Facades\\Hash;
+          use Illuminate\\Validation\\Rules\\Password;
+          use Illuminate\\View\\View;
+
+          class AuthController extends Controller
+          {
+              public function showLoginForm(): View|RedirectResponse
+              {
+                  if (Auth::check()) {
+                      return redirect()->route(Auth::user()->hasVerifiedEmail() ? 'profile.dashboard' : 'verification.notice');
+                  }
+
+                  return view('site.auth.login');
+              }
+
+              public function showRegisterForm(Request $request): View|RedirectResponse
+              {
+                  if (Auth::check()) {
+                      return redirect()->route(Auth::user()->hasVerifiedEmail() ? 'profile.dashboard' : 'verification.notice');
+                  }
+
+                  return view('site.auth.register', [
+                      'captchaQuestion' => $this->createRegistrationCaptcha($request),
+                  ]);
+              }
+
+              public function register(Request $request): RedirectResponse
+              {
+                  $data = $request->validate([
+                      'name' => ['required', 'string', 'max:255'],
+                      'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+                      'phone' => ['nullable', 'string', 'max:64', 'unique:users,phone'],
+                      'password' => ['required', 'confirmed', Password::min(8)],
+                      'captcha' => ['required', 'integer'],
+                      'consent' => ['accepted'],
+                  ], [
+                      'captcha.required' => 'Решите простой пример.',
+                      'captcha.integer' => 'Ответ на пример должен быть числом.',
+                      'consent.accepted' => 'Необходимо согласиться с обработкой персональных данных.',
+                  ]);
+
+                  $expectedCaptcha = $request->session()->pull('registration_captcha_answer');
+                  if ($expectedCaptcha === null || (int) $data['captcha'] !== (int) $expectedCaptcha) {
+                      return back()
+                          ->withInput($request->except(['password', 'password_confirmation', 'captcha']))
+                          ->withErrors(['captcha' => 'Неверный ответ. Решите новый пример.']);
+                  }
+
+                  $user = DB::transaction(function () use ($request, $data) {
+                      $user = User::query()->create([
+                          'name' => $data['name'],
+                          'email' => mb_strtolower($data['email']),
+                          'phone' => ! empty($data['phone']) ? $data['phone'] : null,
+                          'password' => Hash::make($data['password']),
+                          'role' => User::ROLE_PILGRIM,
+                          'is_active' => true,
+                          'preferences' => [
+                              'notifications' => true,
+                              'privacy' => 'private',
+                              'theme' => 'light',
+                              'font_size' => 'normal',
+                              'interests' => [],
+                          ],
+                      ]);
+
+                      FavoriteList::query()->create([
+                          'user_id' => $user->id,
+                          'name' => 'Избранное',
+                          'is_default' => true,
+                      ]);
+
+                      $user->consents()->create([
+                          'type' => 'personal_data_processing',
+                          'policy_version' => config('palomnik.privacy.policy_version', '1.0'),
+                          'accepted_at' => now(),
+                          'ip_address' => $request->ip(),
+                          'user_agent' => mb_substr((string) $request->userAgent(), 0, 2000),
+                      ]);
+
+                      return $user;
+                  });
+
+                  event(new Registered($user));
+                  Auth::login($user);
+                  $request->session()->regenerate();
+
+                  return redirect()->route('verification.notice')
+                      ->with('success', 'Аккаунт создан. Подтвердите email по ссылке из письма.');
+              }
+
+              public function login(Request $request): RedirectResponse
+              {
+                  $credentials = $request->validate([
+                      'email' => ['required', 'email'],
+                      'password' => ['required', 'string'],
+                  ]);
+
+                  if (! Auth::attempt([
+                      'email' => mb_strtolower($credentials['email']),
+                      'password' => $credentials['password'],
+                      'is_active' => true,
+                  ], $request->boolean('remember'))) {
+                      return back()
+                          ->withInput($request->only('email'))
+                          ->withErrors(['email' => 'Неверный email или пароль либо аккаунт заблокирован.']);
+                  }
+
+                  $request->session()->regenerate();
+
+                  if (! $request->user()->hasVerifiedEmail()) {
+                      return redirect()->route('verification.notice');
+                  }
+
+                  return redirect()->intended(route('profile.dashboard'));
+              }
+
+              public function logout(Request $request): RedirectResponse
+              {
+                  Auth::logout();
+                  $request->session()->invalidate();
+                  $request->session()->regenerateToken();
+
+                  return redirect()->route('home')->with('success', 'Вы вышли из личного кабинета.');
+              }
+
+              private function createRegistrationCaptcha(Request $request): string
+              {
+                  $left = random_int(2, 9);
+                  $right = random_int(1, 9);
+                  $addition = (bool) random_int(0, 1);
+
+                  if (! $addition && $right > $left) {
+                      [$left, $right] = [$right, $left];
+                  }
+
+                  $answer = $addition ? $left + $right : $left - $right;
+                  $request->session()->put('registration_captcha_answer', $answer);
+
+                  return $left.' '.($addition ? '+' : '−').' '.$right.' = ?';
+              }
+          }
+          '''.replace('          ', ''))
+
+          write('resources/views/site/auth/login.blade.php', '''@extends('site.layouts.app')
+
+          @section('title', 'Вход — Московский паломник')
+
+          @section('content')
+          <section class="auth-section">
+              <div class="container">
+                  <div class="auth-card mx-auto" style="max-width:980px">
+                      <div class="row g-0">
+                          <div class="col-lg-5">
+                              <div class="auth-aside">
+                                  <div class="section-kicker text-warning mb-3">Личный кабинет</div>
+                                  <h1 class="h2 mb-4">Ваш путь сохраняется</h1>
+                                  <p class="opacity-75 mb-4">После входа доступны избранные места, бронирования, посещения, достижения и собственные маршруты.</p>
+                                  <div class="auth-feature"><i class="bi bi-heart"></i><div><strong>Избранное</strong><div class="small opacity-75">Сохраняйте храмы в персональные списки.</div></div></div>
+                                  <div class="auth-feature"><i class="bi bi-ticket-perforated"></i><div><strong>Бронирования</strong><div class="small opacity-75">Следите за поездками и электронными билетами.</div></div></div>
+                                  <div class="auth-feature"><i class="bi bi-trophy"></i><div><strong>Достижения</strong><div class="small opacity-75">Отмечайте посещения и проходите квесты.</div></div></div>
+                              </div>
+                          </div>
+                          <div class="col-lg-7">
+                              <div class="auth-form">
+                                  <h2 class="h3 mb-2">Вход</h2>
+                                  <p class="text-secondary mb-4">Войдите по email и паролю или используйте VK ID.</p>
+
+                                  <a class="btn w-100 py-3 text-white mb-4" style="background:#07f" href="{{ route('auth.vk.redirect') }}">
+                                      <strong class="me-2">VK</strong>Войти через VK ID
+                                  </a>
+
+                                  <div class="d-flex align-items-center gap-3 mb-4"><hr class="flex-grow-1"><span class="small text-secondary">или по email</span><hr class="flex-grow-1"></div>
+
+                                  <form method="POST" action="{{ route('login.submit') }}">
+                                      @csrf
+                                      <div class="mb-3">
+                                          <label class="form-label" for="email">Email</label>
+                                          <input class="form-control @error('email') is-invalid @enderror" id="email" name="email" type="email" value="{{ old('email') }}" required autofocus autocomplete="email">
+                                          @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                      </div>
+                                      <div class="mb-2">
+                                          <label class="form-label" for="password">Пароль</label>
+                                          <input class="form-control @error('password') is-invalid @enderror" id="password" name="password" type="password" required autocomplete="current-password">
+                                          @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                      </div>
+                                      <div class="d-flex justify-content-between align-items-center gap-3 mb-4">
+                                          <div class="form-check">
+                                              <input class="form-check-input" id="remember" name="remember" type="checkbox" value="1" @checked(old('remember'))>
+                                              <label class="form-check-label" for="remember">Запомнить меня</label>
+                                          </div>
+                                          <a class="small" href="{{ route('password.request') }}">Забыли пароль?</a>
+                                      </div>
+                                      <button class="btn btn-pm-gold w-100 py-3" type="submit">Войти</button>
+                                  </form>
+
+                                  <div class="small text-secondary text-center mt-3">Продолжая вход через VK, вы принимаете <a href="{{ route('terms') }}">правила сервиса</a> и <a href="{{ route('privacy') }}">политику обработки данных</a>.</div>
+                                  <div class="text-center text-secondary mt-4">Нет аккаунта? <a class="fw-semibold" href="{{ route('register') }}">Зарегистрироваться</a></div>
+                                  <div class="text-center mt-3"><a class="small text-secondary" href="{{ route('admin.login') }}">Вход для администратора</a></div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </section>
+          @endsection
+          '''.replace('          ', ''))
+
+          write('resources/views/site/auth/register.blade.php', '''@extends('site.layouts.app')
+
+          @section('title', 'Регистрация — Московский паломник')
+
+          @section('content')
+          <section class="auth-section">
+              <div class="container">
+                  <div class="auth-card mx-auto" style="max-width:1080px">
+                      <div class="row g-0">
+                          <div class="col-lg-5">
+                              <div class="auth-aside">
+                                  <div class="section-kicker text-warning mb-3">Сообщество паломников</div>
+                                  <h1 class="h2 mb-4">Создайте личный кабинет</h1>
+                                  <p class="opacity-75">Данные пользователя нужны, чтобы хранить историю поездок, посещений, достижений, отзывов, избранного и персональных маршрутов.</p>
+                                  <div class="auth-feature"><i class="bi bi-shield-check"></i><div><strong>Персональные данные</strong><div class="small opacity-75">Настройки приватности и уведомлений находятся в профиле.</div></div></div>
+                                  <div class="auth-feature"><i class="bi bi-map"></i><div><strong>Собственные маршруты</strong><div class="small opacity-75">Собирайте путь из выбранных храмов и святынь.</div></div></div>
+                                  <div class="auth-feature"><i class="bi bi-people"></i><div><strong>Участие в сообществе</strong><div class="small opacity-75">Публикуйте отзывы, фотографии и путевые заметки.</div></div></div>
+                              </div>
+                          </div>
+                          <div class="col-lg-7">
+                              <div class="auth-form">
+                                  <h2 class="h3 mb-2">Регистрация</h2>
+                                  <p class="text-secondary mb-4">Создайте аккаунт по email или войдите через VK ID.</p>
+
+                                  <a class="btn w-100 py-3 text-white mb-4" style="background:#07f" href="{{ route('auth.vk.redirect') }}"><strong class="me-2">VK</strong>Продолжить через VK ID</a>
+                                  <div class="d-flex align-items-center gap-3 mb-4"><hr class="flex-grow-1"><span class="small text-secondary">или заполните форму</span><hr class="flex-grow-1"></div>
+
+                                  <form method="POST" action="{{ route('register.submit') }}">
+                                      @csrf
+                                      <div class="row g-3">
+                                          <div class="col-12">
+                                              <label class="form-label" for="name">Имя</label>
+                                              <input class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name') }}" required autofocus autocomplete="name">
+                                              @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                          </div>
+                                          <div class="col-md-6">
+                                              <label class="form-label" for="email">Email</label>
+                                              <input class="form-control @error('email') is-invalid @enderror" id="email" name="email" type="email" value="{{ old('email') }}" required autocomplete="email">
+                                              @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                          </div>
+                                          <div class="col-md-6">
+                                              <label class="form-label" for="phone">Телефон</label>
+                                              <input class="form-control @error('phone') is-invalid @enderror" id="phone" name="phone" value="{{ old('phone') }}" placeholder="+7 ..." autocomplete="tel">
+                                              @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                          </div>
+                                          <div class="col-md-6">
+                                              <label class="form-label" for="password">Пароль</label>
+                                              <input class="form-control @error('password') is-invalid @enderror" id="password" name="password" type="password" required autocomplete="new-password">
+                                              @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                          </div>
+                                          <div class="col-md-6">
+                                              <label class="form-label" for="password_confirmation">Повторите пароль</label>
+                                              <input class="form-control" id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password">
+                                          </div>
+                                          <div class="col-12">
+                                              <label class="form-label" for="captcha">Защита от автоматической регистрации: <strong>{{ $captchaQuestion }}</strong></label>
+                                              <input class="form-control @error('captcha') is-invalid @enderror" id="captcha" name="captcha" type="number" inputmode="numeric" required autocomplete="off" placeholder="Введите ответ">
+                                              @error('captcha')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                          </div>
+                                          <div class="col-12">
+                                              <div class="form-check">
+                                                  <input class="form-check-input @error('consent') is-invalid @enderror" id="consent" name="consent" type="checkbox" value="1" @checked(old('consent')) required>
+                                                  <label class="form-check-label small" for="consent">Я согласен с <a href="{{ route('privacy') }}" target="_blank">политикой обработки персональных данных</a> и принимаю <a href="{{ route('terms') }}" target="_blank">правила сервиса</a>.</label>
+                                                  @error('consent')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                              </div>
+                                          </div>
+                                      </div>
+                                      <button class="btn btn-pm-gold w-100 py-3 mt-4" type="submit">Создать аккаунт</button>
+                                  </form>
+
+                                  <div class="small text-secondary text-center mt-3">После регистрации по email потребуется перейти по ссылке из письма.</div>
+                                  <div class="text-center text-secondary mt-4">Уже зарегистрированы? <a class="fw-semibold" href="{{ route('login') }}">Войти</a></div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </section>
+          @endsection
+          '''.replace('          ', ''))
+
+          # User model: email verification, VK fields and custom notifications.
+          replace('app/Models/User.php',
+                  "use Illuminate\\Database\\Eloquent\\Factories\\HasFactory;\n",
+                  "use App\\Notifications\\ResetPasswordNotification;\nuse App\\Notifications\\VerifyEmailNotification;\nuse Illuminate\\Contracts\\Auth\\MustVerifyEmail as MustVerifyEmailContract;\nuse Illuminate\\Database\\Eloquent\\Factories\\HasFactory;\n")
+          replace('app/Models/User.php',
+                  'class User extends Authenticatable\n',
+                  'class User extends Authenticatable implements MustVerifyEmailContract\n')
+          replace('app/Models/User.php',
+                  "        'email',\n        'phone',",
+                  "        'email',\n        'vk_id',\n        'vk_avatar_url',\n        'phone',")
+          replace('app/Models/User.php',
+                  "        return $this->avatar_path ? Storage::disk('public')->url($this->avatar_path) : null;",
+                  "        return $this->avatar_path\n            ? Storage::disk('public')->url($this->avatar_path)\n            : $this->vk_avatar_url;")
+          replace('app/Models/User.php',
+                  "    public function isAdmin(): bool\n",
+                  "    public function sendEmailVerificationNotification(): void\n    {\n        $this->notify(new VerifyEmailNotification());\n    }\n\n    public function sendPasswordResetNotification($token): void\n    {\n        $this->notify(new ResetPasswordNotification($token));\n    }\n\n    public function isAdmin(): bool\n")
+
+          # VK provider registration.
+          replace('app/Providers/EventServiceProvider.php',
+                  "use Illuminate\\Notifications\\Events\\NotificationSent;\n",
+                  "use Illuminate\\Notifications\\Events\\NotificationSent;\nuse MoveMoveApp\\VKID\\VKIDExtendSocialite;\nuse SocialiteProviders\\Manager\\SocialiteWasCalled;\n")
+          replace('app/Providers/EventServiceProvider.php',
+                  "        NotificationSent::class => [\n            SendDatabaseNotificationPush::class,\n        ],",
+                  "        NotificationSent::class => [\n            SendDatabaseNotificationPush::class,\n        ],\n        SocialiteWasCalled::class => [\n            VKIDExtendSocialite::class.'@handle',\n        ],")
+
+          # VK configuration.
+          replace('config/services.php',
+                  "    'ses' => [\n        'key' => env('AWS_ACCESS_KEY_ID'),\n        'secret' => env('AWS_SECRET_ACCESS_KEY'),\n        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),\n    ],",
+                  "    'ses' => [\n        'key' => env('AWS_ACCESS_KEY_ID'),\n        'secret' => env('AWS_SECRET_ACCESS_KEY'),\n        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),\n    ],\n\n    'vkid' => [\n        'client_id' => env('VKID_CLIENT_ID'),\n        'client_secret' => env('VKID_CLIENT_SECRET'),\n        'redirect' => env('VKID_REDIRECT_URI', rtrim((string) env('APP_URL'), '/').'/auth/vk/callback'),\n        'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('VKID_SCOPES', 'email'))))),\n        'pkce_ttl' => (int) env('VKID_PKCE_TTL', 10),\n        'cache_store' => env('VKID_CACHE_STORE', 'file'),\n        'cache_prefix' => env('VKID_CACHE_PREFIX', 'socialite:vkid:pkce:'),\n        'api_version' => env('VKID_API_VERSION', '5.199'),\n    ],")
+
+          env_path = Path('.env.example')
+          env_text = env_path.read_text(encoding='utf-8')
+          if 'VKID_CLIENT_ID=' not in env_text:
+              marker = 'PRIVACY_POLICY_VERSION=1.0\n'
+              block = '''PRIVACY_POLICY_VERSION=1.0
+
+          # VK ID OAuth 2.1. Callback must exactly match the address configured in VK ID.
+          VKID_CLIENT_ID=
+          VKID_CLIENT_SECRET=
+          VKID_REDIRECT_URI="${APP_URL}/auth/vk/callback"
+          VKID_SCOPES=email
+          VKID_PKCE_TTL=10
+          VKID_CACHE_STORE=file
+          VKID_CACHE_PREFIX=socialite:vkid:pkce:
+          VKID_API_VERSION=5.199
+          '''
+              block = '\n'.join(line.strip() for line in block.splitlines()) + '\n'
+              if marker not in env_text:
+                  raise SystemExit('PRIVACY_POLICY_VERSION marker not found')
+              env_path.write_text(env_text.replace(marker, block, 1), encoding='utf-8')
+
+          # Routes.
+          replace('routes/web.php',
+                  "use App\\Http\\Controllers\\Site\\FavoriteController as SiteFavoriteController;\n",
+                  "use App\\Http\\Controllers\\Site\\EmailVerificationController as SiteEmailVerificationController;\nuse App\\Http\\Controllers\\Site\\FavoriteController as SiteFavoriteController;\n")
+          replace('routes/web.php',
+                  "use App\\Http\\Controllers\\Site\\ProfileController as SiteProfileController;\n",
+                  "use App\\Http\\Controllers\\Site\\PasswordResetController as SitePasswordResetController;\nuse App\\Http\\Controllers\\Site\\ProfileController as SiteProfileController;\n")
+          replace('routes/web.php',
+                  "use App\\Http\\Controllers\\Site\\VisitController as SiteVisitController;\n",
+                  "use App\\Http\\Controllers\\Site\\VisitController as SiteVisitController;\nuse App\\Http\\Controllers\\Site\\VkAuthController as SiteVkAuthController;\n")
+          replace('routes/web.php',
+                  "    Route::post('/register', [SiteAuthController::class, 'register'])->middleware('throttle:5,1')->name('register.submit');\n",
+                  "    Route::post('/register', [SiteAuthController::class, 'register'])->middleware('throttle:5,1')->name('register.submit');\n    Route::get('/forgot-password', [SitePasswordResetController::class, 'requestForm'])->name('password.request');\n    Route::post('/forgot-password', [SitePasswordResetController::class, 'sendLink'])->middleware('throttle:5,1')->name('password.email');\n    Route::get('/reset-password/{token}', [SitePasswordResetController::class, 'resetForm'])->name('password.reset');\n    Route::post('/reset-password', [SitePasswordResetController::class, 'reset'])->middleware('throttle:5,1')->name('password.update');\n    Route::get('/auth/vk', [SiteVkAuthController::class, 'redirect'])->name('auth.vk.redirect');\n    Route::get('/auth/vk/callback', [SiteVkAuthController::class, 'callback'])->name('auth.vk.callback');\n")
+          replace('routes/web.php',
+                  "Route::middleware('auth')->group(function () {\n    Route::post('/logout', [SiteAuthController::class, 'logout'])->name('logout');\n\n    Route::get('/notifications',",
+                  "Route::get('/email/verify/{id}/{hash}', [SiteEmailVerificationController::class, 'verify'])\n    ->middleware(['signed', 'throttle:6,1'])\n    ->name('verification.verify');\n\nRoute::middleware('auth')->group(function () {\n    Route::post('/logout', [SiteAuthController::class, 'logout'])->name('logout');\n    Route::get('/email/verify', [SiteEmailVerificationController::class, 'notice'])->name('verification.notice');\n    Route::post('/email/verification-notification', [SiteEmailVerificationController::class, 'resend'])\n        ->middleware('throttle:6,1')\n        ->name('verification.send');\n\n    Route::middleware('verified')->group(function () {\n    Route::get('/notifications',")
+          replace('routes/web.php',
+                  "        ]);\n});\n\nRoute::get('/community/together/{jointPilgrimage:slug}',",
+                  "        ]);\n    });\n});\n\nRoute::get('/community/together/{jointPilgrimage:slug}',")
+          replace('routes/web.php', "->middleware(['auth', 'service'])", "->middleware(['auth', 'verified', 'service'])")
+          replace('routes/web.php', "->middleware(['auth', 'admin'])", "->middleware(['auth', 'verified', 'admin'])")
+
+          # Changing profile email requires new verification.
+          replace('app/Http/Controllers/Site/ProfileController.php',
+                  "        $user = $request->user();\n\n        $data = $request->validate([",
+                  "        $user = $request->user();\n        $currentEmail = mb_strtolower($user->email);\n\n        $data = $request->validate([")
+          replace('app/Http/Controllers/Site/ProfileController.php',
+                  "        $user->fill([\n            'name' => $data['name'],\n            'email' => mb_strtolower($data['email']),",
+                  "        $newEmail = mb_strtolower($data['email']);\n        $emailChanged = ! hash_equals($currentEmail, $newEmail);\n\n        $user->fill([\n            'name' => $data['name'],\n            'email' => $newEmail,")
+          replace('app/Http/Controllers/Site/ProfileController.php',
+                  "        if (! empty($data['password'])) {\n            $user->password = Hash::make($data['password']);\n        }\n\n        $user->save();\n\n        return back()->with('success', 'Настройки профиля сохранены.');",
+                  "        if (! empty($data['password'])) {\n            $user->password = Hash::make($data['password']);\n        }\n\n        if ($emailChanged) {\n            $user->email_verified_at = null;\n        }\n\n        $user->save();\n\n        if ($emailChanged) {\n            $user->sendEmailVerificationNotification();\n\n            return redirect()->route('verification.notice')\n                ->with('success', 'Email изменён. Подтвердите новый адрес по ссылке из письма.');\n        }\n\n        return back()->with('success', 'Настройки профиля сохранены.');")
+
+          # Mobile API registration sends verification mail and exposes verification state.
+          replace('app/Http/Controllers/Api/V1/AuthController.php',
+                  "use Illuminate\\Http\\JsonResponse;\n",
+                  "use Illuminate\\Auth\\Events\\Registered;\nuse Illuminate\\Http\\JsonResponse;\n")
+          replace('app/Http/Controllers/Api/V1/AuthController.php',
+                  "        return response()->json([\n            'token' => $result['token'],",
+                  "        event(new Registered($result['user']));\n\n        return response()->json([\n            'token' => $result['token'],")
+          replace('app/Http/Controllers/Api/V1/AuthController.php',
+                  "            'is_verified_organizer' => (bool) $user->is_verified_organizer,",
+                  "            'email_verified' => $user->hasVerifiedEmail(),\n            'is_verified_organizer' => (bool) $user->is_verified_organizer,")
+
+          write('tests/Feature/AuthenticationFlowTest.php', '''<?php
+
+          namespace Tests\\Feature;
+
+          use App\\Models\\User;
+          use App\\Notifications\\ResetPasswordNotification;
+          use App\\Notifications\\VerifyEmailNotification;
+          use Illuminate\\Foundation\\Testing\\RefreshDatabase;
+          use Illuminate\\Support\\Facades\\Notification;
+          use Illuminate\\Support\\Facades\\URL;
+          use Tests\\TestCase;
+
+          class AuthenticationFlowTest extends TestCase
+          {
+              use RefreshDatabase;
+
+              public function test_registration_rejects_wrong_captcha(): void
+              {
+                  $this->withSession(['registration_captcha_answer' => 7])
+                      ->post('/register', [
+                          'name' => 'Тестовый паломник',
+                          'email' => 'captcha@example.test',
+                          'password' => 'password123',
+                          'password_confirmation' => 'password123',
+                          'captcha' => 6,
+                          'consent' => 1,
+                      ])
+                      ->assertSessionHasErrors('captcha');
+
+                  $this->assertDatabaseMissing('users', ['email' => 'captcha@example.test']);
+              }
+
+              public function test_registration_sends_email_verification_notification(): void
+              {
+                  Notification::fake();
+
+                  $this->withSession(['registration_captcha_answer' => 7])
+                      ->post('/register', [
+                          'name' => 'Тестовый паломник',
+                          'email' => 'pilgrim@example.test',
+                          'password' => 'password123',
+                          'password_confirmation' => 'password123',
+                          'captcha' => 7,
+                          'consent' => 1,
+                      ])
+                      ->assertRedirect(route('verification.notice'));
+
+                  $user = User::query()->where('email', 'pilgrim@example.test')->firstOrFail();
+                  $this->assertNull($user->email_verified_at);
+                  Notification::assertSentTo($user, VerifyEmailNotification::class);
+              }
+
+              public function test_signed_email_link_verifies_user_without_browser_session(): void
+              {
+                  $user = User::factory()->unverified()->create();
+                  $url = URL::temporarySignedRoute('verification.verify', now()->addMinutes(5), [
+                      'id' => $user->id,
+                      'hash' => sha1($user->email),
+                  ]);
+
+                  $this->get($url)->assertRedirect(route('login'));
+                  $this->assertTrue($user->fresh()->hasVerifiedEmail());
+              }
+
+              public function test_unverified_user_is_sent_to_verification_notice_after_login(): void
+              {
+                  $user = User::factory()->unverified()->create([
+                      'password' => bcrypt('password123'),
+                      'is_active' => true,
+                  ]);
+
+                  $this->post('/login', [
+                      'email' => $user->email,
+                      'password' => 'password123',
+                  ])->assertRedirect(route('verification.notice'));
+              }
+
+              public function test_password_reset_request_sends_notification(): void
+              {
+                  Notification::fake();
+                  $user = User::factory()->create();
+
+                  $this->post('/forgot-password', ['email' => $user->email])
+                      ->assertSessionHas('success');
+
+                  Notification::assertSentTo($user, ResetPasswordNotification::class);
+              }
+
+              public function test_vk_login_without_configuration_returns_readable_error(): void
+              {
+                  config()->set('services.vkid.client_id', null);
+                  config()->set('services.vkid.client_secret', null);
+
+                  $this->get('/auth/vk')
+                      ->assertRedirect(route('login'))
+                      ->assertSessionHas('error');
+              }
+          }
+          '''.replace('          ', ''))
+          PY
+
+      - name: Install authentication dependencies
+        run: composer update laravel/socialite socialiteproviders/manager movemoveapp/vkid --with-all-dependencies --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Validate PHP and Blade
+        run: |
+          php -l app/Http/Controllers/Site/AuthController.php
+          php -l app/Http/Controllers/Site/EmailVerificationController.php
+          php -l app/Http/Controllers/Site/PasswordResetController.php
+          php -l app/Http/Controllers/Site/VkAuthController.php
+          php -l app/Models/User.php
+          php -l app/Providers/EventServiceProvider.php
+          php -l config/services.php
+          php -l routes/web.php
+          php -l database/migrations/2026_07_22_120000_add_vk_fields_to_users_table.php
+          php artisan route:list --name=verification
+          php artisan route:list --name=auth.vk
+          php artisan view:clear
+          php artisan view:cache
+
+      - name: Run authentication tests
+        run: php artisan test --filter=AuthenticationFlowTest
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add composer.json composer.lock app config database/migrations resources/views routes tests .env.example
+          git commit -m "feat(auth): add email verification VK ID and registration captcha"
+          git push origin HEAD:main

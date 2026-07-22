@@ -1,0 +1,162 @@
+<?php
+
+namespace App\Http\Controllers\Site;
+
+use App\Http\Controllers\Controller;
+use App\Models\FavoriteList;
+use App\Models\User;
+use App\Services\VkIdProvider;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Laravel\Socialite\Two\InvalidStateException;
+use Throwable;
+
+class VkAuthController extends Controller
+{
+    public function redirect(Request $request): RedirectResponse
+    {
+        if (! $this->configured()) {
+  return redirect()->route('login')
+      ->with('error', 'Вход через VK пока не настроен администратором.');
+        }
+
+        return $this->provider($request)->redirect();
+    }
+
+    public function callback(Request $request): RedirectResponse
+    {
+        if ($request->filled('error')) {
+  return redirect()->route('login')
+      ->with('error', 'Авторизация VK была отменена или завершилась ошибкой.');
+        }
+
+        if (! $this->configured()) {
+  return redirect()->route('login')
+      ->with('error', 'Вход через VK пока не настроен администратором.');
+        }
+
+        try {
+  $vkUser = $this->provider($request)->user();
+  $vkId = trim((string) $vkUser->getId());
+
+  if ($vkId === '') {
+      throw new \RuntimeException('VK ID did not return user id.');
+  }
+
+  $email = mb_strtolower(trim((string) ($vkUser->getEmail() ?? '')));
+  if ($email !== '' && ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+      $email = '';
+  }
+
+  $name = trim((string) ($vkUser->getName() ?? '')) ?: 'Пользователь VK';
+  $avatar = trim((string) ($vkUser->getAvatar() ?? '')) ?: null;
+  $phone = trim((string) ($vkUser->user['phone'] ?? '')) ?: null;
+
+  $user = DB::transaction(function () use ($request, $vkId, $email, $name, $avatar, $phone) {
+      $user = User::query()->where('vk_id', $vkId)->first();
+
+      if (! $user && $email !== '') {
+$user = User::query()->where('email', $email)->first();
+      }
+
+      if ($user && $user->vk_id && $user->vk_id !== $vkId) {
+throw new \RuntimeException('Email is already linked to another VK account.');
+      }
+
+      if (! $user) {
+$localEmail = $email !== '' ? $email : 'vk_'.$vkId.'@users.palomnik.invalid';
+
+$user = User::query()->create([
+    'name' => $name,
+    'email' => $localEmail,
+    'email_verified_at' => now(),
+    'phone' => $phone,
+    'password' => Hash::make(Str::random(64)),
+    'vk_id' => $vkId,
+    'vk_avatar_url' => $avatar,
+    'role' => User::ROLE_PILGRIM,
+    'is_active' => true,
+    'preferences' => [
+        'notifications' => true,
+        'privacy' => 'private',
+        'theme' => 'system',
+        'font_size' => 'normal',
+        'interests' => [],
+    ],
+]);
+
+FavoriteList::query()->create([
+    'user_id' => $user->id,
+    'name' => 'Избранное',
+    'is_default' => true,
+]);
+
+$user->consents()->create([
+    'type' => 'personal_data_processing',
+    'policy_version' => config('palomnik.privacy.policy_version', '1.0'),
+    'accepted_at' => now(),
+    'ip_address' => $request->ip(),
+    'user_agent' => mb_substr((string) $request->userAgent(), 0, 2000),
+]);
+      } else {
+$updates = [
+    'vk_id' => $vkId,
+    'vk_avatar_url' => $avatar ?: $user->vk_avatar_url,
+];
+
+if ($email !== '' && hash_equals(mb_strtolower($user->email), $email) && ! $user->email_verified_at) {
+    $updates['email_verified_at'] = now();
+}
+
+if (! $user->phone && $phone) {
+    $updates['phone'] = $phone;
+}
+
+$user->forceFill($updates)->save();
+      }
+
+      return $user->fresh();
+  });
+
+  if (! $user->is_active) {
+      return redirect()->route('login')->with('error', 'Учётная запись заблокирована.');
+  }
+
+  Auth::login($user, true);
+  $request->session()->regenerate();
+
+  return redirect()->intended(route('profile.dashboard'))
+      ->with('success', 'Вы вошли через VK ID.');
+        } catch (InvalidStateException $exception) {
+  return redirect()->route('login')
+      ->with('error', 'Сессия VK ID устарела. Повторите вход.');
+        } catch (Throwable $exception) {
+  report($exception);
+
+  return redirect()->route('login')
+      ->with('error', 'Не удалось войти через VK ID. Повторите попытку позднее.');
+        }
+    }
+
+    private function configured(): bool
+    {
+        return filled(config('services.vkid.client_id'))
+  && filled(config('services.vkid.client_secret'))
+  && filled(config('services.vkid.redirect'));
+    }
+
+    private function provider(Request $request): VkIdProvider
+    {
+        return (new VkIdProvider(
+  $request,
+  (string) config('services.vkid.client_id'),
+  (string) config('services.vkid.client_secret'),
+  (string) config('services.vkid.redirect'),
+  ['timeout' => 20, 'connect_timeout' => 10]
+        ))->setScopes(config('services.vkid.scopes', ['email']));
+    }
+}

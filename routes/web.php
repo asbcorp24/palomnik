@@ -21,11 +21,13 @@ use App\Http\Controllers\Site\BlogPostController as SiteBlogPostController;
 use App\Http\Controllers\Site\BookingController as SiteBookingController;
 use App\Http\Controllers\Site\CalendarController as SiteCalendarController;
 use App\Http\Controllers\Site\CommunityController as SiteCommunityController;
+use App\Http\Controllers\Site\EmailVerificationController as SiteEmailVerificationController;
 use App\Http\Controllers\Site\FavoriteController as SiteFavoriteController;
 use App\Http\Controllers\Site\HomeController as SiteHomeController;
 use App\Http\Controllers\Site\MapController as SiteMapController;
 use App\Http\Controllers\Site\NotificationController as SiteNotificationController;
 use App\Http\Controllers\Site\ObjectController as SiteObjectController;
+use App\Http\Controllers\Site\PasswordResetController as SitePasswordResetController;
 use App\Http\Controllers\Site\ProfileController as SiteProfileController;
 use App\Http\Controllers\Site\ReviewController as SiteReviewController;
 use App\Http\Controllers\Site\RouteController as SiteRouteController;
@@ -36,6 +38,7 @@ use App\Http\Controllers\Site\TogetherController as SiteTogetherController;
 use App\Http\Controllers\Site\TogetherMessageController as SiteTogetherMessageController;
 use App\Http\Controllers\Site\UserMediaController as SiteUserMediaController;
 use App\Http\Controllers\Site\VisitController as SiteVisitController;
+use App\Http\Controllers\Site\VkAuthController as SiteVkAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', SiteHomeController::class)->name('home');
@@ -63,11 +66,26 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [SiteAuthController::class, 'login'])->middleware('throttle:10,1')->name('login.submit');
     Route::get('/register', [SiteAuthController::class, 'showRegisterForm'])->name('register');
     Route::post('/register', [SiteAuthController::class, 'register'])->middleware('throttle:5,1')->name('register.submit');
+    Route::get('/forgot-password', [SitePasswordResetController::class, 'requestForm'])->name('password.request');
+    Route::post('/forgot-password', [SitePasswordResetController::class, 'sendLink'])->middleware('throttle:5,1')->name('password.email');
+    Route::get('/reset-password/{token}', [SitePasswordResetController::class, 'resetForm'])->name('password.reset');
+    Route::post('/reset-password', [SitePasswordResetController::class, 'reset'])->middleware('throttle:5,1')->name('password.update');
+    Route::get('/auth/vk', [SiteVkAuthController::class, 'redirect'])->name('auth.vk.redirect');
+    Route::get('/auth/vk/callback', [SiteVkAuthController::class, 'callback'])->name('auth.vk.callback');
 });
+
+Route::get('/email/verify/{id}/{hash}', [SiteEmailVerificationController::class, 'verify'])
+    ->middleware(['signed', 'throttle:6,1'])
+    ->name('verification.verify');
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [SiteAuthController::class, 'logout'])->name('logout');
+    Route::get('/email/verify', [SiteEmailVerificationController::class, 'notice'])->name('verification.notice');
+    Route::post('/email/verification-notification', [SiteEmailVerificationController::class, 'resend'])
+        ->middleware('throttle:6,1')
+        ->name('verification.send');
 
+    Route::middleware('verified')->group(function () {
     Route::get('/notifications', [SiteNotificationController::class, 'index'])->name('notifications.index');
     Route::put('/notifications/{notification}/read', [SiteNotificationController::class, 'read'])->name('notifications.read');
     Route::post('/notifications/read-all', [SiteNotificationController::class, 'readAll'])->name('notifications.read-all');
@@ -131,13 +149,14 @@ Route::middleware('auth')->group(function () {
             'update' => 'route-plans.update',
             'destroy' => 'route-plans.destroy',
         ]);
+    });
 });
 
 Route::get('/community/together/{jointPilgrimage:slug}', [SiteTogetherController::class, 'show'])->name('together.show');
 
 Route::prefix('service')
     ->name('service.')
-    ->middleware(['auth', 'service'])
+    ->middleware(['auth', 'verified', 'service'])
     ->group(function () {
         Route::get('/', ServiceDashboardController::class)->name('dashboard');
         Route::get('/objects', [ServiceObjectController::class, 'index'])->name('objects.index');
@@ -155,7 +174,7 @@ Route::post('/admin/login', [AdminAuthController::class, 'login'])->middleware('
 
 Route::prefix('admin')
     ->name('admin.')
-    ->middleware(['auth', 'admin'])
+    ->middleware(['auth', 'verified', 'admin'])
     ->group(function () {
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
         Route::get('/', AdminDashboardController::class)->name('dashboard');

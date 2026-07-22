@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\FavoriteList;
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,8 @@ class AuthController extends Controller
 
             return compact('user', 'token');
         });
+
+        event(new Registered($result['user']));
 
         return response()->json([
             'token' => $result['token'],
@@ -119,6 +122,7 @@ class AuthController extends Controller
             'avatar_url' => $user->avatar_url,
             'birth_date' => optional($user->birth_date)->format('Y-m-d'),
             'preferences' => $user->preferences ?: [],
+            'email_verified' => $user->hasVerifiedEmail(),
             'is_verified_organizer' => (bool) $user->is_verified_organizer,
         ];
     }

@@ -63,6 +63,7 @@ class ProfileController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $user = $request->user();
+        $currentEmail = mb_strtolower($user->email);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -87,9 +88,12 @@ class ProfileController extends Controller
             $user->avatar_path = $request->file('avatar')->store('avatars', 'public');
         }
 
+        $newEmail = mb_strtolower($data['email']);
+        $emailChanged = ! hash_equals($currentEmail, $newEmail);
+
         $user->fill([
             'name' => $data['name'],
-            'email' => mb_strtolower($data['email']),
+            'email' => $newEmail,
             'phone' => ! empty($data['phone']) ? $data['phone'] : null,
             'birth_date' => ! empty($data['birth_date']) ? $data['birth_date'] : null,
             'preferences' => [
@@ -105,7 +109,18 @@ class ProfileController extends Controller
             $user->password = Hash::make($data['password']);
         }
 
+        if ($emailChanged) {
+            $user->email_verified_at = null;
+        }
+
         $user->save();
+
+        if ($emailChanged) {
+            $user->sendEmailVerificationNotification();
+
+            return redirect()->route('verification.notice')
+                ->with('success', 'Email изменён. Подтвердите новый адрес по ссылке из письма.');
+        }
 
         return back()->with('success', 'Настройки профиля сохранены.');
     }

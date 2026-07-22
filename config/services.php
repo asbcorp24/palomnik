@@ -30,4 +30,15 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'vkid' => [
+        'client_id' => env('VKID_CLIENT_ID'),
+        'client_secret' => env('VKID_CLIENT_SECRET'),
+        'redirect' => env('VKID_REDIRECT_URI', rtrim((string) env('APP_URL'), '/').'/auth/vk/callback'),
+        'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('VKID_SCOPES', 'email'))))),
+        'pkce_ttl' => (int) env('VKID_PKCE_TTL', 10),
+        'cache_store' => env('VKID_CACHE_STORE', 'file'),
+        'cache_prefix' => env('VKID_CACHE_PREFIX', 'socialite:vkid:pkce:'),
+        'api_version' => env('VKID_API_VERSION', '5.199'),
+    ],
+
 ];

@@ -1,0 +1,3 @@
+patch=success
+composer=failure
+tests=success

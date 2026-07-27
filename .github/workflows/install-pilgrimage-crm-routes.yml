@@ -1,0 +1,100 @@
+name: Install pilgrimage CRM routes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/install-pilgrimage-crm-routes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Add routes and sidebar link
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Pattern not found in {path}: {old[:180]!r}')
+              file.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace(
+              'routes/web.php',
+              "use App\\Http\\Controllers\\Admin\\PilgrimageObjectController as AdminPilgrimageObjectController;\n",
+              "use App\\Http\\Controllers\\Admin\\PilgrimageObjectController as AdminPilgrimageObjectController;\nuse App\\Http\\Controllers\\Admin\\PilgrimageCrmController as AdminPilgrimageCrmController;\n",
+          )
+
+          routes = '''        Route::get('/crm', [AdminPilgrimageCrmController::class, 'index'])->name('crm.index');
+          Route::get('/crm/create', [AdminPilgrimageCrmController::class, 'create'])->name('crm.create');
+          Route::post('/crm', [AdminPilgrimageCrmController::class, 'store'])->name('crm.store');
+          Route::get('/crm/reports', [AdminPilgrimageCrmController::class, 'reports'])->name('crm.reports');
+          Route::get('/crm/export/bookings', [AdminPilgrimageCrmController::class, 'exportBookings'])->name('crm.export');
+          Route::post('/crm/bulk', [AdminPilgrimageCrmController::class, 'bulkUpdate'])->name('crm.bulk');
+          Route::get('/crm/trips/{trip}', [AdminPilgrimageCrmController::class, 'trip'])->name('crm.trip');
+          Route::get('/crm/trips/{trip}/export', [AdminPilgrimageCrmController::class, 'exportTrip'])->name('crm.trip.export');
+          Route::get('/crm/trips/{trip}/print', [AdminPilgrimageCrmController::class, 'printTrip'])->name('crm.trip.print');
+          Route::get('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'show'])->name('crm.show');
+          Route::put('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'update'])->name('crm.update');
+          Route::post('/crm/bookings/{booking}/notes', [AdminPilgrimageCrmController::class, 'addNote'])->name('crm.notes.store');
+          Route::post('/crm/bookings/{booking}/participants', [AdminPilgrimageCrmController::class, 'storeParticipant'])->name('crm.participants.store');
+          Route::put('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'updateParticipant'])->name('crm.participants.update');
+          Route::delete('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'destroyParticipant'])->name('crm.participants.destroy');
+          Route::redirect('/moderation/bookings', '/admin/crm')->name('crm.legacy-bookings');
+
+          '''.replace('          ', '        ')
+
+          replace(
+              'routes/web.php',
+              "        Route::redirect('/help', '/help?section=admin')->name('help');\n\n        Route::resource('calendar',",
+              "        Route::redirect('/help', '/help?section=admin')->name('help');\n\n" + routes + "        Route::resource('calendar',",
+          )
+
+          replace(
+              'resources/views/admin/layouts/app.blade.php',
+              "            <a class=\"sidebar-link {{ request()->is('admin/moderation/bookings*') ? 'active' : '' }}\" href=\"{{ route('admin.moderation.index', 'bookings') }}\"><i class=\"bi bi-ticket-perforated\"></i><span>Бронирования и билеты</span></a>",
+              "            <a class=\"sidebar-link {{ request()->routeIs('admin.crm.*') ? 'active' : '' }}\" href=\"{{ route('admin.crm.index') }}\"><i class=\"bi bi-headset\"></i><span>CRM заявок</span></a>",
+          )
+          PY
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare and validate application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php -l app/Http/Controllers/Admin/PilgrimageCrmController.php
+          php -l app/Services/BookingCrmService.php
+          php -l app/Models/BookingParticipant.php
+          php -l app/Models/BookingActivity.php
+          php -l database/migrations/2026_07_27_120000_create_pilgrimage_crm_tables.php
+          php -l routes/web.php
+          php artisan route:list --name=admin.crm
+          php artisan view:clear
+          php artisan view:cache
+          php artisan test --filter=PilgrimageCrmTest
+
+      - name: Commit routes and navigation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add routes/web.php resources/views/admin/layouts/app.blade.php
+          git commit -m "feat(crm): register pilgrimage CRM navigation"
+          git push origin HEAD:main

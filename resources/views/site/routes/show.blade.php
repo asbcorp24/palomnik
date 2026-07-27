@@ -34,6 +34,23 @@
                         @empty<div class="filter-card text-secondary">Точки маршрута ещё не добавлены.</div>@endforelse
                     </div>
                 </section>
+
+                @if($pilgrimageRoute->pilgrimagePhotos->isNotEmpty())
+                    <section class="mt-5">
+                        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+                            <div><div class="section-kicker mb-2">Фотолетопись</div><h2 class="h2 mb-0">Фото паломников</h2></div>
+                            <a class="btn btn-outline-pm" href="{{ route('community.photos', ['route' => $pilgrimageRoute->slug]) }}">Все фотографии</a>
+                        </div>
+                        <div class="row g-3">
+                            @foreach($pilgrimageRoute->pilgrimagePhotos as $photo)
+                                <div class="col-6 col-md-4">
+                                    <a href="{{ $photo->url }}" target="_blank" rel="noopener"><img class="gallery-image" src="{{ $photo->url }}" alt="{{ $photo->title ?: $pilgrimageRoute->title }}" loading="lazy"></a>
+                                    <div class="small mt-2"><strong>{{ $photo->title ?: 'Паломническое фото' }}</strong><br><span class="text-secondary">{{ optional($photo->user)->name }}</span></div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
             </div>
 
             <aside class="col-lg-4">
@@ -73,6 +90,7 @@
                         @empty<p class="small text-secondary mb-0">Даты организованных поездок пока не опубликованы. Маршрут можно пройти самостоятельно.</p>@endforelse
                     </div>
 
+                    @auth<a class="btn btn-pm-gold py-3" href="{{ route('profile.photos') }}"><i class="bi bi-camera me-2"></i>Добавить фото маршрута</a>@endauth
                     @auth<a class="btn btn-outline-pm py-3" href="{{ route('route-plans.create') }}"><i class="bi bi-plus-circle me-2"></i>Создать свой маршрут</a>@endauth
                     <a class="btn btn-outline-pm py-3" href="{{ route('map', ['route' => $pilgrimageRoute->slug]) }}"><i class="bi bi-map me-2"></i>Показать маршрут на карте</a>
                 </div>

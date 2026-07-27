@@ -42,6 +42,7 @@ class UserMediaController extends Controller
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
             'status' => 'pending',
+            'publication_requested' => true,
         ]);
 
         return back()->with('success', 'Файл загружен и отправлен на модерацию.');

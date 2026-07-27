@@ -27,9 +27,10 @@ class CommunityController extends Controller
 
         $mediaItems = UserMedia::query()
             ->where('status', 'published')
+            ->where('publication_requested', true)
             ->where('type', 'image')
-            ->with(['user', 'pilgrimageObject'])
-            ->latest()
+            ->with(['user', 'pilgrimageObject', 'pilgrimageRoute'])
+            ->latest('published_at')
             ->limit(8)
             ->get();
 

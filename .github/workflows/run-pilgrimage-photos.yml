@@ -1,0 +1,77 @@
+name: Run pilgrimage photos implementation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/run-pilgrimage-photos.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Apply feature source changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          source = Path('.github/workflows/add-pilgrimage-photos.yml').read_text(encoding='utf-8')
+          marker = "          python - <<'PY'\n"
+          start = source.index(marker) + len(marker)
+          end = source.index("\n          PY", start)
+          script = textwrap.dedent(source[start:end])
+          exec(compile(script, 'pilgrimage-photo-patch', 'exec'), {})
+          PY
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare and validate Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php -l app/Http/Controllers/Site/PilgrimagePhotoController.php
+          php -l app/Http/Controllers/Api/V1/MobileActionController.php
+          php -l app/Http/Controllers/Admin/ModerationController.php
+          php -l app/Models/UserMedia.php
+          php -l app/Models/PilgrimageRoute.php
+          php -l routes/web.php
+          php -l routes/api.php
+          php -l database/migrations/2026_07_27_210000_add_publication_and_route_to_user_media_table.php
+          php artisan view:clear
+          php artisan view:cache
+          php artisan test --filter=PilgrimagePhotoTest
+          php artisan test --filter=HelpPageTest
+
+      - name: Validate Flutter
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter test
+
+      - name: Commit implementation
+        run: |
+          rm -f .github/workflows/add-pilgrimage-photos.yml .github/workflows/run-pilgrimage-photos.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(photos): add route-linked pilgrimage photo library"
+          git push origin HEAD:main

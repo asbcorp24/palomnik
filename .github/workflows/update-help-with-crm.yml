@@ -1,0 +1,259 @@
+name: Update help with CRM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/update-help-with-crm.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Add new help sections
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('resources/views/site/help.blade.php')
+          text = path.read_text(encoding='utf-8')
+
+          def replace(old, new):
+              global text
+              if old not in text:
+                  raise SystemExit('Help marker not found: ' + old[:180])
+              text = text.replace(old, new, 1)
+
+          replace(
+              'поиск святынь, карта, маршруты, поездки, личный кабинет, сообщество\n                    и управление платформой.',
+              'поиск святынь, карта, маршруты, поездки, личный кабинет, сообщество,\n                    CRM паломнических заявок и управление платформой.'
+          )
+
+          replace(
+              '<span class="text-secondary small">Объекты, маршруты, справочники, пользователи и модерация.</span>',
+              '<span class="text-secondary small">CRM заявок, участники поездок, отчёты, объекты, маршруты и модерация.</span>'
+          )
+
+          replace(
+              'placeholder="Найти в справке: билет, маршрут, фото, пользователь..."',
+              'placeholder="Найти в справке: CRM, участник, отчёт, билет, маршрут..."'
+          )
+
+          old_registration = '''                                        <div class="help-step"><span class="help-step-number">1</span><div>Нажмите <a href="{{ route('register') }}">«Регистрация»</a> в правой части верхнего меню.</div></div>
+                                        <div class="help-step"><span class="help-step-number">2</span><div>Введите имя, электронную почту, телефон и пароль. Используйте действующий адрес электронной почты.</div></div>
+                                        <div class="help-step"><span class="help-step-number">3</span><div>Примите правила сервиса и политику обработки персональных данных.</div></div>
+                                        <div class="help-step"><span class="help-step-number">4</span><div>После создания аккаунта войдите на сайт и откройте личный кабинет.</div></div>
+                                        <div class="help-note">Пароль должен быть известен только владельцу аккаунта. Администратор не видит исходный пароль пользователя.</div>'''
+          new_registration = '''                                        <div class="help-step"><span class="help-step-number">1</span><div>Нажмите <a href="{{ route('register') }}">«Регистрация»</a> в правой части верхнего меню.</div></div>
+                                        <div class="help-step"><span class="help-step-number">2</span><div>Выберите способ: продолжить через <strong>VK ID</strong> либо заполнить форму регистрации по email.</div></div>
+                                        <div class="help-step"><span class="help-step-number">3</span><div>При регистрации по email укажите имя, действующую электронную почту, телефон и пароль.</div></div>
+                                        <div class="help-step"><span class="help-step-number">4</span><div>Решите простой арифметический пример — это защита от автоматических регистраций.</div></div>
+                                        <div class="help-step"><span class="help-step-number">5</span><div>Примите правила сервиса и политику обработки персональных данных, затем создайте аккаунт.</div></div>
+                                        <div class="help-step"><span class="help-step-number">6</span><div>Откройте письмо от «Московского паломника» и нажмите <strong>«Подтвердить email»</strong>. До подтверждения доступ к основным функциям личного кабинета ограничен.</div></div>
+                                        <div class="help-note">При входе через VK ID отдельное подтверждение email обычно не требуется. Пароль известен только владельцу аккаунта; администратор не видит его исходное значение.</div>'''
+          replace(old_registration, new_registration)
+
+          replace(
+              'data-help-search="регистрация создать аккаунт пользователь имя email телефон пароль вход"',
+              'data-help-search="регистрация создать аккаунт пользователь имя email телефон пароль вход vk капча подтверждение письмо"'
+          )
+
+          old_login = '''                                        <p>Для входа откройте <a href="{{ route('login') }}">страницу авторизации</a>, укажите электронную почту и пароль.</p>
+                                        <p>Для выхода откройте меню пользователя в верхней части сайта и нажмите <strong>«Выйти»</strong>. На общедоступном компьютере всегда завершайте сеанс после работы.</p>
+                                        <div class="help-warning">Если вход не выполняется, проверьте раскладку клавиатуры, регистр букв и отсутствие пробелов. Отключённый администратором аккаунт не сможет войти до повторной активации.</div>'''
+          new_login = '''                                        <p>Откройте <a href="{{ route('login') }}">страницу авторизации</a>. Можно войти по email и паролю либо нажать <strong>«Войти через VK ID»</strong>.</p>
+                                        <p>При забытом пароле нажмите <strong>«Забыли пароль?»</strong>, укажите email и перейдите по ссылке из письма. Если письмо подтверждения не пришло, на странице проверки email доступна повторная отправка.</p>
+                                        <p>Для выхода откройте меню пользователя в верхней части сайта и нажмите <strong>«Выйти»</strong>. На общедоступном компьютере всегда завершайте сеанс после работы.</p>
+                                        <div class="help-warning">Если вход не выполняется, проверьте раскладку клавиатуры, регистр букв, отсутствие пробелов и подтверждение email. Отключённый администратором аккаунт не сможет войти до повторной активации.</div>'''
+          replace(old_login, new_login)
+
+          replace(
+              'data-help-search="вход авторизация выйти забыли пароль аккаунт заблокирован"',
+              'data-help-search="вход авторизация выйти забыли пароль восстановление email vk подтверждение аккаунт заблокирован"'
+          )
+
+          replace(
+              '                        <a href="#admin-routes"><i class="bi bi-signpost-split"></i>Маршруты и события</a>\n                        <a href="#admin-bookings"><i class="bi bi-ticket-perforated"></i>Билеты и поездки</a>',
+              '                        <a href="#admin-routes"><i class="bi bi-signpost-split"></i>Маршруты и события</a>\n                        <a href="#admin-crm"><i class="bi bi-kanban"></i>CRM заявок</a>\n                        <a href="#admin-bookings"><i class="bi bi-qr-code-scan"></i>QR-билеты</a>'
+          )
+
+          crm_section = '''
+                    <div class="help-section mb-5" id="admin-crm" data-help-section>
+                        <div class="help-section-heading">
+                            <span class="help-role-icon"><i class="bi bi-kanban"></i></span>
+                            <div><div class="section-kicker">Работа с обращениями</div><h2 class="h3 mb-0">CRM паломнических заявок</h2></div>
+                        </div>
+
+                        <div class="accordion help-accordion" id="adminCrmAccordion">
+                            <div class="accordion-item help-search-item" data-help-search="crm заявки реестр сводка поиск фильтры просроченные контакты долг оплата">
+                                <h3 class="accordion-header" id="adminCrmOverviewHeading">
+                                    <button class="accordion-button" data-bs-toggle="collapse" data-bs-target="#adminCrmOverview" type="button">Главный экран CRM и показатели</button>
+                                </h3>
+                                <div class="accordion-collapse collapse show" id="adminCrmOverview" data-bs-parent="#adminCrmAccordion">
+                                    <div class="accordion-body">
+                                        <p>Откройте <a href="{{ $isAdministrator ? route('admin.crm.index') : route('admin.login') }}">раздел «CRM заявок»</a>. В верхней части отображаются количество заявок и участников, подтверждённые места, ожидающие решения, оплаченная сумма, задолженность и просроченные контакты.</p>
+                                        <p>Поиск работает по ФИО, телефону, email, коду билета, участнику и названию маршрута. Фильтры позволяют выбрать поездку, статус, этап CRM, оплату, приоритет, источник, менеджера и период.</p>
+                                        <div class="help-note">Красным или приоритетным порядком выводятся срочные заявки и обращения, по которым наступило время следующего контакта.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item help-search-item" data-help-search="этап crm новая связаться связались ждем решение готово закрыта приоритет источник менеджер следующий контакт">
+                                <h3 class="accordion-header" id="adminCrmStagesHeading">
+                                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#adminCrmStages" type="button">Этапы обработки, приоритет и ответственный</button>
+                                </h3>
+                                <div class="accordion-collapse collapse" id="adminCrmStages" data-bs-parent="#adminCrmAccordion">
+                                    <div class="accordion-body">
+                                        <ul class="help-checklist">
+                                            <li><strong>Новая заявка</strong> — поступила с сайта, приложения или создана сотрудником.</li>
+                                            <li><strong>Нужно связаться</strong> — требуется звонок, письмо или сообщение.</li>
+                                            <li><strong>Связались</strong> — первый контакт выполнен, информация передана.</li>
+                                            <li><strong>Ждём решение</strong> — клиент или отдельные участники ещё не подтвердили поездку.</li>
+                                            <li><strong>Готово к поездке</strong> — состав группы и основные данные проверены.</li>
+                                            <li><strong>Закрыта</strong> — работа по заявке завершена или заявка отменена.</li>
+                                        </ul>
+                                        <p>Назначьте ответственного менеджера, приоритет и дату следующего контакта. После звонка включите отметку <strong>«Связались с клиентом»</strong> и добавьте результат в историю.</p>
+                                        <div class="help-warning">Не используйте внутренние заметки для лишних персональных или медицинских данных. Сохраняйте только сведения, необходимые для организации поездки.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item help-search-item" data-help-search="создать заявку вручную телефон email vk личный визит участники список имена источник">
+                                <h3 class="accordion-header" id="adminCrmCreateHeading">
+                                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#adminCrmCreate" type="button">Создание заявки вручную</button>
+                                </h3>
+                                <div class="accordion-collapse collapse" id="adminCrmCreate" data-bs-parent="#adminCrmAccordion">
+                                    <div class="accordion-body">
+                                        <div class="help-step"><span class="help-step-number">1</span><div>Нажмите <strong>«Новая заявка»</strong> на главной странице CRM.</div></div>
+                                        <div class="help-step"><span class="help-step-number">2</span><div>Выберите поездку, укажите контактное лицо, телефон, email и количество участников.</div></div>
+                                        <div class="help-step"><span class="help-step-number">3</span><div>Выберите источник: телефон, email, VK, личный визит, партнёр или другой канал.</div></div>
+                                        <div class="help-step"><span class="help-step-number">4</span><div>ФИО участников можно вставить списком — по одному человеку в каждой строке.</div></div>
+                                        <div class="help-step"><span class="help-step-number">5</span><div>Проверьте стоимость, статус оплаты, этап CRM, ответственного и сохраните заявку.</div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item help-search-item" data-help-search="участники кто едет не едет не определился прибыл не явился дата рождения оплата список">
+                                <h3 class="accordion-header" id="adminCrmParticipantsHeading">
+                                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#adminCrmParticipants" type="button">Контроль «кто едет» и фактической явки</button>
+                                </h3>
+                                <div class="accordion-collapse collapse" id="adminCrmParticipants" data-bs-parent="#adminCrmAccordion">
+                                    <div class="accordion-body">
+                                        <p>В карточке заявки каждый человек ведётся отдельно. Для участника доступны ФИО, телефон, email, дата рождения, примечание, оплаченная сумма, решение и явка.</p>
+                                        <ul class="help-checklist mb-0">
+                                            <li><strong>Решение:</strong> не определился, едет, не едет.</li>
+                                            <li><strong>Явка:</strong> не отмечен, прибыл, не явился.</li>
+                                            <li>Отказавшийся участник не должен занимать место в фактическом составе группы.</li>
+                                            <li>Перед закрытием посадки сравните список с QR-сканером и ведомостью поездки.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item help-search-item" data-help-search="ведомость поездки список участников печать pdf csv места вместимость массовое изменение">
+                                <h3 class="accordion-header" id="adminCrmManifestHeading">
+                                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#adminCrmManifest" type="button">Ведомость конкретной поездки</button>
+                                </h3>
+                                <div class="accordion-collapse collapse" id="adminCrmManifest" data-bs-parent="#adminCrmAccordion">
+                                    <div class="accordion-body">
+                                        <p>Откройте расписание поездок и нажмите кнопку ведомости либо выберите поездку в CRM. На странице отображаются вместимость, заявки, состав группы, решения участников, явка и оплата.</p>
+                                        <p>Доступны печатная версия для автобуса или места сбора и экспорт CSV для Excel. Перед поездкой распечатайте актуальную ведомость после последнего обзвона.</p>
+                                        <div class="help-success">Для нескольких заявок одновременно используйте массовое изменение статуса, этапа CRM, оплаты или ответственного сотрудника.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item help-search-item" data-help-search="отчеты crm период поездка источник статус динамика заявки участники сумма оплачено долг csv экспорт">
+                                <h3 class="accordion-header" id="adminCrmReportsHeading">
+                                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#adminCrmReports" type="button">Отчёты и экспорт</button>
+                                </h3>
+                                <div class="accordion-collapse collapse" id="adminCrmReports" data-bs-parent="#adminCrmAccordion">
+                                    <div class="accordion-body">
+                                        <p>Откройте <a href="{{ $isAdministrator ? route('admin.crm.reports') : route('admin.login') }}">«CRM заявок → Отчёты»</a>. Выберите период и при необходимости конкретную поездку.</p>
+                                        <p>Отчёт показывает заявки, число людей, кто едет и отказался, прибытия и неявки, общую сумму, оплату, задолженность, распределение по поездкам, источникам и статусам, а также динамику по дням.</p>
+                                        <p>Кнопка экспорта формирует CSV в кодировке UTF-8, пригодный для открытия в Excel. Перед передачей файла проверьте, кому разрешено видеть персональные данные участников.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item help-search-item" data-help-search="ежедневная работа crm новые заявки звонки просроченные контакты оплата состав группы закрыть">
+                                <h3 class="accordion-header" id="adminCrmDailyHeading">
+                                    <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#adminCrmDaily" type="button">Ежедневный порядок работы в CRM</button>
+                                </h3>
+                                <div class="accordion-collapse collapse" id="adminCrmDaily" data-bs-parent="#adminCrmAccordion">
+                                    <div class="accordion-body">
+                                        <ol class="mb-0">
+                                            <li>Проверьте новые и просроченные заявки.</li>
+                                            <li>Назначьте ответственных и время следующего контакта.</li>
+                                            <li>Свяжитесь с клиентами и запишите результат в историю.</li>
+                                            <li>Уточните состав: кто едет, кто отказался, кто ещё думает.</li>
+                                            <li>Проверьте оплату и задолженность.</li>
+                                            <li>Перед поездкой сформируйте ведомость и закройте запись при заполнении мест.</li>
+                                            <li>После поездки отметьте прибывших и неявившихся, затем завершите заявки.</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+'''
+
+          marker = '                    <div class="help-section mb-5" id="admin-bookings" data-help-section>'
+          if marker not in text:
+              raise SystemExit('Admin bookings marker not found')
+          text = text.replace(marker, crm_section + marker, 1)
+
+          replace(
+              '<div><div class="section-kicker">Участники поездок</div><h2 class="h3 mb-0">Бронирования и QR-билеты</h2></div>',
+              '<div><div class="section-kicker">Посадка и контроль билетов</div><h2 class="h3 mb-0">QR-билеты и регистрация участников</h2></div>'
+          )
+
+          old_booking_body = '''                                        <p>В разделе <span class="help-path">Бронирования и билеты</span> фильтруйте заявки по статусу и поездке. Перед подтверждением проверьте число участников, доступную вместимость и контактные данные.</p>
+                                        <p>Изменяйте статус последовательно и не подтверждайте больше участников, чем позволяет вместимость поездки.</p>'''
+          new_booking_body = '''                                        <p>Основная обработка заявок теперь выполняется в разделе <span class="help-path">CRM заявок</span>. Там ведутся контакты, ответственные, оплаты, состав группы и отчёты.</p>
+                                        <p>Раздел QR-билетов используется при посадке: для поиска билета, проверки его действительности и фиксации фактически прибывших участников.</p>'''
+          replace(old_booking_body, new_booking_body)
+
+          replace(
+              'data-help-search="бронирования заявки статус участники оплата подтвердить отменить завершить возврат"',
+              'data-help-search="crm бронирования заявки статус участники оплата подтвердить отменить qr посадка"'
+          )
+          replace(
+              '>Обработка бронирований</button>',
+              '>Связь CRM и электронных билетов</button>'
+          )
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Install dependencies and validate
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php artisan view:clear
+          php artisan view:cache
+          php artisan test --filter=HelpPageTest
+
+      - name: Commit help update and remove workflow
+        run: |
+          rm -f .github/workflows/update-help-with-crm.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs(help): add CRM and updated authentication guides"
+          git push origin HEAD:main

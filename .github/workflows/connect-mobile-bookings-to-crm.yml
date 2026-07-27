@@ -1,0 +1,161 @@
+name: Connect mobile bookings to CRM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/connect-mobile-bookings-to-crm.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Patch mobile booking actions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/Http/Controllers/Api/V1/MobileActionController.php')
+          text = path.read_text(encoding='utf-8')
+
+          old_import = "use App\\Models\\UserRoutePlan;\n"
+          new_import = "use App\\Models\\UserRoutePlan;\nuse App\\Services\\BookingCrmService;\n"
+          if old_import not in text:
+              raise SystemExit('Import marker not found')
+          text = text.replace(old_import, new_import, 1)
+
+          start = text.index('    public function storeBooking(')
+          end = text.index('    public function myJointPilgrimages(', start)
+          replacement = '''    public function storeBooking(
+              Request $request,
+              Trip $trip,
+              BookingCrmService $service
+          ): JsonResponse {
+              $data = $request->validate([
+                  'participants_count' => ['required', 'integer', 'min:1', 'max:10'],
+                  'contact_name' => ['required', 'string', 'max:255'],
+                  'email' => ['required', 'email', 'max:255'],
+                  'phone' => ['required', 'string', 'max:64'],
+                  'notes' => ['nullable', 'string', 'max:2000'],
+              ]);
+
+              $trip->load('pilgrimageRoute');
+
+              if ($trip->status !== 'open') {
+                  throw ValidationException::withMessages(['trip' => 'Запись на эту поездку закрыта.']);
+              }
+
+              if ($trip->starts_at->isPast()) {
+                  throw ValidationException::withMessages(['trip' => 'Дата поездки уже прошла.']);
+              }
+
+              $active = Booking::query()
+                  ->where('trip_id', $trip->id)
+                  ->where('user_id', $request->user()->id)
+                  ->whereNotIn('status', BookingCrmService::CLOSED_BOOKING_STATUSES)
+                  ->exists();
+
+              if ($active) {
+                  throw ValidationException::withMessages([
+                      'trip' => 'У вас уже есть активное бронирование на эту поездку.',
+                  ]);
+              }
+
+              $participants = (int) $data['participants_count'];
+              $price = $trip->price !== null
+                  ? (float) $trip->price
+                  : (float) ($trip->pilgrimageRoute->base_price ?? 0);
+
+              $booking = $service->createBooking($trip, [
+                  'contact_name' => $data['contact_name'],
+                  'email' => $data['email'],
+                  'phone' => $data['phone'],
+                  'participants_count' => $participants,
+                  'total_amount' => $price * $participants,
+                  'status' => 'pending',
+                  'payment_status' => 'unpaid',
+                  'crm_stage' => 'new',
+                  'priority' => 'normal',
+                  'source' => 'site',
+                  'notes' => $data['notes'] ?? null,
+              ], $request->user(), $request->user());
+
+              return response()->json(['data' => $this->bookingData($booking)], 201);
+          }
+
+          public function cancelBooking(
+              Request $request,
+              Booking $booking,
+              BookingCrmService $service
+          ): JsonResponse {
+              abort_unless($booking->user_id === $request->user()->id, 403);
+
+              if (in_array($booking->status, ['cancelled', 'completed', 'refunded'], true)) {
+                  throw ValidationException::withMessages(['booking' => 'Бронирование уже закрыто.']);
+              }
+
+              if ($booking->trip?->starts_at?->isPast()) {
+                  throw ValidationException::withMessages([
+                      'booking' => 'Нельзя отменить прошедшую поездку.',
+                  ]);
+              }
+
+              $service->updateBooking($booking, [
+                  'status' => 'cancelled',
+                  'crm_stage' => 'closed',
+                  'cancellation_reason' => 'Отменено пользователем в мобильном приложении.',
+              ], $request->user());
+
+              return response()->json(['status' => 'cancelled']);
+          }
+
+'''
+          replacement = replacement.replace('          ', '    ')
+          text = text[:start] + replacement + text[end:]
+
+          old_data = """            'payment_status' => $booking->payment_status,
+              'ticket_code' => $booking->ticket_code,"""
+          new_data = """            'payment_status' => $booking->payment_status,
+              'crm_stage' => $booking->crm_stage,
+              'ticket_code' => $booking->ticket_code,
+              'participants' => $booking->relationLoaded('participants')
+                  ? $booking->participants->map(fn ($participant) => [
+                      'id' => $participant->id,
+                      'full_name' => $participant->full_name,
+                      'decision_status' => $participant->decision_status,
+                      'attendance_status' => $participant->attendance_status,
+                  ])->values()
+                  : [],"""
+          if old_data not in text:
+              raise SystemExit('bookingData marker not found')
+          text = text.replace(old_data, new_data, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Validate
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php -l app/Http/Controllers/Api/V1/MobileActionController.php
+          php artisan test --filter=PilgrimageCrmTest
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/Http/Controllers/Api/V1/MobileActionController.php
+          git commit -m "feat(crm): route mobile bookings through CRM"
+          git push origin HEAD:main

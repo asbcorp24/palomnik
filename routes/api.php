@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\MobileController;
 use App\Http\Controllers\Api\V1\MobileProfileController;
 use App\Http\Controllers\Api\V1\MobileTogetherController;
 use App\Http\Controllers\Api\V1\PilgrimageObjectController;
+use App\Http\Controllers\Api\V1\PilgrimagePhotoController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
@@ -91,9 +92,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::put('/route-plans/{plan}', [MobileActionController::class, 'updateRoutePlan'])->name('route-plans.update');
             Route::delete('/route-plans/{plan}', [MobileActionController::class, 'destroyRoutePlan'])->name('route-plans.destroy');
 
-            Route::get('/media', [MobileActionController::class, 'media'])->name('media.index');
-            Route::post('/media', [MobileActionController::class, 'storeMedia'])->name('media.store');
-            Route::delete('/media/{media}', [MobileActionController::class, 'destroyMedia'])->name('media.destroy');
+            Route::get('/media', [PilgrimagePhotoController::class, 'index'])->name('media.index');
+            Route::post('/media', [PilgrimagePhotoController::class, 'store'])->name('media.store');
+            Route::post('/media/{media}/publication', [PilgrimagePhotoController::class, 'requestPublication'])->name('media.publication.store');
+            Route::delete('/media/{media}/publication', [PilgrimagePhotoController::class, 'withdrawPublication'])->name('media.publication.destroy');
+            Route::delete('/media/{media}', [PilgrimagePhotoController::class, 'destroy'])->name('media.destroy');
 
             Route::post('/push-devices', [MobileActionController::class, 'storePushDevice'])->name('push-devices.store');
             Route::delete('/push-devices', [MobileActionController::class, 'destroyPushDevice'])->name('push-devices.destroy');

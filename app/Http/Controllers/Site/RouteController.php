@@ -51,6 +51,12 @@ class RouteController extends Controller
         $pilgrimageRoute->load([
             'objects.objectType',
             'objects.coverMedia',
+            'pilgrimagePhotos' => fn ($query) => $query
+                ->where('publication_requested', true)
+                ->where('status', 'published')
+                ->with('user:id,name')
+                ->latest('published_at')
+                ->limit(12),
             'trips' => function ($query) {
                 $query->whereIn('status', ['planned', 'open'])
                     ->where('starts_at', '>=', now())

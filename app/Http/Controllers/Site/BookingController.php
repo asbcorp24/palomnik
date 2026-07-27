@@ -5,16 +5,18 @@ namespace App\Http\Controllers\Site;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Trip;
+use App\Services\BookingCrmService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
-    public function store(Request $request, Trip $trip): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        Trip $trip,
+        BookingCrmService $service
+    ): RedirectResponse {
         $data = $request->validate([
             'participants_count' => ['required', 'integer', 'min:1', 'max:10'],
             'contact_name' => ['required', 'string', 'max:255'],
@@ -24,91 +26,75 @@ class BookingController extends Controller
             'consent' => ['accepted'],
         ]);
 
-        $booking = DB::transaction(function () use ($request, $trip, $data) {
-            $lockedTrip = Trip::query()
-                ->with('pilgrimageRoute')
-                ->lockForUpdate()
-                ->findOrFail($trip->id);
+        $trip->load('pilgrimageRoute');
 
-            if ($lockedTrip->status !== 'open') {
-                throw ValidationException::withMessages(['trip' => 'Запись на эту поездку закрыта.']);
-            }
-            if ($lockedTrip->starts_at->isPast()) {
-                throw ValidationException::withMessages(['trip' => 'Дата поездки уже прошла.']);
-            }
+        if ($trip->status !== 'open') {
+            throw ValidationException::withMessages(['trip' => 'Запись на эту поездку закрыта.']);
+        }
 
-            $hasActiveBooking = Booking::query()
-                ->where('trip_id', $lockedTrip->id)
-                ->where('user_id', $request->user()->id)
-                ->whereNotIn('status', ['cancelled', 'refunded'])
-                ->exists();
+        if ($trip->starts_at->isPast()) {
+            throw ValidationException::withMessages(['trip' => 'Дата поездки уже прошла.']);
+        }
 
-            if ($hasActiveBooking) {
-                throw ValidationException::withMessages(['trip' => 'У вас уже есть активное бронирование на эту поездку.']);
-            }
+        $hasActiveBooking = Booking::query()
+            ->where('trip_id', $trip->id)
+            ->where('user_id', $request->user()->id)
+            ->whereNotIn('status', BookingCrmService::CLOSED_BOOKING_STATUSES)
+            ->exists();
 
-            $participants = (int) $data['participants_count'];
-            if ($lockedTrip->capacity !== null
-                && $lockedTrip->booked_count + $participants > $lockedTrip->capacity) {
-                throw ValidationException::withMessages(['participants_count' => 'Недостаточно свободных мест.']);
-            }
-
-            $unitPrice = $lockedTrip->price !== null
-                ? (float) $lockedTrip->price
-                : (float) ($lockedTrip->pilgrimageRoute->base_price ?? 0);
-
-            $booking = Booking::query()->create([
-                'trip_id' => $lockedTrip->id,
-                'user_id' => $request->user()->id,
-                'contact_name' => $data['contact_name'],
-                'email' => mb_strtolower($data['email']),
-                'phone' => $data['phone'],
-                'participants_count' => $participants,
-                'total_amount' => $unitPrice * $participants,
-                'status' => 'pending',
-                'payment_status' => 'unpaid',
-                'ticket_code' => $this->ticketCode(),
-                'notes' => $data['notes'] ?? null,
+        if ($hasActiveBooking) {
+            throw ValidationException::withMessages([
+                'trip' => 'У вас уже есть активное бронирование на эту поездку.',
             ]);
+        }
 
-            $lockedTrip->increment('booked_count', $participants);
+        $participants = (int) $data['participants_count'];
+        $unitPrice = $trip->price !== null
+            ? (float) $trip->price
+            : (float) ($trip->pilgrimageRoute->base_price ?? 0);
 
-            return $booking;
-        });
+        $booking = $service->createBooking($trip, [
+            'contact_name' => $data['contact_name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'],
+            'participants_count' => $participants,
+            'total_amount' => $unitPrice * $participants,
+            'status' => 'pending',
+            'payment_status' => 'unpaid',
+            'crm_stage' => 'new',
+            'priority' => 'normal',
+            'source' => 'site',
+            'notes' => $data['notes'] ?? null,
+        ], $request->user(), $request->user());
 
         return redirect()
             ->route('profile.bookings')
             ->with('success', 'Заявка создана. Код бронирования: '.$booking->ticket_code.'.');
     }
 
-    public function cancel(Request $request, Booking $booking): RedirectResponse
-    {
+    public function cancel(
+        Request $request,
+        Booking $booking,
+        BookingCrmService $service
+    ): RedirectResponse {
         abort_unless($booking->user_id === $request->user()->id, 403);
 
         if (in_array($booking->status, ['cancelled', 'completed', 'refunded'], true)) {
             return back()->with('error', 'Бронирование уже закрыто.');
         }
 
-        DB::transaction(function () use ($booking) {
-            $trip = Trip::query()->lockForUpdate()->findOrFail($booking->trip_id);
-            if ($trip->starts_at->isPast()) {
-                throw ValidationException::withMessages(['booking' => 'Нельзя отменить прошедшую поездку.']);
-            }
+        if ($booking->trip?->starts_at?->isPast()) {
+            throw ValidationException::withMessages([
+                'booking' => 'Нельзя отменить прошедшую поездку.',
+            ]);
+        }
 
-            $booking->update(['status' => 'cancelled']);
-            $trip->booked_count = max(0, $trip->booked_count - $booking->participants_count);
-            $trip->save();
-        });
+        $service->updateBooking($booking, [
+            'status' => 'cancelled',
+            'crm_stage' => 'closed',
+            'cancellation_reason' => 'Отменено пользователем через личный кабинет.',
+        ], $request->user());
 
         return back()->with('success', 'Бронирование отменено.');
-    }
-
-    private function ticketCode(): string
-    {
-        do {
-            $code = 'MP-'.now()->format('ymd').'-'.Str::upper(Str::random(7));
-        } while (Booking::query()->where('ticket_code', $code)->exists());
-
-        return $code;
     }
 }

@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Service;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Services\BookingCrmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -25,57 +25,53 @@ class TicketScannerController extends Controller
         ]);
 
         $booking = Booking::query()
-            ->with(['trip.pilgrimageRoute', 'user', 'checkedInBy'])
+            ->with(['trip.pilgrimageRoute', 'user', 'checkedInBy', 'participants'])
             ->where('ticket_token', $data['token'])
             ->firstOrFail();
 
         return response()->json($this->payload($booking));
     }
 
-    public function checkIn(Request $request): JsonResponse|RedirectResponse
-    {
+    public function checkIn(
+        Request $request,
+        BookingCrmService $service
+    ): JsonResponse|RedirectResponse {
         $data = $request->validate([
             'token' => ['required', 'string', 'size:64'],
             'participants' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $booking = DB::transaction(function () use ($request, $data) {
-            $booking = Booking::query()
-                ->with(['trip.pilgrimageRoute', 'user'])
-                ->where('ticket_token', $data['token'])
-                ->lockForUpdate()
-                ->firstOrFail();
+        $booking = Booking::query()
+            ->with(['trip.pilgrimageRoute', 'user', 'participants'])
+            ->where('ticket_token', $data['token'])
+            ->firstOrFail();
 
-            if ($booking->isClosed()) {
-                throw ValidationException::withMessages(['token' => 'Билет отменён или возвращён.']);
-            }
-
-            if (! $booking->trip) {
-                throw ValidationException::withMessages(['token' => 'Поездка для билета не найдена.']);
-            }
-
-            $participants = (int) ($data['participants'] ?? $booking->participants_count);
-            if ($participants > $booking->participants_count) {
-                throw ValidationException::withMessages([
-                    'participants' => 'Нельзя отметить больше участников, чем указано в билете.',
-                ]);
-            }
-
-            if ($booking->isCheckedIn()) {
-                throw ValidationException::withMessages([
-                    'token' => 'Билет уже использован '.optional($booking->checked_in_at)->format('d.m.Y H:i').'.',
-                ]);
-            }
-
-            $booking->update([
-                'checked_in_at' => now(),
-                'checked_in_by' => $request->user()->id,
-                'checked_in_participants' => $participants,
-                'status' => $booking->status === 'pending' ? 'confirmed' : $booking->status,
+        if ($booking->isClosed()) {
+            throw ValidationException::withMessages([
+                'token' => 'Билет отменён или возвращён.',
             ]);
+        }
 
-            return $booking->fresh(['trip.pilgrimageRoute', 'user', 'checkedInBy']);
-        });
+        if (! $booking->trip) {
+            throw ValidationException::withMessages([
+                'token' => 'Поездка для билета не найдена.',
+            ]);
+        }
+
+        $participants = (int) ($data['participants'] ?? $booking->participants_count);
+        if ($participants > $booking->participants_count) {
+            throw ValidationException::withMessages([
+                'participants' => 'Нельзя отметить больше участников, чем указано в билете.',
+            ]);
+        }
+
+        if ($booking->isCheckedIn()) {
+            throw ValidationException::withMessages([
+                'token' => 'Билет уже использован '.optional($booking->checked_in_at)->format('d.m.Y H:i').'.',
+            ]);
+        }
+
+        $booking = $service->markCheckedIn($booking, $participants, $request->user());
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -103,9 +99,16 @@ class TicketScannerController extends Controller
             'payment_status' => $booking->payment_status,
             'is_closed' => $booking->isClosed(),
             'is_checked_in' => $booking->isCheckedIn(),
-            'trip_title' => optional(optional($trip)->pilgrimageRoute)->title ?: optional($trip)->title ?: 'Паломническая поездка',
+            'trip_title' => optional(optional($trip)->pilgrimageRoute)->title
+                ?: optional($trip)->title
+                ?: 'Паломническая поездка',
             'starts_at' => optional(optional($trip)->starts_at)->format('d.m.Y H:i'),
             'meeting_point' => optional($trip)->meeting_point,
+            'participants' => $booking->participants->map(fn ($participant) => [
+                'name' => $participant->full_name,
+                'decision_status' => $participant->decision_status,
+                'attendance_status' => $participant->attendance_status,
+            ])->values(),
         ];
     }
 }

@@ -15,6 +15,7 @@
             <div class="col-lg-4 text-lg-end">
                 @auth
                     <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                        <a class="btn btn-outline-pm" href="{{ route('profile.photos') }}"><i class="bi bi-camera me-2"></i>Добавить фото</a>
                         <a class="btn btn-outline-pm" href="{{ route('together.create') }}"><i class="bi bi-people-fill me-2"></i>Предложить поездку</a>
                         <a class="btn btn-pm-gold" href="{{ route('community.posts.create') }}"><i class="bi bi-pencil-square me-2"></i>Написать заметку</a>
                     </div>
@@ -58,9 +59,9 @@
                         </a>
                     </div>
                     <div class="col-md-6">
-                        <a class="category-card h-100 align-items-start" href="#community-media">
+                        <a class="category-card h-100 align-items-start" href="{{ route('community.photos') }}">
                             <span class="category-icon"><i class="bi bi-camera"></i></span>
-                            <span><span class="fw-semibold d-block mb-2">Фото и видео</span><span class="small text-secondary">Медиаматериалы участников с привязкой к объектам.</span></span>
+                            <span><span class="fw-semibold d-block mb-2">Паломнические фото</span><span class="small text-secondary">Проверенные фотографии участников с привязкой к маршрутам.</span></span>
                         </a>
                     </div>
                     <div class="col-md-6">
@@ -119,10 +120,21 @@
 @if($mediaItems->isNotEmpty())
 <section class="section-space" id="community-media">
     <div class="container">
-        <div class="section-kicker mb-2">Впечатления</div><h2 class="section-title h2 mb-4">Фотографии участников</h2>
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+            <div><div class="section-kicker mb-2">Впечатления</div><h2 class="section-title h2 mb-0">Фотографии участников</h2></div>
+            <a class="btn btn-outline-pm" href="{{ route('community.photos') }}">Открыть всю галерею</a>
+        </div>
         <div class="row g-3">
             @foreach($mediaItems as $media)
-                <div class="col-6 col-md-3"><div class="position-relative"><img class="community-media" src="{{ $media->url }}" alt="{{ $media->title }}"><div class="position-absolute bottom-0 start-0 end-0 p-3 text-white" style="background:linear-gradient(transparent,rgba(0,0,0,.72));border-radius:0 0 16px 16px"><div class="small fw-semibold">{{ optional($media->pilgrimageObject)->name ?: $media->title }}</div><div class="small opacity-75">{{ optional($media->user)->name }}</div></div></div></div>
+                <div class="col-6 col-md-3">
+                    <div class="position-relative">
+                        <img class="community-media" src="{{ $media->url }}" alt="{{ $media->title }}">
+                        <div class="position-absolute bottom-0 start-0 end-0 p-3 text-white" style="background:linear-gradient(transparent,rgba(0,0,0,.72));border-radius:0 0 16px 16px">
+                            <div class="small fw-semibold">{{ optional($media->pilgrimageRoute)->title ?: optional($media->pilgrimageObject)->name ?: $media->title }}</div>
+                            <div class="small opacity-75">{{ optional($media->user)->name }}</div>
+                        </div>
+                    </div>
+                </div>
             @endforeach
         </div>
     </div>

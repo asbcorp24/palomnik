@@ -70,6 +70,12 @@ class PilgrimageRoute extends Model
             ->orderByPivot('sort_order');
     }
 
+    public function pilgrimagePhotos(): HasMany
+    {
+        return $this->hasMany(UserMedia::class, 'pilgrimage_route_id')
+            ->where('type', 'image');
+    }
+
     public function trips(): HasMany
     {
         return $this->hasMany(Trip::class);

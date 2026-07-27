@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\BlogPost;
 use App\Models\Booking;
+use App\Models\PilgrimageRoute;
 use App\Models\Review;
 use App\Models\Trip;
 use App\Models\UserMedia;
@@ -30,6 +31,11 @@ class ModerationController extends Controller
         ]);
 
         $query = $config['model']::query()->with($config['with']);
+
+        if ($resource === 'media') {
+            $query->where('publication_requested', true);
+        }
+
         $search = trim((string) ($filters['q'] ?? ''));
 
         if ($search !== '') {
@@ -44,7 +50,9 @@ class ModerationController extends Controller
                         ->orWhereHas('user', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"));
                 } elseif ($resource === 'media') {
                     $query->where('title', 'like', "%{$search}%")
-                        ->orWhereHas('user', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"));
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('user', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('pilgrimageRoute', fn (Builder $query) => $query->where('title', 'like', "%{$search}%"));
                 } else {
                     $query->whereHas('user', function (Builder $query) use ($search) {
                         $query->where('name', 'like', "%{$search}%")
@@ -70,6 +78,9 @@ class ModerationController extends Controller
             'config' => $config,
             'items' => $items,
             'filters' => $filters,
+            'routes' => $resource === 'media'
+                ? PilgrimageRoute::query()->published()->orderBy('title')->get(['id', 'title'])
+                : collect(),
         ]);
     }
 
@@ -84,8 +95,17 @@ class ModerationController extends Controller
 
         $rules = [
             'status' => ['required', Rule::in(array_keys($config['statuses']))],
-            'notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:5000'],
         ];
+
+        if ($resource === 'media') {
+            $rules['pilgrimage_route_id'] = [
+                Rule::requiredIf(fn () => $request->input('status') === 'published'),
+                'nullable',
+                'integer',
+                'exists:pilgrimage_routes,id',
+            ];
+        }
 
         if ($resource === 'bookings') {
             $rules['payment_status'] = ['required', Rule::in(array_keys($config['payment_statuses']))];
@@ -123,11 +143,19 @@ class ModerationController extends Controller
             $item->moderated_by = auth()->id();
             $item->moderated_at = now();
 
+            if ($resource === 'media') {
+                $item->pilgrimage_route_id = $data['pilgrimage_route_id'] ?? $item->pilgrimage_route_id;
+                $item->moderation_notes = $data['notes'] ?? null;
+                $item->publication_requested = true;
+                $item->published_at = $data['status'] === 'published' ? now() : null;
+            }
+
             if ($resource === 'posts') {
                 $item->published_at = $data['status'] === 'published'
                     ? ($item->published_at ?? now())
                     : null;
             }
+
             $item->save();
         } elseif ($resource === 'visits') {
             $item->notes = $data['notes'] ?? $item->notes;
@@ -225,10 +253,10 @@ class ModerationController extends Controller
             ],
             'media' => [
                 'model' => UserMedia::class,
-                'title' => 'Фото и видео пользователей',
-                'single' => 'Медиаматериал',
+                'title' => 'Паломнические фотографии',
+                'single' => 'Фотография',
                 'icon' => 'bi-camera',
-                'with' => ['user', 'pilgrimageObject', 'blogPost'],
+                'with' => ['user', 'pilgrimageObject', 'pilgrimageRoute', 'blogPost'],
                 'order_by' => 'created_at',
                 'statuses' => [
                     'pending' => 'На модерации',

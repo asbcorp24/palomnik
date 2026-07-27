@@ -29,6 +29,7 @@ use App\Http\Controllers\Site\MapController as SiteMapController;
 use App\Http\Controllers\Site\NotificationController as SiteNotificationController;
 use App\Http\Controllers\Site\ObjectController as SiteObjectController;
 use App\Http\Controllers\Site\PasswordResetController as SitePasswordResetController;
+use App\Http\Controllers\Site\PilgrimagePhotoController as SitePilgrimagePhotoController;
 use App\Http\Controllers\Site\ProfileController as SiteProfileController;
 use App\Http\Controllers\Site\ReviewController as SiteReviewController;
 use App\Http\Controllers\Site\RouteController as SiteRouteController;
@@ -58,6 +59,7 @@ Route::get('/calendar/{calendarEvent:slug}/ics', [SiteCalendarController::class,
 Route::get('/calendar/{calendarEvent:slug}', [SiteCalendarController::class, 'show'])->name('calendar.show');
 
 Route::get('/community', [SiteCommunityController::class, 'index'])->name('community.index');
+Route::get('/community/photos', [SitePilgrimagePhotoController::class, 'gallery'])->name('community.photos');
 Route::get('/community/together', [SiteTogetherController::class, 'index'])->name('together.index');
 Route::get('/community/{post:slug}', [SiteCommunityController::class, 'show'])->name('community.show');
 Route::redirect('/together', '/community/together', 301);
@@ -87,69 +89,75 @@ Route::middleware('auth')->group(function () {
         ->name('verification.send');
 
     Route::middleware('verified')->group(function () {
-    Route::get('/notifications', [SiteNotificationController::class, 'index'])->name('notifications.index');
-    Route::put('/notifications/{notification}/read', [SiteNotificationController::class, 'read'])->name('notifications.read');
-    Route::post('/notifications/read-all', [SiteNotificationController::class, 'readAll'])->name('notifications.read-all');
+        Route::get('/notifications', [SiteNotificationController::class, 'index'])->name('notifications.index');
+        Route::put('/notifications/{notification}/read', [SiteNotificationController::class, 'read'])->name('notifications.read');
+        Route::post('/notifications/read-all', [SiteNotificationController::class, 'readAll'])->name('notifications.read-all');
 
-    Route::get('/profile', [SiteProfileController::class, 'dashboard'])->name('profile.dashboard');
-    Route::get('/profile/settings', [SiteProfileController::class, 'settings'])->name('profile.settings');
-    Route::put('/profile/settings', [SiteProfileController::class, 'update'])->name('profile.update');
-    Route::get('/profile/favorites', [SiteProfileController::class, 'favorites'])->name('profile.favorites');
-    Route::get('/profile/bookings', [SiteProfileController::class, 'bookings'])->name('profile.bookings');
-    Route::get('/profile/achievements', [SiteProfileController::class, 'achievements'])->name('profile.achievements');
-    Route::get('/profile/activity', [SiteProfileController::class, 'activity'])->name('profile.activity');
-    Route::get('/profile/blocked-users', [SiteProfileController::class, 'blockedUsers'])->name('profile.blocked-users');
+        Route::get('/profile', [SiteProfileController::class, 'dashboard'])->name('profile.dashboard');
+        Route::get('/profile/settings', [SiteProfileController::class, 'settings'])->name('profile.settings');
+        Route::put('/profile/settings', [SiteProfileController::class, 'update'])->name('profile.update');
+        Route::get('/profile/favorites', [SiteProfileController::class, 'favorites'])->name('profile.favorites');
+        Route::get('/profile/bookings', [SiteProfileController::class, 'bookings'])->name('profile.bookings');
+        Route::get('/profile/achievements', [SiteProfileController::class, 'achievements'])->name('profile.achievements');
+        Route::get('/profile/activity', [SiteProfileController::class, 'activity'])->name('profile.activity');
+        Route::get('/profile/photos', [SitePilgrimagePhotoController::class, 'index'])->name('profile.photos');
+        Route::post('/profile/photos', [SitePilgrimagePhotoController::class, 'store'])->name('profile.photos.store');
+        Route::put('/profile/photos/{photo}', [SitePilgrimagePhotoController::class, 'update'])->name('profile.photos.update');
+        Route::post('/profile/photos/{photo}/publication', [SitePilgrimagePhotoController::class, 'requestPublication'])->name('profile.photos.publish');
+        Route::delete('/profile/photos/{photo}/publication', [SitePilgrimagePhotoController::class, 'withdrawPublication'])->name('profile.photos.withdraw');
+        Route::delete('/profile/photos/{photo}', [SitePilgrimagePhotoController::class, 'destroy'])->name('profile.photos.destroy');
+        Route::get('/profile/blocked-users', [SiteProfileController::class, 'blockedUsers'])->name('profile.blocked-users');
 
-    Route::get('/bookings/{booking}/ticket', [SiteTicketController::class, 'show'])->name('tickets.show');
-    Route::get('/bookings/{booking}/calendar.ics', [SiteTicketController::class, 'ics'])->name('tickets.ics');
+        Route::get('/bookings/{booking}/ticket', [SiteTicketController::class, 'show'])->name('tickets.show');
+        Route::get('/bookings/{booking}/calendar.ics', [SiteTicketController::class, 'ics'])->name('tickets.ics');
 
-    Route::post('/favorites/lists', [SiteFavoriteController::class, 'storeList'])->name('favorites.lists.store');
-    Route::delete('/favorites/lists/{favoriteList}', [SiteFavoriteController::class, 'destroyList'])->name('favorites.lists.destroy');
-    Route::post('/favorites/objects/{object}', [SiteFavoriteController::class, 'addObject'])->name('favorites.objects.add');
-    Route::delete('/favorites/lists/{favoriteList}/objects/{object}', [SiteFavoriteController::class, 'removeObject'])->name('favorites.objects.remove');
+        Route::post('/favorites/lists', [SiteFavoriteController::class, 'storeList'])->name('favorites.lists.store');
+        Route::delete('/favorites/lists/{favoriteList}', [SiteFavoriteController::class, 'destroyList'])->name('favorites.lists.destroy');
+        Route::post('/favorites/objects/{object}', [SiteFavoriteController::class, 'addObject'])->name('favorites.objects.add');
+        Route::delete('/favorites/lists/{favoriteList}/objects/{object}', [SiteFavoriteController::class, 'removeObject'])->name('favorites.objects.remove');
 
-    Route::post('/objects/{object}/reviews', [SiteReviewController::class, 'store'])->name('reviews.store');
-    Route::delete('/reviews/{review}', [SiteReviewController::class, 'destroy'])->name('reviews.destroy');
-    Route::post('/objects/{object}/visits', [SiteVisitController::class, 'store'])->name('visits.store');
+        Route::post('/objects/{object}/reviews', [SiteReviewController::class, 'store'])->name('reviews.store');
+        Route::delete('/reviews/{review}', [SiteReviewController::class, 'destroy'])->name('reviews.destroy');
+        Route::post('/objects/{object}/visits', [SiteVisitController::class, 'store'])->name('visits.store');
 
-    Route::post('/trips/{trip}/bookings', [SiteBookingController::class, 'store'])->name('bookings.store');
-    Route::delete('/bookings/{booking}', [SiteBookingController::class, 'cancel'])->name('bookings.cancel');
+        Route::post('/trips/{trip}/bookings', [SiteBookingController::class, 'store'])->name('bookings.store');
+        Route::delete('/bookings/{booking}', [SiteBookingController::class, 'cancel'])->name('bookings.cancel');
 
-    Route::get('/community/posts/create', [SiteBlogPostController::class, 'create'])->name('community.posts.create');
-    Route::post('/community/posts', [SiteBlogPostController::class, 'store'])->name('community.posts.store');
-    Route::get('/community/posts/{post}/edit', [SiteBlogPostController::class, 'edit'])->name('community.posts.edit');
-    Route::put('/community/posts/{post}', [SiteBlogPostController::class, 'update'])->name('community.posts.update');
-    Route::delete('/community/posts/{post}', [SiteBlogPostController::class, 'destroy'])->name('community.posts.destroy');
-    Route::post('/community/media', [SiteUserMediaController::class, 'store'])->name('community.media.store');
-    Route::delete('/community/media/{media}', [SiteUserMediaController::class, 'destroy'])->name('community.media.destroy');
+        Route::get('/community/posts/create', [SiteBlogPostController::class, 'create'])->name('community.posts.create');
+        Route::post('/community/posts', [SiteBlogPostController::class, 'store'])->name('community.posts.store');
+        Route::get('/community/posts/{post}/edit', [SiteBlogPostController::class, 'edit'])->name('community.posts.edit');
+        Route::put('/community/posts/{post}', [SiteBlogPostController::class, 'update'])->name('community.posts.update');
+        Route::delete('/community/posts/{post}', [SiteBlogPostController::class, 'destroy'])->name('community.posts.destroy');
+        Route::post('/community/media', [SiteUserMediaController::class, 'store'])->name('community.media.store');
+        Route::delete('/community/media/{media}', [SiteUserMediaController::class, 'destroy'])->name('community.media.destroy');
 
-    Route::get('/community/together/my', [SiteTogetherController::class, 'my'])->name('together.my');
-    Route::get('/community/together/create', [SiteTogetherController::class, 'create'])->name('together.create');
-    Route::post('/community/together', [SiteTogetherController::class, 'store'])->name('together.store');
-    Route::get('/community/together/{jointPilgrimage}/edit', [SiteTogetherController::class, 'edit'])->name('together.edit');
-    Route::put('/community/together/{jointPilgrimage}', [SiteTogetherController::class, 'update'])->name('together.update');
-    Route::delete('/community/together/{jointPilgrimage}', [SiteTogetherController::class, 'destroy'])->name('together.destroy');
-    Route::post('/community/together/{jointPilgrimage}/join', [SiteTogetherController::class, 'join'])->name('together.join');
-    Route::delete('/community/together/{jointPilgrimage}/leave', [SiteTogetherController::class, 'leave'])->name('together.leave');
-    Route::put('/community/together/{jointPilgrimage}/members/{member}', [SiteTogetherController::class, 'updateMember'])->name('together.members.update');
-    Route::get('/community/together/{jointPilgrimage}/messages-feed', [SiteTogetherMessageController::class, 'index'])->name('together.messages.index');
-    Route::post('/community/together/{jointPilgrimage}/messages', [SiteTogetherController::class, 'storeMessage'])->name('together.messages.store');
+        Route::get('/community/together/my', [SiteTogetherController::class, 'my'])->name('together.my');
+        Route::get('/community/together/create', [SiteTogetherController::class, 'create'])->name('together.create');
+        Route::post('/community/together', [SiteTogetherController::class, 'store'])->name('together.store');
+        Route::get('/community/together/{jointPilgrimage}/edit', [SiteTogetherController::class, 'edit'])->name('together.edit');
+        Route::put('/community/together/{jointPilgrimage}', [SiteTogetherController::class, 'update'])->name('together.update');
+        Route::delete('/community/together/{jointPilgrimage}', [SiteTogetherController::class, 'destroy'])->name('together.destroy');
+        Route::post('/community/together/{jointPilgrimage}/join', [SiteTogetherController::class, 'join'])->name('together.join');
+        Route::delete('/community/together/{jointPilgrimage}/leave', [SiteTogetherController::class, 'leave'])->name('together.leave');
+        Route::put('/community/together/{jointPilgrimage}/members/{member}', [SiteTogetherController::class, 'updateMember'])->name('together.members.update');
+        Route::get('/community/together/{jointPilgrimage}/messages-feed', [SiteTogetherMessageController::class, 'index'])->name('together.messages.index');
+        Route::post('/community/together/{jointPilgrimage}/messages', [SiteTogetherController::class, 'storeMessage'])->name('together.messages.store');
 
-    Route::post('/safety/reports', [SiteSafetyController::class, 'report'])->name('safety.reports.store');
-    Route::post('/safety/blocks/{user}', [SiteSafetyController::class, 'block'])->name('safety.blocks.store');
-    Route::delete('/safety/blocks/{user}', [SiteSafetyController::class, 'unblock'])->name('safety.blocks.destroy');
+        Route::post('/safety/reports', [SiteSafetyController::class, 'report'])->name('safety.reports.store');
+        Route::post('/safety/blocks/{user}', [SiteSafetyController::class, 'block'])->name('safety.blocks.store');
+        Route::delete('/safety/blocks/{user}', [SiteSafetyController::class, 'unblock'])->name('safety.blocks.destroy');
 
-    Route::resource('my-routes', SiteRoutePlanController::class)
-        ->parameters(['my-routes' => 'plan'])
-        ->names([
-            'index' => 'route-plans.index',
-            'create' => 'route-plans.create',
-            'store' => 'route-plans.store',
-            'show' => 'route-plans.show',
-            'edit' => 'route-plans.edit',
-            'update' => 'route-plans.update',
-            'destroy' => 'route-plans.destroy',
-        ]);
+        Route::resource('my-routes', SiteRoutePlanController::class)
+            ->parameters(['my-routes' => 'plan'])
+            ->names([
+                'index' => 'route-plans.index',
+                'create' => 'route-plans.create',
+                'store' => 'route-plans.store',
+                'show' => 'route-plans.show',
+                'edit' => 'route-plans.edit',
+                'update' => 'route-plans.update',
+                'destroy' => 'route-plans.destroy',
+            ]);
     });
 });
 
@@ -182,21 +190,21 @@ Route::prefix('admin')
         Route::redirect('/help', '/help?section=admin')->name('help');
 
         Route::get('/crm', [AdminPilgrimageCrmController::class, 'index'])->name('crm.index');
-Route::get('/crm/create', [AdminPilgrimageCrmController::class, 'create'])->name('crm.create');
-Route::post('/crm', [AdminPilgrimageCrmController::class, 'store'])->name('crm.store');
-Route::get('/crm/reports', [AdminPilgrimageCrmController::class, 'reports'])->name('crm.reports');
-Route::get('/crm/export/bookings', [AdminPilgrimageCrmController::class, 'exportBookings'])->name('crm.export');
-Route::post('/crm/bulk', [AdminPilgrimageCrmController::class, 'bulkUpdate'])->name('crm.bulk');
-Route::get('/crm/trips/{trip}', [AdminPilgrimageCrmController::class, 'trip'])->name('crm.trip');
-Route::get('/crm/trips/{trip}/export', [AdminPilgrimageCrmController::class, 'exportTrip'])->name('crm.trip.export');
-Route::get('/crm/trips/{trip}/print', [AdminPilgrimageCrmController::class, 'printTrip'])->name('crm.trip.print');
-Route::get('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'show'])->name('crm.show');
-Route::put('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'update'])->name('crm.update');
-Route::post('/crm/bookings/{booking}/notes', [AdminPilgrimageCrmController::class, 'addNote'])->name('crm.notes.store');
-Route::post('/crm/bookings/{booking}/participants', [AdminPilgrimageCrmController::class, 'storeParticipant'])->name('crm.participants.store');
-Route::put('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'updateParticipant'])->name('crm.participants.update');
-Route::delete('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'destroyParticipant'])->name('crm.participants.destroy');
-Route::redirect('/moderation/bookings', '/admin/crm')->name('crm.legacy-bookings');
+        Route::get('/crm/create', [AdminPilgrimageCrmController::class, 'create'])->name('crm.create');
+        Route::post('/crm', [AdminPilgrimageCrmController::class, 'store'])->name('crm.store');
+        Route::get('/crm/reports', [AdminPilgrimageCrmController::class, 'reports'])->name('crm.reports');
+        Route::get('/crm/export/bookings', [AdminPilgrimageCrmController::class, 'exportBookings'])->name('crm.export');
+        Route::post('/crm/bulk', [AdminPilgrimageCrmController::class, 'bulkUpdate'])->name('crm.bulk');
+        Route::get('/crm/trips/{trip}', [AdminPilgrimageCrmController::class, 'trip'])->name('crm.trip');
+        Route::get('/crm/trips/{trip}/export', [AdminPilgrimageCrmController::class, 'exportTrip'])->name('crm.trip.export');
+        Route::get('/crm/trips/{trip}/print', [AdminPilgrimageCrmController::class, 'printTrip'])->name('crm.trip.print');
+        Route::get('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'show'])->name('crm.show');
+        Route::put('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'update'])->name('crm.update');
+        Route::post('/crm/bookings/{booking}/notes', [AdminPilgrimageCrmController::class, 'addNote'])->name('crm.notes.store');
+        Route::post('/crm/bookings/{booking}/participants', [AdminPilgrimageCrmController::class, 'storeParticipant'])->name('crm.participants.store');
+        Route::put('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'updateParticipant'])->name('crm.participants.update');
+        Route::delete('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'destroyParticipant'])->name('crm.participants.destroy');
+        Route::redirect('/moderation/bookings', '/admin/crm')->name('crm.legacy-bookings');
 
         Route::resource('calendar', AdminCalendarEventController::class)
             ->parameters(['calendar' => 'calendarEvent']);

@@ -11,6 +11,7 @@ use App\Models\PushDevice;
 use App\Models\Trip;
 use App\Models\UserMedia;
 use App\Models\UserRoutePlan;
+use App\Services\BookingCrmService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,8 +22,12 @@ use Illuminate\Validation\ValidationException;
 
 class MobileActionController extends Controller
 {
-    public function storeBooking(Request $request, Trip $trip): JsonResponse
-    {
+
+    public function storeBooking(
+        Request $request,
+        Trip $trip,
+        BookingCrmService $service
+    ): JsonResponse {
         $data = $request->validate([
             'participants_count' => ['required', 'integer', 'min:1', 'max:10'],
             'contact_name' => ['required', 'string', 'max:255'],
@@ -31,71 +36,72 @@ class MobileActionController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $booking = DB::transaction(function () use ($request, $trip, $data) {
-            $lockedTrip = Trip::query()->with('pilgrimageRoute')->lockForUpdate()->findOrFail($trip->id);
-            if ($lockedTrip->status !== 'open') {
-                throw ValidationException::withMessages(['trip' => 'Запись на эту поездку закрыта.']);
-            }
-            if ($lockedTrip->starts_at->isPast()) {
-                throw ValidationException::withMessages(['trip' => 'Дата поездки уже прошла.']);
-            }
+        $trip->load('pilgrimageRoute');
 
-            $active = Booking::query()
-                ->where('trip_id', $lockedTrip->id)
-                ->where('user_id', $request->user()->id)
-                ->whereNotIn('status', ['cancelled', 'refunded'])
-                ->exists();
-            if ($active) {
-                throw ValidationException::withMessages(['trip' => 'У вас уже есть активное бронирование на эту поездку.']);
-            }
+        if ($trip->status !== 'open') {
+            throw ValidationException::withMessages(['trip' => 'Запись на эту поездку закрыта.']);
+        }
 
-            $participants = (int) $data['participants_count'];
-            if ($lockedTrip->capacity !== null && $lockedTrip->booked_count + $participants > $lockedTrip->capacity) {
-                throw ValidationException::withMessages(['participants_count' => 'Недостаточно свободных мест.']);
-            }
+        if ($trip->starts_at->isPast()) {
+            throw ValidationException::withMessages(['trip' => 'Дата поездки уже прошла.']);
+        }
 
-            $price = $lockedTrip->price !== null
-                ? (float) $lockedTrip->price
-                : (float) ($lockedTrip->pilgrimageRoute->base_price ?? 0);
+        $active = Booking::query()
+            ->where('trip_id', $trip->id)
+            ->where('user_id', $request->user()->id)
+            ->whereNotIn('status', BookingCrmService::CLOSED_BOOKING_STATUSES)
+            ->exists();
 
-            $booking = Booking::query()->create([
-                'trip_id' => $lockedTrip->id,
-                'user_id' => $request->user()->id,
-                'contact_name' => $data['contact_name'],
-                'email' => mb_strtolower($data['email']),
-                'phone' => $data['phone'],
-                'participants_count' => $participants,
-                'total_amount' => $price * $participants,
-                'status' => 'pending',
-                'payment_status' => 'unpaid',
-                'ticket_code' => $this->ticketCode(),
-                'notes' => $data['notes'] ?? null,
+        if ($active) {
+            throw ValidationException::withMessages([
+                'trip' => 'У вас уже есть активное бронирование на эту поездку.',
             ]);
+        }
 
-            $lockedTrip->increment('booked_count', $participants);
+        $participants = (int) $data['participants_count'];
+        $price = $trip->price !== null
+            ? (float) $trip->price
+            : (float) ($trip->pilgrimageRoute->base_price ?? 0);
 
-            return $booking->load('trip.pilgrimageRoute');
-        });
+        $booking = $service->createBooking($trip, [
+            'contact_name' => $data['contact_name'],
+            'email' => $data['email'],
+            'phone' => $data['phone'],
+            'participants_count' => $participants,
+            'total_amount' => $price * $participants,
+            'status' => 'pending',
+            'payment_status' => 'unpaid',
+            'crm_stage' => 'new',
+            'priority' => 'normal',
+            'source' => 'site',
+            'notes' => $data['notes'] ?? null,
+        ], $request->user(), $request->user());
 
         return response()->json(['data' => $this->bookingData($booking)], 201);
     }
 
-    public function cancelBooking(Request $request, Booking $booking): JsonResponse
-    {
+    public function cancelBooking(
+        Request $request,
+        Booking $booking,
+        BookingCrmService $service
+    ): JsonResponse {
         abort_unless($booking->user_id === $request->user()->id, 403);
+
         if (in_array($booking->status, ['cancelled', 'completed', 'refunded'], true)) {
             throw ValidationException::withMessages(['booking' => 'Бронирование уже закрыто.']);
         }
 
-        DB::transaction(function () use ($booking) {
-            $trip = Trip::query()->lockForUpdate()->findOrFail($booking->trip_id);
-            if ($trip->starts_at->isPast()) {
-                throw ValidationException::withMessages(['booking' => 'Нельзя отменить прошедшую поездку.']);
-            }
-            $booking->update(['status' => 'cancelled']);
-            $trip->booked_count = max(0, $trip->booked_count - $booking->participants_count);
-            $trip->save();
-        });
+        if ($booking->trip?->starts_at?->isPast()) {
+            throw ValidationException::withMessages([
+                'booking' => 'Нельзя отменить прошедшую поездку.',
+            ]);
+        }
+
+        $service->updateBooking($booking, [
+            'status' => 'cancelled',
+            'crm_stage' => 'closed',
+            'cancellation_reason' => 'Отменено пользователем в мобильном приложении.',
+        ], $request->user());
 
         return response()->json(['status' => 'cancelled']);
     }

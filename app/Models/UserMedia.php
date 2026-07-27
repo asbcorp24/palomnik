@@ -16,6 +16,7 @@ class UserMedia extends Model
     protected $fillable = [
         'user_id',
         'pilgrimage_object_id',
+        'pilgrimage_route_id',
         'blog_post_id',
         'type',
         'path',
@@ -24,14 +25,19 @@ class UserMedia extends Model
         'latitude',
         'longitude',
         'status',
+        'publication_requested',
         'moderated_by',
         'moderated_at',
+        'published_at',
+        'moderation_notes',
     ];
 
     protected $casts = [
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
+        'publication_requested' => 'boolean',
         'moderated_at' => 'datetime',
+        'published_at' => 'datetime',
     ];
 
     protected $appends = ['url'];
@@ -49,6 +55,11 @@ class UserMedia extends Model
     public function pilgrimageObject(): BelongsTo
     {
         return $this->belongsTo(PilgrimageObject::class);
+    }
+
+    public function pilgrimageRoute(): BelongsTo
+    {
+        return $this->belongsTo(PilgrimageRoute::class);
     }
 
     public function blogPost(): BelongsTo

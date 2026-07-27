@@ -6,6 +6,7 @@ import 'advanced_features.dart';
 import 'app_sections.dart';
 import 'content_features.dart';
 import 'maplibre_map.dart';
+import 'pilgrimage_photos.dart';
 import 'user_features.dart';
 
 class EnhancedRootShell extends StatefulWidget {
@@ -99,7 +100,7 @@ class EnhancedProfileTab extends StatelessWidget {
           ProfileAction(icon: Icons.groups_outlined, title: 'Совместные паломничества', onTap: () => _open(context, const TogetherScreen())),
           _section(context, 'Мои публикации'),
           ProfileAction(icon: Icons.edit_note, title: 'Путевые заметки', onTap: () => _open(context, const MyPostsScreen())),
-          ProfileAction(icon: Icons.photo_library_outlined, title: 'Фото и видео', onTap: () => _open(context, const MediaScreen())),
+          ProfileAction(icon: Icons.photo_library_outlined, title: 'Паломнические фото', onTap: () => _open(context, const PilgrimagePhotosScreen())),
           _section(context, 'Аккаунт'),
           ProfileAction(icon: Icons.notifications_none, title: 'Уведомления', onTap: () => _open(context, const NotificationsScreen())),
           ProfileAction(icon: Icons.settings_outlined, title: 'Настройки профиля', onTap: () => _open(context, ProfileSettingsScreen(session: session))),

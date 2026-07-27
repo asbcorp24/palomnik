@@ -77,6 +77,10 @@
                             </td>
                         @endforeach
                         <td class="text-end text-nowrap">
+                            @if($resource === 'trips')
+                                <a class="btn btn-sm btn-outline-green" href="{{ route('admin.crm.trip', $item) }}" title="Ведомость участников"><i class="bi bi-clipboard-check"></i></a>
+                                <a class="btn btn-sm btn-light" href="{{ route('admin.crm.index', ['trip_id' => $item->id]) }}" title="Заявки поездки"><i class="bi bi-headset"></i></a>
+                            @endif
                             <a class="btn btn-sm btn-light" href="{{ route('admin.modules.edit', [$resource, $item->getKey()]) }}" title="Редактировать"><i class="bi bi-pencil"></i></a>
                             <form class="d-inline" method="POST" action="{{ route('admin.modules.destroy', [$resource, $item->getKey()]) }}" onsubmit="return confirm('Удалить запись?')">
                                 @csrf

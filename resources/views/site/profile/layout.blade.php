@@ -27,6 +27,7 @@
                         <a class="{{ request()->routeIs('profile.achievements') ? 'active' : '' }}" href="{{ route('profile.achievements') }}"><i class="bi bi-trophy"></i>Достижения</a>
                         <a class="{{ request()->routeIs('route-plans.*') ? 'active' : '' }}" href="{{ route('route-plans.index') }}"><i class="bi bi-signpost-split"></i>Мои маршруты</a>
                         <a class="{{ request()->routeIs('together.my') ? 'active' : '' }}" href="{{ route('together.my') }}"><i class="bi bi-people"></i>Совместные поездки</a>
+                        <a class="{{ request()->routeIs('profile.photos*') ? 'active' : '' }}" href="{{ route('profile.photos') }}"><i class="bi bi-camera"></i>Паломнические фото</a>
                         <a class="{{ request()->routeIs('profile.activity') ? 'active' : '' }}" href="{{ route('profile.activity') }}"><i class="bi bi-activity"></i>Моя активность</a>
                         <a class="{{ request()->routeIs('profile.blocked-users') ? 'active' : '' }}" href="{{ route('profile.blocked-users') }}"><i class="bi bi-person-slash"></i>Заблокированные</a>
                         <a class="{{ request()->routeIs('profile.settings') ? 'active' : '' }}" href="{{ route('profile.settings') }}"><i class="bi bi-sliders"></i>Настройки</a>

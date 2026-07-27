@@ -89,7 +89,7 @@
             <a class="sidebar-link {{ request()->routeIs('admin.together.*') ? 'active' : '' }}" href="{{ route('admin.together.index') }}"><i class="bi bi-people-fill"></i><span>Паломничество вместе</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.safety.*') ? 'active' : '' }}" href="{{ route('admin.safety.index') }}"><i class="bi bi-shield-exclamation"></i><span>Безопасность и жалобы</span></a>
             <a class="sidebar-link {{ request()->is('admin/moderation/reviews*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'reviews') }}"><i class="bi bi-chat-square-text"></i><span>Отзывы</span></a>
-            <a class="sidebar-link {{ request()->is('admin/moderation/media*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'media') }}"><i class="bi bi-camera"></i><span>Фото и видео</span></a>
+            <a class="sidebar-link {{ request()->is('admin/moderation/media*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'media') }}"><i class="bi bi-camera"></i><span>Паломнические фото</span></a>
             <a class="sidebar-link {{ request()->is('admin/moderation/posts*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'posts') }}"><i class="bi bi-journal-richtext"></i><span>Блог и заметки</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}"><i class="bi bi-people"></i><span>Пользователи</span></a>
 

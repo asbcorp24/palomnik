@@ -14,7 +14,7 @@
     <div class="row g-3 align-items-end">
         <div class="col-md-7">
             <label class="form-label" for="q">Поиск</label>
-            <input class="form-control" id="q" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Пользователь, объект, билет или название">
+            <input class="form-control" id="q" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Пользователь, объект, маршрут, билет или название">
         </div>
         <div class="col-md-3">
             <label class="form-label" for="status">Статус</label>
@@ -74,14 +74,16 @@
                     @else
                         <div class="d-flex gap-3 align-items-start">
                             @if($item->type === 'image' && $item->url)
-                                <img src="{{ $item->url }}" alt="{{ $item->title }}" style="width:160px;height:120px;object-fit:cover;border-radius:15px">
+                                <img src="{{ $item->url }}" alt="{{ $item->title }}" style="width:180px;height:135px;object-fit:cover;border-radius:15px">
                             @else
                                 <div class="object-thumb d-flex align-items-center justify-content-center" style="width:120px;height:100px"><i class="bi bi-camera-video fs-2"></i></div>
                             @endif
                             <div>
                                 <div class="small text-secondary mb-2">{{ optional($item->user)->name }} · {{ strtoupper($item->type) }}</div>
                                 <h2 class="h5 mb-2">{{ $item->title ?: 'Медиаматериал #'.$item->id }}</h2>
-                                <div class="small text-secondary">Объект: {{ optional($item->pilgrimageObject)->name ?: 'не привязан' }}</div>
+                                <div class="small text-secondary"><strong>Маршрут:</strong> {{ optional($item->pilgrimageRoute)->title ?: 'не выбран' }}</div>
+                                <div class="small text-secondary"><strong>Объект:</strong> {{ optional($item->pilgrimageObject)->name ?: 'не привязан' }}</div>
+                                @if($item->description)<div class="small mt-2">{{ $item->description }}</div>@endif
                                 @if($item->url)<a class="btn btn-sm btn-light mt-3" href="{{ $item->url }}" target="_blank" rel="noopener">Открыть файл</a>@endif
                             </div>
                         </div>
@@ -101,6 +103,20 @@
                                     @endforeach
                                 </select>
                             </div>
+
+                            @if($resource === 'media')
+                                <div class="col-12">
+                                    <label class="form-label" for="route-{{ $item->id }}">Паломнический маршрут</label>
+                                    <select class="form-select" id="route-{{ $item->id }}" name="pilgrimage_route_id">
+                                        <option value="">Выберите маршрут</option>
+                                        @foreach($routes as $route)
+                                            <option value="{{ $route->id }}" @selected($item->pilgrimage_route_id === $route->id)>{{ $route->title }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="form-text">Для публикации маршрут обязателен.</div>
+                                </div>
+                            @endif
+
                             @if($resource === 'bookings')
                                 <div class="col-md-6">
                                     <label class="form-label" for="payment-{{ $item->id }}">Оплата</label>
@@ -111,12 +127,15 @@
                                     </select>
                                 </div>
                             @endif
-                            @if(in_array($resource, ['bookings', 'visits']))
+
+                            @if(in_array($resource, ['bookings', 'visits', 'media']))
                                 <div class="col-12">
                                     <label class="form-label" for="notes-{{ $item->id }}">Комментарий администратора</label>
-                                    <textarea class="form-control" id="notes-{{ $item->id }}" name="notes" rows="3">{{ $item->notes }}</textarea>
+                                    <textarea class="form-control" id="notes-{{ $item->id }}" name="notes" rows="3">{{ $resource === 'media' ? $item->moderation_notes : $item->notes }}</textarea>
+                                    @if($resource === 'media')<div class="form-text">Комментарий будет виден владельцу фотографии, особенно при отклонении.</div>@endif
                                 </div>
                             @endif
+
                             <div class="col-12 d-flex flex-wrap gap-2">
                                 <button class="btn btn-gold" type="submit"><i class="bi bi-check-lg me-1"></i>Сохранить статус</button>
                             </div>

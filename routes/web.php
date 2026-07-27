@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DirectoryController as AdminDirectoryController;
 use App\Http\Controllers\Admin\ModerationController as AdminModerationController;
 use App\Http\Controllers\Admin\ObjectMediaController as AdminObjectMediaController;
 use App\Http\Controllers\Admin\PilgrimageObjectController as AdminPilgrimageObjectController;
+use App\Http\Controllers\Admin\PilgrimageCrmController as AdminPilgrimageCrmController;
 use App\Http\Controllers\Admin\PlatformModuleController as AdminPlatformModuleController;
 use App\Http\Controllers\Admin\RepresentativeController as AdminRepresentativeController;
 use App\Http\Controllers\Admin\SafetyController as AdminSafetyController;
@@ -179,6 +180,23 @@ Route::prefix('admin')
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
         Route::get('/', AdminDashboardController::class)->name('dashboard');
         Route::redirect('/help', '/help?section=admin')->name('help');
+
+        Route::get('/crm', [AdminPilgrimageCrmController::class, 'index'])->name('crm.index');
+Route::get('/crm/create', [AdminPilgrimageCrmController::class, 'create'])->name('crm.create');
+Route::post('/crm', [AdminPilgrimageCrmController::class, 'store'])->name('crm.store');
+Route::get('/crm/reports', [AdminPilgrimageCrmController::class, 'reports'])->name('crm.reports');
+Route::get('/crm/export/bookings', [AdminPilgrimageCrmController::class, 'exportBookings'])->name('crm.export');
+Route::post('/crm/bulk', [AdminPilgrimageCrmController::class, 'bulkUpdate'])->name('crm.bulk');
+Route::get('/crm/trips/{trip}', [AdminPilgrimageCrmController::class, 'trip'])->name('crm.trip');
+Route::get('/crm/trips/{trip}/export', [AdminPilgrimageCrmController::class, 'exportTrip'])->name('crm.trip.export');
+Route::get('/crm/trips/{trip}/print', [AdminPilgrimageCrmController::class, 'printTrip'])->name('crm.trip.print');
+Route::get('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'show'])->name('crm.show');
+Route::put('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'update'])->name('crm.update');
+Route::post('/crm/bookings/{booking}/notes', [AdminPilgrimageCrmController::class, 'addNote'])->name('crm.notes.store');
+Route::post('/crm/bookings/{booking}/participants', [AdminPilgrimageCrmController::class, 'storeParticipant'])->name('crm.participants.store');
+Route::put('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'updateParticipant'])->name('crm.participants.update');
+Route::delete('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'destroyParticipant'])->name('crm.participants.destroy');
+Route::redirect('/moderation/bookings', '/admin/crm')->name('crm.legacy-bookings');
 
         Route::resource('calendar', AdminCalendarEventController::class)
             ->parameters(['calendar' => 'calendarEvent']);

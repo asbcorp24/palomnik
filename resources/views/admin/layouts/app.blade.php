@@ -78,7 +78,7 @@
             <a class="sidebar-link {{ request()->is('admin/modules/routes*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'routes') }}"><i class="bi bi-signpost-split"></i><span>Маршруты</span></a>
             <a class="sidebar-link {{ request()->is('admin/modules/trips*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'trips') }}"><i class="bi bi-bus-front"></i><span>Расписание поездок</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.calendar.*') ? 'active' : '' }}" href="{{ route('admin.calendar.index') }}"><i class="bi bi-calendar-event"></i><span>Календарь событий</span></a>
-            <a class="sidebar-link {{ request()->is('admin/moderation/bookings*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'bookings') }}"><i class="bi bi-ticket-perforated"></i><span>Бронирования и билеты</span></a>
+            <a class="sidebar-link {{ request()->routeIs('admin.crm.*') ? 'active' : '' }}" href="{{ route('admin.crm.index') }}"><i class="bi bi-headset"></i><span>CRM заявок</span></a>
             <a class="sidebar-link" href="{{ route('service.tickets.scanner') }}" target="_blank" rel="noopener"><i class="bi bi-qr-code-scan"></i><span>Сканер QR-билетов</span></a>
 
             <div class="sidebar-label">Геймификация</div>

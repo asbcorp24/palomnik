@@ -1,0 +1,170 @@
+name: Finalize pilgrimage CRM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finalize-pilgrimage-crm.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Connect mobile booking actions to CRM
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          path = Path('app/Http/Controllers/Api/V1/MobileActionController.php')
+          text = path.read_text(encoding='utf-8')
+
+          if 'use App\\Services\\BookingCrmService;' not in text:
+              marker = "use App\\Models\\UserRoutePlan;\n"
+              if marker not in text:
+                  raise SystemExit('MobileActionController import marker not found')
+              text = text.replace(marker, marker + "use App\\Services\\BookingCrmService;\n", 1)
+
+          start = text.index('    public function storeBooking(')
+          end = text.index('    public function myJointPilgrimages(', start)
+          block = textwrap.indent(textwrap.dedent('''
+          public function storeBooking(
+              Request $request,
+              Trip $trip,
+              BookingCrmService $service
+          ): JsonResponse {
+              $data = $request->validate([
+                  'participants_count' => ['required', 'integer', 'min:1', 'max:10'],
+                  'contact_name' => ['required', 'string', 'max:255'],
+                  'email' => ['required', 'email', 'max:255'],
+                  'phone' => ['required', 'string', 'max:64'],
+                  'notes' => ['nullable', 'string', 'max:2000'],
+              ]);
+
+              $trip->load('pilgrimageRoute');
+
+              if ($trip->status !== 'open') {
+                  throw ValidationException::withMessages(['trip' => 'Запись на эту поездку закрыта.']);
+              }
+
+              if ($trip->starts_at->isPast()) {
+                  throw ValidationException::withMessages(['trip' => 'Дата поездки уже прошла.']);
+              }
+
+              $active = Booking::query()
+                  ->where('trip_id', $trip->id)
+                  ->where('user_id', $request->user()->id)
+                  ->whereNotIn('status', BookingCrmService::CLOSED_BOOKING_STATUSES)
+                  ->exists();
+
+              if ($active) {
+                  throw ValidationException::withMessages([
+                      'trip' => 'У вас уже есть активное бронирование на эту поездку.',
+                  ]);
+              }
+
+              $participants = (int) $data['participants_count'];
+              $price = $trip->price !== null
+                  ? (float) $trip->price
+                  : (float) ($trip->pilgrimageRoute->base_price ?? 0);
+
+              $booking = $service->createBooking($trip, [
+                  'contact_name' => $data['contact_name'],
+                  'email' => $data['email'],
+                  'phone' => $data['phone'],
+                  'participants_count' => $participants,
+                  'total_amount' => $price * $participants,
+                  'status' => 'pending',
+                  'payment_status' => 'unpaid',
+                  'crm_stage' => 'new',
+                  'priority' => 'normal',
+                  'source' => 'site',
+                  'notes' => $data['notes'] ?? null,
+              ], $request->user(), $request->user());
+
+              return response()->json(['data' => $this->bookingData($booking)], 201);
+          }
+
+          public function cancelBooking(
+              Request $request,
+              Booking $booking,
+              BookingCrmService $service
+          ): JsonResponse {
+              abort_unless($booking->user_id === $request->user()->id, 403);
+
+              if (in_array($booking->status, ['cancelled', 'completed', 'refunded'], true)) {
+                  throw ValidationException::withMessages(['booking' => 'Бронирование уже закрыто.']);
+              }
+
+              if ($booking->trip?->starts_at?->isPast()) {
+                  throw ValidationException::withMessages([
+                      'booking' => 'Нельзя отменить прошедшую поездку.',
+                  ]);
+              }
+
+              $service->updateBooking($booking, [
+                  'status' => 'cancelled',
+                  'crm_stage' => 'closed',
+                  'cancellation_reason' => 'Отменено пользователем в мобильном приложении.',
+              ], $request->user());
+
+              return response()->json(['status' => 'cancelled']);
+          }
+
+          '''), '    ')
+
+          path.write_text(text[:start] + block + text[end:], encoding='utf-8')
+          PY
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Validate CRM
+        run: |
+          php -l app/Models/Booking.php
+          php -l app/Models/BookingParticipant.php
+          php -l app/Models/BookingActivity.php
+          php -l app/Services/BookingCrmService.php
+          php -l app/Http/Controllers/Admin/PilgrimageCrmController.php
+          php -l app/Http/Controllers/Site/BookingController.php
+          php -l app/Http/Controllers/Service/TicketScannerController.php
+          php -l app/Http/Controllers/Api/V1/MobileActionController.php
+          php -l database/migrations/2026_07_27_120000_create_pilgrimage_crm_tables.php
+          php -l routes/web.php
+          php artisan route:list --name=admin.crm
+          php artisan view:clear
+          php artisan view:cache
+          php artisan test --filter=PilgrimageCrmTest
+
+      - name: Remove one-off workflows
+        run: |
+          rm -f \
+            .github/workflows/install-pilgrimage-crm-routes.yml \
+            .github/workflows/connect-mobile-bookings-to-crm.yml \
+            .github/workflows/finalize-pilgrimage-crm.yml
+
+      - name: Commit final CRM changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(crm): finalize pilgrimage request management"
+          git push origin HEAD:main

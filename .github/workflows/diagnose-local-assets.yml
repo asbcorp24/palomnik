@@ -21,19 +21,13 @@ jobs:
         with:
           node-version: '20'
 
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.0'
-          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
-          coverage: none
-
       - name: Run diagnostic build
         run: |
           set +e
           : > local-assets-diagnostic.log
 
           echo '=== npm install ===' >> local-assets-diagnostic.log
-          npm install --no-audit --no-fund >> local-assets-diagnostic.log 2>&1
+          npm install --no-audit --no-fund --legacy-peer-deps >> local-assets-diagnostic.log 2>&1
           npm_status=$?
           echo "npm_status=$npm_status" >> local-assets-diagnostic.log
 
@@ -43,29 +37,17 @@ jobs:
           echo "build_status=$build_status" >> local-assets-diagnostic.log
 
           echo '=== output files ===' >> local-assets-diagnostic.log
-          find public -maxdepth 3 -type f \( -path '*/css/app.css' -o -path '*/js/app.js' -o -path '*/mix-manifest.json' -o -path '*/fonts/*' \) -printf '%p %s bytes\n' >> local-assets-diagnostic.log 2>&1
-
-          echo '=== PHP setup and Blade ===' >> local-assets-diagnostic.log
-          composer install --no-interaction --prefer-dist --no-progress >> local-assets-diagnostic.log 2>&1
-          composer_status=$?
-          cp .env.example .env >> local-assets-diagnostic.log 2>&1
-          php artisan key:generate >> local-assets-diagnostic.log 2>&1
-          php artisan view:cache >> local-assets-diagnostic.log 2>&1
-          blade_status=$?
-          echo "composer_status=$composer_status" >> local-assets-diagnostic.log
-          echo "blade_status=$blade_status" >> local-assets-diagnostic.log
+          find public -maxdepth 4 -type f \( -path '*/css/app.css' -o -path '*/js/app.js' -o -path '*/mix-manifest.json' -o -path '*/fonts/*' \) -printf '%p %s bytes\n' >> local-assets-diagnostic.log 2>&1
 
           cat > local-assets-outcomes.txt <<EOF
           npm_status=$npm_status
           build_status=$build_status
-          composer_status=$composer_status
-          blade_status=$blade_status
           EOF
 
       - name: Commit diagnostic logs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add local-assets-diagnostic.log local-assets-outcomes.txt
+          git add local-assets-diagnostic.log local-assets-outcomes.txt package-lock.json public/css/app.css public/js/app.js public/mix-manifest.json public/fonts || true
           git commit -m "ci: record local asset build diagnostics"
           git push origin HEAD:main

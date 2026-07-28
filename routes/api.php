@@ -25,6 +25,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
     Route::get('/map/config', [MapController::class, 'config'])->name('map.config');
     Route::get('/map/style.json', [MapController::class, 'style'])->name('map.style');
+    Route::get('/map/tiles/{z}/{x}/{y}.png', [MapController::class, 'tile'])
+        ->where(['z' => '\d{1,2}', 'x' => '\d+', 'y' => '\d+'])
+        ->middleware('throttle:600,1')
+        ->name('map.tile');
     Route::post('/map/route', [MapController::class, 'route'])
         ->middleware('throttle:60,1')
         ->name('map.route');

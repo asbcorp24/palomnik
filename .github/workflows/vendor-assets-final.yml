@@ -1,0 +1,165 @@
+name: Finalize same-origin frontend assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/vendor-assets-final.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Download local copies and rewrite Blade templates
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.parse import urljoin, urlparse
+          from urllib.request import Request, urlopen
+          import hashlib, re, shutil
+
+          root = Path('.')
+          vendor = root / 'public/vendor'
+          if vendor.exists(): shutil.rmtree(vendor)
+          vendor.mkdir(parents=True)
+          ua = 'Mozilla/5.0 AppleWebKit/537.36 Chrome/150 Safari/537.36'
+
+          def get(url, text=False):
+              req = Request(url, headers={'User-Agent': ua, 'Accept': 'text/css,*/*' if text else '*/*'})
+              with urlopen(req, timeout=90) as response:
+                  data = response.read()
+              return data.decode('utf-8') if text else data
+
+          def save(url, path, optional=False):
+              try:
+                  data = get(url)
+                  if len(data) < 50: raise RuntimeError(f'small response: {url}')
+                  path.parent.mkdir(parents=True, exist_ok=True)
+                  path.write_bytes(data)
+                  print(url, '->', path, len(data))
+              except Exception:
+                  if not optional: raise
+
+          b = vendor / 'bootstrap'
+          save('https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css', b/'bootstrap.min.css')
+          save('https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css.map', b/'bootstrap.min.css.map')
+          save('https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js', b/'bootstrap.bundle.min.js')
+          save('https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js.map', b/'bootstrap.bundle.min.js.map')
+          save('https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/LICENSE', b/'LICENSE.txt', True)
+
+          bi = vendor / 'bootstrap-icons'; bi.mkdir(parents=True)
+          bi_url = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css'
+          bi_css = get(bi_url, True)
+          for raw in sorted(set(re.findall(r'url\(([^)]+)\)', bi_css))):
+              rel = raw.strip('"\'')
+              if rel.startswith('data:'): continue
+              name = Path(urlparse(rel).path).name
+              save(urljoin(bi_url, rel), bi/'fonts'/name)
+              bi_css = bi_css.replace(raw, f'"./fonts/{name}"')
+          (bi/'bootstrap-icons.min.css').write_text(bi_css, encoding='utf-8')
+          save('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/LICENSE', bi/'LICENSE.txt', True)
+
+          ml = vendor/'maplibre'
+          save('https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css', ml/'maplibre-gl.css')
+          save('https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js', ml/'maplibre-gl.js')
+          save('https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js.map', ml/'maplibre-gl.js.map', True)
+          save('https://unpkg.com/maplibre-gl@5/LICENSE.txt', ml/'LICENSE.txt', True)
+
+          hq = vendor/'html5-qrcode'
+          save('https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js', hq/'html5-qrcode.min.js')
+          save('https://unpkg.com/html5-qrcode@2.3.8/LICENSE', hq/'LICENSE.txt', True)
+
+          qr = vendor/'qrcodejs'
+          save('https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js', qr/'qrcode.min.js')
+          save('https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/LICENSE', qr/'LICENSE.txt', True)
+
+          fonts = vendor/'fonts'; files = fonts/'files'; files.mkdir(parents=True)
+          css_parts = []
+          font_urls = [
+              'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prata&display=swap',
+              'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap',
+          ]
+          for css_url in font_urls:
+              css = get(css_url, True)
+              for remote in sorted(set(re.findall(r'url\((https://[^)]+)\)', css))):
+                  ext = Path(urlparse(remote).path).suffix or '.woff2'
+                  name = hashlib.sha256(remote.encode()).hexdigest()[:24] + ext
+                  if not (files/name).exists(): save(remote, files/name)
+                  css = css.replace(remote, f'./files/{name}')
+              css_parts.append(css)
+          (fonts/'palomnik-fonts.css').write_text('\n\n'.join(css_parts)+'\n', encoding='utf-8')
+
+          replacements = {
+              'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prata&display=swap': "{{ asset('vendor/fonts/palomnik-fonts.css') }}",
+              'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap': "{{ asset('vendor/fonts/palomnik-fonts.css') }}",
+              'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css': "{{ asset('vendor/bootstrap/bootstrap.min.css') }}",
+              'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js': "{{ asset('vendor/bootstrap/bootstrap.bundle.min.js') }}",
+              'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css': "{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}",
+              'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js': "{{ asset('vendor/html5-qrcode/html5-qrcode.min.js') }}",
+              'https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css': "{{ asset('vendor/maplibre/maplibre-gl.css') }}",
+              'https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js': "{{ asset('vendor/maplibre/maplibre-gl.js') }}",
+              'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js': "{{ asset('vendor/qrcodejs/qrcode.min.js') }}",
+          }
+          for path in (root/'resources/views').rglob('*.blade.php'):
+              text = path.read_text(encoding='utf-8'); old = text
+              text = re.sub(r'^\s*<link\s+rel=["\']preconnect["\']\s+href=["\']https://fonts\.(?:googleapis|gstatic)\.com["\'](?:\s+crossorigin)?\s*>\s*\n?', '', text, flags=re.I|re.M)
+              for src, dst in replacements.items(): text = text.replace(src, dst)
+              if text != old: path.write_text(text, encoding='utf-8')
+
+          swp = root/'public/sw.js'; sw = swp.read_text(encoding='utf-8')
+          sw = re.sub(r"const CACHE_VERSION = 'palomnik-v\d+';", "const CACHE_VERSION = 'palomnik-v4';", sw)
+          if "'/vendor/fonts/palomnik-fonts.css'" not in sw:
+              sw = sw.replace("  '/css/pilgrim-account.css',\n", "  '/css/pilgrim-account.css',\n  '/vendor/fonts/palomnik-fonts.css',\n  '/vendor/bootstrap/bootstrap.min.css',\n  '/vendor/bootstrap/bootstrap.bundle.min.js',\n  '/vendor/bootstrap-icons/bootstrap-icons.min.css',\n")
+          if "url.pathname.startsWith('/vendor/')" not in sw:
+              sw = sw.replace("  if (url.pathname.startsWith('/css/')\n      || url.pathname.startsWith('/icons/')", "  if (url.pathname.startsWith('/css/')\n      || url.pathname.startsWith('/js/')\n      || url.pathname.startsWith('/vendor/')\n      || url.pathname.startsWith('/icons/')")
+          swp.write_text(sw, encoding='utf-8')
+          PY
+
+      - name: Verify local asset references
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          failures=[]
+          checks=[re.compile(r'<link\b[^>]+href=["\']https?://',re.I),re.compile(r'<script\b[^>]+src=["\']https?://',re.I)]
+          for path in Path('resources/views').rglob('*.blade.php'):
+              for line_no,line in enumerate(path.read_text(encoding='utf-8').splitlines(),1):
+                  if any(x.search(line) for x in checks): failures.append(f'{path}:{line_no}: {line.strip()}')
+          font_css=Path('public/vendor/fonts/palomnik-fonts.css').read_text(encoding='utf-8')
+          if re.search(r'url\(https?://',font_css,re.I): failures.append('public/vendor/fonts/palomnik-fonts.css contains external font URL')
+          if failures: raise SystemExit('\n'.join(failures))
+          print('All external CSS, JS and fonts are now same-origin.')
+          PY
+
+      - name: Validate Blade and tests
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php artisan view:clear
+          php artisan view:cache
+          php artisan test --filter=HelpPageTest
+
+      - name: Commit assets and remove temporary workflows
+        run: |
+          rm -f .github/workflows/scan-external-assets.yml .github/workflows/vendor-external-assets.yml .github/workflows/diagnose-vendor-assets.yml .github/workflows/vendor-assets-from-source.yml .github/workflows/diagnose-vendor-source.yml .github/workflows/fix-vendor-assets-workflow.yml .github/workflows/vendor-assets-final.yml external-assets-report.txt vendor-npm.log vendor-copy.log vendor-assets-outcomes.txt vendor-source-download.log vendor-source-assert.log vendor-source-outcomes.txt
+          git checkout -- package.json 2>/dev/null || true
+          rm -f package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(assets): serve all CSS JavaScript and fonts locally"
+          git push origin HEAD:main

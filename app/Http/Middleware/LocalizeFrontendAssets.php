@@ -52,6 +52,17 @@ class LocalizeFrontendAssets
             $response->headers->remove('Content-Length');
         }
 
+        // CSS and JavaScript are allowed only from the application domain.
+        // Inline code is currently required by existing Blade templates.
+        $response->headers->set(
+            'Content-Security-Policy',
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            ."style-src 'self' 'unsafe-inline'; "
+            ."font-src 'self' data:; "
+            ."worker-src 'self' blob:; "
+            ."child-src 'self' blob:;"
+        );
+
         return $response;
     }
 }

@@ -21,9 +21,13 @@ return [
         'openmaptiles_tiles' => env('OPENMAPTILES_TILE_URL'),
         'glyphs_url' => env('MAP_GLYPHS_URL'),
         'raster_tiles' => env('MAP_RASTER_TILE_URL', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
-        'tile_cache_enabled' => (bool) env('MAP_TILE_CACHE_ENABLED', true),
+        'tile_mode' => env(
+            'MAP_TILE_MODE',
+            (bool) env('MAP_TILE_CACHE_ENABLED', true) ? 'cache' : 'direct'
+        ),
         'tile_cache_disk' => env('MAP_TILE_CACHE_DISK', 'local'),
         'tile_cache_directory' => env('MAP_TILE_CACHE_DIRECTORY', 'map-tiles/osm'),
+        'tile_cache_max_size_mb' => (int) env('MAP_TILE_CACHE_MAX_SIZE_MB', 1024),
         'tile_default_ttl' => (int) env('MAP_TILE_DEFAULT_TTL', 604800),
         'tile_browser_ttl' => (int) env('MAP_TILE_BROWSER_TTL', 86400),
         'tile_connect_timeout' => (int) env('MAP_TILE_CONNECT_TIMEOUT', 5),

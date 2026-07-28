@@ -12,6 +12,8 @@ use Throwable;
 
 class MapTileCacheService
 {
+    private const SIZE_INDEX_REFRESH_SECONDS = 300;
+
     public function response(Request $request, int $z, int $x, int $y): Response
     {
         if (! (bool) config('palomnik.maps.tile_cache_enabled', true)) {
@@ -38,9 +40,14 @@ class MapTileCacheService
                     'last_checked_at' => time(),
                 ]);
 
-                $this->writeMetadata($disk, $metadataPath, $metadata);
+                $stored = $this->storeMetadataIfWithinLimit($disk, $metadataPath, $metadata);
 
-                return $this->localResponse($request, $cached['contents'], $metadata, 'REVALIDATED');
+                return $this->localResponse(
+                    $request,
+                    $cached['contents'],
+                    $stored ? $metadata : $cached['metadata'],
+                    $stored ? 'REVALIDATED' : 'REVALIDATED-LIMIT'
+                );
             }
 
             if ($upstreamResponse->successful()) {
@@ -61,10 +68,20 @@ class MapTileCacheService
                     'source' => $this->upstreamUrl($z, $x, $y),
                 ];
 
-                $disk->put($tilePath, $contents);
-                $this->writeMetadata($disk, $metadataPath, $metadata);
+                $stored = $this->storeTileIfWithinLimit(
+                    $disk,
+                    $tilePath,
+                    $metadataPath,
+                    $contents,
+                    $metadata
+                );
 
-                return $this->localResponse($request, $contents, $metadata, $cached ? 'REFRESH' : 'MISS');
+                return $this->localResponse(
+                    $request,
+                    $contents,
+                    $metadata,
+                    $stored ? ($cached ? 'REFRESH' : 'MISS') : 'BYPASS-LIMIT'
+                );
             }
 
             if ($cached) {
@@ -198,9 +215,129 @@ class MapTileCacheService
         ];
     }
 
-    private function writeMetadata($disk, string $path, array $metadata): void
+    private function storeTileIfWithinLimit(
+        $disk,
+        string $tilePath,
+        string $metadataPath,
+        string $contents,
+        array $metadata
+    ): bool {
+        $metadataContents = $this->metadataContents($metadata);
+        $currentSize = $this->currentCacheSize($disk);
+        $replacedSize = $this->existingFileSize($disk, $tilePath)
+            + $this->existingFileSize($disk, $metadataPath);
+        $projectedSize = max(0, $currentSize - $replacedSize)
+            + strlen($contents)
+            + strlen($metadataContents);
+
+        if (! $this->fitsCacheLimit($projectedSize)) {
+            return false;
+        }
+
+        $disk->put($tilePath, $contents);
+        $disk->put($metadataPath, $metadataContents);
+        $this->writeSizeIndex($disk, $projectedSize);
+
+        return true;
+    }
+
+    private function storeMetadataIfWithinLimit($disk, string $metadataPath, array $metadata): bool
     {
-        $disk->put($path, json_encode($metadata, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        $metadataContents = $this->metadataContents($metadata);
+        $currentSize = $this->currentCacheSize($disk);
+        $projectedSize = max(0, $currentSize - $this->existingFileSize($disk, $metadataPath))
+            + strlen($metadataContents);
+
+        if (! $this->fitsCacheLimit($projectedSize)) {
+            return false;
+        }
+
+        $disk->put($metadataPath, $metadataContents);
+        $this->writeSizeIndex($disk, $projectedSize);
+
+        return true;
+    }
+
+    private function currentCacheSize($disk): int
+    {
+        $indexPath = $this->sizeIndexPath();
+
+        if ($disk->exists($indexPath)) {
+            $index = json_decode($disk->get($indexPath), true);
+            if (
+                is_array($index)
+                && isset($index['bytes'], $index['calculated_at'])
+                && (int) $index['calculated_at'] >= time() - self::SIZE_INDEX_REFRESH_SECONDS
+            ) {
+                return max(0, (int) $index['bytes']);
+            }
+        }
+
+        $size = 0;
+        foreach ($disk->allFiles($this->cacheDirectory()) as $path) {
+            if ($path === $indexPath) {
+                continue;
+            }
+
+            try {
+                $size += max(0, (int) $disk->size($path));
+            } catch (Throwable $exception) {
+                Log::debug('Unable to calculate map tile cache file size.', [
+                    'path' => $path,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $this->writeSizeIndex($disk, $size);
+
+        return $size;
+    }
+
+    private function writeSizeIndex($disk, int $bytes): void
+    {
+        $disk->put($this->sizeIndexPath(), json_encode([
+            'bytes' => max(0, $bytes),
+            'calculated_at' => time(),
+        ], JSON_UNESCAPED_SLASHES));
+    }
+
+    private function existingFileSize($disk, string $path): int
+    {
+        if (! $disk->exists($path)) {
+            return 0;
+        }
+
+        try {
+            return max(0, (int) $disk->size($path));
+        } catch (Throwable $exception) {
+            return 0;
+        }
+    }
+
+    private function fitsCacheLimit(int $projectedSize): bool
+    {
+        $maxSizeMb = (int) config('palomnik.maps.tile_cache_max_size_mb', 1024);
+        if ($maxSizeMb <= 0) {
+            return true;
+        }
+
+        return $projectedSize <= $maxSizeMb * 1024 * 1024;
+    }
+
+    private function metadataContents(array $metadata): string
+    {
+        return (string) json_encode($metadata, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    private function sizeIndexPath(): string
+    {
+        return $this->cacheDirectory().'/.cache-size.json';
+    }
+
+    private function cacheDirectory(): string
+    {
+        return trim((string) config('palomnik.maps.tile_cache_directory', 'map-tiles/osm'), '/');
     }
 
     private function validateCoordinates(int $z, int $x, int $y): void
@@ -229,9 +366,7 @@ class MapTileCacheService
 
     private function tilePath(int $z, int $x, int $y): string
     {
-        $directory = trim((string) config('palomnik.maps.tile_cache_directory', 'map-tiles/osm'), '/');
-
-        return $directory.'/'.$z.'/'.$x.'/'.$y.'.png';
+        return $this->cacheDirectory().'/'.$z.'/'.$x.'/'.$y.'.png';
     }
 
     private function disk(): string

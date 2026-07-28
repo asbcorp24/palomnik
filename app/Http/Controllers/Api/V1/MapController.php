@@ -15,15 +15,16 @@ class MapController extends Controller
 {
     public function config(): JsonResponse
     {
-        $tileCacheEnabled = (bool) config('palomnik.maps.tile_cache_enabled', true);
+        $tileMode = $this->tileMode();
 
         return response()->json([
             'data' => [
                 'style_url' => config('palomnik.maps.style_url') ?: route('api.v1.map.style'),
                 'provider' => config('palomnik.maps.openmaptiles_tiles')
                     ? 'openmaptiles'
-                    : ($tileCacheEnabled ? 'server-cached-raster' : 'raster-fallback'),
-                'tile_cache_enabled' => $tileCacheEnabled,
+                    : ($tileMode === 'cache' ? 'server-cached-raster' : 'direct-raster'),
+                'tile_mode' => $tileMode,
+                'tile_cache_enabled' => $tileMode === 'cache',
                 'offline_enabled' => (bool) config('palomnik.maps.offline_enabled'),
                 'offline_tile_limit' => (int) config('palomnik.maps.offline_tile_limit', 100000),
                 'routing_enabled' => filled(config('palomnik.maps.valhalla_url')),
@@ -148,7 +149,7 @@ class MapController extends Controller
 
     private function rasterTileUrl(): string
     {
-        if (! (bool) config('palomnik.maps.tile_cache_enabled', true)) {
+        if ($this->tileMode() === 'direct') {
             return (string) config(
                 'palomnik.maps.raster_tiles',
                 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -166,6 +167,13 @@ class MapController extends Controller
             ['{z}', '{x}', '{y}'],
             $url
         );
+    }
+
+    private function tileMode(): string
+    {
+        $mode = strtolower(trim((string) config('palomnik.maps.tile_mode', 'cache')));
+
+        return in_array($mode, ['cache', 'direct'], true) ? $mode : 'cache';
     }
 
     private function vectorStyle(string $tileUrl, string $attribution): array

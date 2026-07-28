@@ -1,0 +1,62 @@
+name: Diagnose source frontend asset vendoring
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-vendor-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Extract scripts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          source = Path('.github/workflows/vendor-assets-from-source.yml').read_text(encoding='utf-8')
+          marker = "          python - <<'PY'\n"
+          positions = []
+          offset = 0
+          while True:
+              try:
+                  start = source.index(marker, offset) + len(marker)
+              except ValueError:
+                  break
+              end = source.index("\n          PY", start)
+              positions.append(textwrap.dedent(source[start:end]))
+              offset = end + 1
+          Path('/tmp/vendor-download.py').write_text(positions[0], encoding='utf-8')
+          Path('/tmp/vendor-assert.py').write_text(positions[1], encoding='utf-8')
+          PY
+
+      - name: Run download step
+        id: download
+        continue-on-error: true
+        run: python /tmp/vendor-download.py > vendor-source-download.log 2>&1
+
+      - name: Run assertion step
+        id: assertion
+        continue-on-error: true
+        run: python /tmp/vendor-assert.py > vendor-source-assert.log 2>&1
+
+      - name: Record diagnostics
+        run: |
+          cat > vendor-source-outcomes.txt <<EOF
+          download=${{ steps.download.outcome }}
+          assertion=${{ steps.assertion.outcome }}
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vendor-source-download.log vendor-source-assert.log vendor-source-outcomes.txt
+          git commit -m "ci: record source asset vendoring diagnostics"
+          git push origin HEAD:main

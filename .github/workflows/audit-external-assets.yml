@@ -1,0 +1,60 @@
+name: Audit external assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-external-assets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Find external CSS and JS
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          roots = [Path('resources/views'), Path('public'), Path('resources/js'), Path('resources/css')]
+          rows = []
+          patterns = [
+              re.compile(r'<(?:script|link)\b[^>]*(?:src|href)=["\'](https?://[^"\']+)["\']', re.I),
+              re.compile(r'url\(["\']?(https?://[^)"\']+)', re.I),
+              re.compile(r'importScripts\(["\'](https?://[^"\']+)', re.I),
+          ]
+
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob('*'):
+                  if not path.is_file() or path.suffix.lower() not in {'.php', '.blade.php', '.js', '.css', '.html'}:
+                      continue
+                  try:
+                      text = path.read_text(encoding='utf-8')
+                  except UnicodeDecodeError:
+                      continue
+                  for lineno, line in enumerate(text.splitlines(), 1):
+                      for pattern in patterns:
+                          for match in pattern.finditer(line):
+                              url = match.group(1)
+                              if url.endswith(('.css', '.js')) or any(token in url for token in ['fonts.googleapis.com', 'cdn.jsdelivr.net', 'unpkg.com', 'cdnjs.cloudflare.com']):
+                                  rows.append(f'{path}:{lineno}: {url}')
+
+          Path('external-assets-report.txt').write_text('\n'.join(sorted(set(rows))) + '\n', encoding='utf-8')
+          PY
+
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add external-assets-report.txt
+          git commit -m "ci: record external CSS and JavaScript references"
+          git push origin HEAD:main

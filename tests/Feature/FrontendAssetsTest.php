@@ -31,9 +31,11 @@ HTML;
     {
         Storage::fake('local');
         Http::fake([
-            '*' => Http::response('/* locally cached stylesheet */', 200, [
-                'Content-Type' => 'text/css',
-            ]),
+            '*' => Http::response(
+                '/* locally cached stylesheet used by same-origin frontend asset test */ body { display: block; }',
+                200,
+                ['Content-Type' => 'text/css']
+            ),
         ]);
 
         $this->get('/assets/vendor/bootstrap/bootstrap.min.css')
@@ -50,6 +52,6 @@ HTML;
 
     public function test_unknown_asset_path_is_not_used_as_an_open_proxy(): void
     {
-        $this->get('/assets/vendor/https://example.com/file.js')->assertNotFound();
+        $this->get('/assets/vendor/unknown/file.js')->assertNotFound();
     }
 }

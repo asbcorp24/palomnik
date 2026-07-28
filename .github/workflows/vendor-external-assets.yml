@@ -20,7 +20,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -65,7 +64,6 @@ jobs:
               dst.parent.mkdir(parents=True, exist_ok=True)
               shutil.copy2(src, dst)
 
-          # Bootstrap.
           reset_dir(public / 'bootstrap')
           for name in ['bootstrap.min.css', 'bootstrap.min.css.map']:
               copy_file(f'node_modules/bootstrap/dist/css/{name}', f'public/vendor/bootstrap/{name}')
@@ -73,23 +71,17 @@ jobs:
               copy_file(f'node_modules/bootstrap/dist/js/{name}', f'public/vendor/bootstrap/{name}')
           copy_file('node_modules/bootstrap/LICENSE', 'public/vendor/bootstrap/LICENSE.txt')
 
-          # Bootstrap Icons with local font files.
           reset_dir(public / 'bootstrap-icons')
           copy_file('node_modules/bootstrap-icons/font/bootstrap-icons.min.css', 'public/vendor/bootstrap-icons/bootstrap-icons.min.css')
-          shutil.copytree(
-              root / 'node_modules/bootstrap-icons/font/fonts',
-              public / 'bootstrap-icons/fonts',
-          )
+          shutil.copytree(root / 'node_modules/bootstrap-icons/font/fonts', public / 'bootstrap-icons/fonts')
           copy_file('node_modules/bootstrap-icons/LICENSE.md', 'public/vendor/bootstrap-icons/LICENSE.md')
 
-          # MapLibre GL.
           reset_dir(public / 'maplibre')
           for name in ['maplibre-gl.css', 'maplibre-gl.js', 'maplibre-gl.js.map']:
               copy_file(f'node_modules/maplibre-gl/dist/{name}', f'public/vendor/maplibre/{name}', required=name != 'maplibre-gl.js.map')
           copy_file('node_modules/maplibre-gl/LICENSE.txt', 'public/vendor/maplibre/LICENSE.txt', required=False)
           copy_file('node_modules/maplibre-gl/LICENSE', 'public/vendor/maplibre/LICENSE.txt', required=False)
 
-          # QR scanner and ticket QR generator.
           reset_dir(public / 'html5-qrcode')
           copy_file('node_modules/html5-qrcode/html5-qrcode.min.js', 'public/vendor/html5-qrcode/html5-qrcode.min.js')
           copy_file('node_modules/html5-qrcode/LICENSE', 'public/vendor/html5-qrcode/LICENSE.txt', required=False)
@@ -98,7 +90,6 @@ jobs:
           copy_file('node_modules/qrcodejs/qrcode.min.js', 'public/vendor/qrcodejs/qrcode.min.js')
           copy_file('node_modules/qrcodejs/LICENSE', 'public/vendor/qrcodejs/LICENSE.txt', required=False)
 
-          # Self-hosted fonts. Copy only CSS used by the application and the font files referenced by it.
           reset_dir(public / 'fonts')
           font_specs = {
               'inter': ['400.css', '500.css', '600.css', '700.css'],
@@ -157,7 +148,6 @@ jobs:
               if text != original:
                   path.write_text(text, encoding='utf-8')
 
-          # Cache same-origin vendor files on first use and pre-cache the shared application shell.
           sw_path = root / 'public' / 'sw.js'
           sw = sw_path.read_text(encoding='utf-8')
           sw = sw.replace("const CACHE_VERSION = 'palomnik-v3';", "const CACHE_VERSION = 'palomnik-v4';")

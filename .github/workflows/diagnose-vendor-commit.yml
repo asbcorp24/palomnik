@@ -1,0 +1,66 @@
+name: Diagnose asset commit validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-vendor-commit.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+      - name: Extract scripts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+          source=Path('.github/workflows/vendor-assets-commit.yml').read_text(encoding='utf-8')
+          marker="          python - <<'PY'\n"
+          blocks=[];pos=0
+          while True:
+              try:start=source.index(marker,pos)+len(marker)
+              except ValueError:break
+              end=source.index("\n          PY",start)
+              blocks.append(textwrap.dedent(source[start:end]));pos=end+1
+          for i,block in enumerate(blocks):Path(f'/tmp/block-{i}.py').write_text(block,encoding='utf-8')
+          PY
+      - name: Run download and cleanup
+        id: build
+        continue-on-error: true
+        run: |
+          python /tmp/block-0.py > vendor-commit-build.log 2>&1
+          python /tmp/block-1.py >> vendor-commit-build.log 2>&1
+      - name: Run verification
+        id: verify
+        continue-on-error: true
+        run: python /tmp/block-2.py > vendor-commit-verify.log 2>&1
+      - name: Run Laravel validation
+        id: laravel
+        continue-on-error: true
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress > vendor-commit-laravel.log 2>&1
+          cp .env.example .env >> vendor-commit-laravel.log 2>&1
+          php artisan key:generate >> vendor-commit-laravel.log 2>&1
+          php artisan view:clear >> vendor-commit-laravel.log 2>&1
+          php artisan view:cache >> vendor-commit-laravel.log 2>&1
+          php artisan test --filter=HelpPageTest >> vendor-commit-laravel.log 2>&1
+      - name: Record outcomes
+        run: |
+          printf 'build=%s\nverify=%s\nlaravel=%s\n' '${{ steps.build.outcome }}' '${{ steps.verify.outcome }}' '${{ steps.laravel.outcome }}' > vendor-commit-outcomes.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add vendor-commit-*.log vendor-commit-outcomes.txt
+          git commit -m "ci: record asset commit validation diagnostics"
+          git push origin HEAD:main

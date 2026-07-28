@@ -1,0 +1,4 @@
+npm_status=0
+build_status=2
+composer_status=0
+blade_status=0

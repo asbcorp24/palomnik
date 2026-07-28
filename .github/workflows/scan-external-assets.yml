@@ -1,0 +1,62 @@
+name: Scan external assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/scan-external-assets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Scan external stylesheets and scripts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          roots = [Path('resources'), Path('public'), Path('app'), Path('routes')]
+          allowed = {'.php', '.blade.php', '.html', '.htm', '.css', '.scss', '.sass', '.less', '.js', '.mjs', '.ts', '.tsx', '.vue'}
+          patterns = [
+              re.compile(r'<link\b[^>]*?href=["\'](https?://[^"\']+)["\'][^>]*>', re.I),
+              re.compile(r'<script\b[^>]*?src=["\'](https?://[^"\']+)["\'][^>]*>', re.I),
+              re.compile(r'@import\s+(?:url\()?\s*["\']?(https?://[^"\')\s;]+)', re.I),
+          ]
+          lines = []
+          for root in roots:
+              if not root.exists():
+                  continue
+              for path in root.rglob('*'):
+                  if not path.is_file():
+                      continue
+                  name = path.name.lower()
+                  if not (path.suffix.lower() in allowed or name.endswith('.blade.php')):
+                      continue
+                  try:
+                      text = path.read_text(encoding='utf-8')
+                  except UnicodeDecodeError:
+                      continue
+                  for lineno, line in enumerate(text.splitlines(), 1):
+                      for pattern in patterns:
+                          for match in pattern.finditer(line):
+                              lines.append(f'{path}:{lineno}: {match.group(1)}')
+
+          Path('external-assets-report.txt').write_text('\n'.join(sorted(set(lines))) + ('\n' if lines else ''), encoding='utf-8')
+          print(Path('external-assets-report.txt').read_text(encoding='utf-8'))
+          PY
+
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add external-assets-report.txt
+          git commit -m "ci: record external CSS and JavaScript assets"
+          git push origin HEAD:main

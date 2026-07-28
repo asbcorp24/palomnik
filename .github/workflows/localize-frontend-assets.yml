@@ -1,0 +1,90 @@
+name: Localize frontend assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/localize-frontend-assets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  localize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Replace remote CSS and JavaScript references
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css': "{{ asset('assets/vendor/bootstrap/bootstrap.min.css') }}",
+              'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js': "{{ asset('assets/vendor/bootstrap/bootstrap.bundle.min.js') }}",
+              'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css': "{{ asset('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') }}",
+              'https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css': "{{ asset('assets/vendor/maplibre/maplibre-gl.css') }}",
+              'https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js': "{{ asset('assets/vendor/maplibre/maplibre-gl.js') }}",
+              'https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css': "{{ asset('assets/vendor/maplibre/maplibre-gl.css') }}",
+              'https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js': "{{ asset('assets/vendor/maplibre/maplibre-gl.js') }}",
+              'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js': "{{ asset('assets/vendor/html5-qrcode/html5-qrcode.min.js') }}",
+              'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js': "{{ asset('assets/vendor/qrcodejs/qrcode.min.js') }}",
+          }
+
+          roots = [Path('resources/views')]
+          for root in roots:
+              for path in root.rglob('*.php'):
+                  text = path.read_text(encoding='utf-8')
+                  original = text
+                  for remote, local in replacements.items():
+                      text = text.replace(remote, local)
+
+                  lines = []
+                  for line in text.splitlines():
+                      if 'fonts.googleapis.com' in line or 'fonts.gstatic.com' in line:
+                          continue
+                      lines.append(line)
+                  text = '\n'.join(lines) + ('\n' if original.endswith('\n') else '')
+
+                  if text != original:
+                      path.write_text(text, encoding='utf-8')
+
+          # External CSS/JS references must remain only in server-side asset config.
+          findings = []
+          for path in Path('resources/views').rglob('*.php'):
+              for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
+                  if ('http://' in line or 'https://' in line) and (
+                      '<script' in line or '<link' in line or '.css' in line or '.js' in line
+                  ):
+                      findings.append(f'{path}:{number}: {line.strip()}')
+
+          if findings:
+              raise SystemExit('External CSS/JS references remain:\n' + '\n'.join(findings))
+          PY
+
+      - name: Install dependencies and validate
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php artisan view:clear
+          php artisan view:cache
+          php artisan test --filter=FrontendAssetsTest
+
+      - name: Commit changes
+        run: |
+          rm -f .github/workflows/audit-external-assets.yml .github/workflows/localize-frontend-assets.yml external-assets-audit.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(assets): serve all frontend CSS and JavaScript locally"
+          git push origin HEAD:main

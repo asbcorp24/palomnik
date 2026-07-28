@@ -16,9 +16,11 @@ class MapTileCacheTest extends TestCase
         config([
             'palomnik.maps.openmaptiles_tiles' => null,
             'palomnik.maps.raster_tiles' => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'palomnik.maps.tile_mode' => 'cache',
             'palomnik.maps.tile_cache_enabled' => true,
             'palomnik.maps.tile_cache_disk' => 'local',
             'palomnik.maps.tile_cache_directory' => 'map-tiles/osm',
+            'palomnik.maps.tile_cache_max_size_mb' => 1024,
             'palomnik.maps.tile_default_ttl' => 604800,
             'palomnik.maps.tile_browser_ttl' => 86400,
             'palomnik.maps.tile_max_zoom' => 19,
@@ -26,7 +28,7 @@ class MapTileCacheTest extends TestCase
         ]);
     }
 
-    public function test_map_style_uses_same_origin_tile_endpoint(): void
+    public function test_cache_mode_uses_same_origin_tile_endpoint(): void
     {
         $response = $this->getJson('/api/v1/map/style.json')->assertOk();
 
@@ -34,6 +36,23 @@ class MapTileCacheTest extends TestCase
 
         $this->assertStringContainsString('/api/v1/map/tiles/{z}/{x}/{y}.png', $tileUrl);
         $this->assertStringNotContainsString('tile.openstreetmap.org', $tileUrl);
+    }
+
+    public function test_direct_mode_uses_external_tile_url_and_disables_cache_endpoint(): void
+    {
+        config([
+            'palomnik.maps.tile_mode' => 'direct',
+            'palomnik.maps.tile_cache_enabled' => false,
+        ]);
+
+        $response = $this->getJson('/api/v1/map/style.json')->assertOk();
+
+        $this->assertSame(
+            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            $response->json('sources.osm.tiles.0')
+        );
+
+        $this->get('/api/v1/map/tiles/10/619/319.png')->assertNotFound();
     }
 
     public function test_requested_tile_is_downloaded_once_and_then_served_from_disk(): void
@@ -63,6 +82,29 @@ class MapTileCacheTest extends TestCase
 
         $this->assertSame($png, $second->getContent());
         Http::assertSentCount(1);
+    }
+
+    public function test_new_tile_is_not_saved_when_cache_size_limit_is_reached(): void
+    {
+        config(['palomnik.maps.tile_cache_max_size_mb' => 1]);
+
+        Storage::disk('local')->put('map-tiles/osm/existing.bin', str_repeat('x', 1024 * 1024));
+
+        $png = "\x89PNG\r\n\x1a\n".str_repeat('new-tile-', 20);
+        Http::fake([
+            'https://tile.openstreetmap.org/*' => Http::response($png, 200, [
+                'Content-Type' => 'image/png',
+                'Cache-Control' => 'public, max-age=604800',
+            ]),
+        ]);
+
+        $response = $this->get('/api/v1/map/tiles/10/619/319.png')
+            ->assertOk()
+            ->assertHeader('X-Map-Tile-Cache', 'BYPASS-LIMIT');
+
+        $this->assertSame($png, $response->getContent());
+        Storage::disk('local')->assertMissing('map-tiles/osm/10/619/319.png');
+        Storage::disk('local')->assertMissing('map-tiles/osm/10/619/319.png.json');
     }
 
     public function test_stale_tile_is_returned_when_upstream_is_unavailable(): void

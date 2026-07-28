@@ -27,6 +27,23 @@ HTML;
         $this->assertStringNotContainsString('fonts.gstatic.com', $localized);
     }
 
+    public function test_rendered_page_contains_only_same_origin_styles_and_scripts(): void
+    {
+        $response = $this->get('/privacy')
+            ->assertOk()
+            ->assertHeader('Content-Security-Policy');
+
+        $html = (string) $response->getContent();
+
+        $this->assertStringContainsString('/assets/vendor/bootstrap/bootstrap.min.css', $html);
+        $this->assertStringContainsString('/assets/vendor/bootstrap/bootstrap.bundle.min.js', $html);
+        $this->assertStringContainsString('/assets/vendor/bootstrap-icons/bootstrap-icons.min.css', $html);
+        $this->assertStringNotContainsString('cdn.jsdelivr.net', $html);
+        $this->assertStringNotContainsString('unpkg.com', $html);
+        $this->assertStringNotContainsString('fonts.googleapis.com', $html);
+        $this->assertStringNotContainsString('fonts.gstatic.com', $html);
+    }
+
     public function test_frontend_asset_is_downloaded_once_and_served_from_local_cache(): void
     {
         Storage::fake('local');

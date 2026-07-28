@@ -3,20 +3,27 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Services\MapTileCacheService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
 class MapController extends Controller
 {
     public function config(): JsonResponse
     {
+        $tileCacheEnabled = (bool) config('palomnik.maps.tile_cache_enabled', true);
+
         return response()->json([
             'data' => [
                 'style_url' => config('palomnik.maps.style_url') ?: route('api.v1.map.style'),
-                'provider' => config('palomnik.maps.openmaptiles_tiles') ? 'openmaptiles' : 'raster-fallback',
+                'provider' => config('palomnik.maps.openmaptiles_tiles')
+                    ? 'openmaptiles'
+                    : ($tileCacheEnabled ? 'server-cached-raster' : 'raster-fallback'),
+                'tile_cache_enabled' => $tileCacheEnabled,
                 'offline_enabled' => (bool) config('palomnik.maps.offline_enabled'),
                 'offline_tile_limit' => (int) config('palomnik.maps.offline_tile_limit', 100000),
                 'routing_enabled' => filled(config('palomnik.maps.valhalla_url')),
@@ -28,7 +35,6 @@ class MapController extends Controller
     public function style(): JsonResponse
     {
         $vectorTiles = config('palomnik.maps.openmaptiles_tiles');
-        $rasterTiles = config('palomnik.maps.raster_tiles');
         $attribution = config('palomnik.maps.attribution', '© OpenStreetMap contributors');
 
         if ($vectorTiles) {
@@ -41,10 +47,10 @@ class MapController extends Controller
             'sources' => [
                 'osm' => [
                     'type' => 'raster',
-                    'tiles' => [$rasterTiles ?: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                    'tiles' => [$this->rasterTileUrl()],
                     'tileSize' => 256,
                     'attribution' => $attribution,
-                    'maxzoom' => 19,
+                    'maxzoom' => (int) config('palomnik.maps.tile_max_zoom', 19),
                 ],
             ],
             'layers' => [
@@ -52,6 +58,16 @@ class MapController extends Controller
                 ['id' => 'osm', 'type' => 'raster', 'source' => 'osm'],
             ],
         ]);
+    }
+
+    public function tile(
+        Request $request,
+        MapTileCacheService $tiles,
+        int $z,
+        int $x,
+        int $y
+    ): Response {
+        return $tiles->response($request, $z, $x, $y);
     }
 
     public function route(Request $request): JsonResponse
@@ -128,6 +144,28 @@ class MapController extends Controller
                 'optimized' => $action === 'optimized_route',
             ],
         ]);
+    }
+
+    private function rasterTileUrl(): string
+    {
+        if (! (bool) config('palomnik.maps.tile_cache_enabled', true)) {
+            return (string) config(
+                'palomnik.maps.raster_tiles',
+                'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            );
+        }
+
+        $url = route('api.v1.map.tile', [
+            'z' => '__Z__',
+            'x' => '__X__',
+            'y' => '__Y__',
+        ]);
+
+        return str_replace(
+            ['__Z__', '__X__', '__Y__'],
+            ['{z}', '{x}', '{y}'],
+            $url
+        );
     }
 
     private function vectorStyle(string $tileUrl, string $attribution): array

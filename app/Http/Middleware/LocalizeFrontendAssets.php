@@ -5,10 +5,10 @@ namespace App\Http\Middleware;
 use App\Services\FrontendAssetService;
 use Closure;
 use Illuminate\Http\Request;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Throwable;
 
 class LocalizeFrontendAssets
 {
@@ -23,7 +23,7 @@ class LocalizeFrontendAssets
 
             try {
                 return $this->assets->response($path);
-            } catch (Throwable $exception) {
+            } catch (RuntimeException $exception) {
                 report($exception);
 
                 return response(

@@ -117,7 +117,8 @@ class FrontendAssetService
      */
     private function asset(string $path): array
     {
-        $asset = config('frontend_assets.assets.'.$path);
+        $assets = (array) config('frontend_assets.assets', []);
+        $asset = $assets[$path] ?? null;
 
         if (! is_array($asset) || empty($asset['url'])) {
             abort(404);

@@ -1,0 +1,273 @@
+name: Self-host all frontend assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/self-host-assets-final.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  vendor-assets:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Install pinned frontend packages temporarily
+        run: |
+          npm install --no-save --legacy-peer-deps --no-audit --no-fund \
+            bootstrap@5.3.3 \
+            bootstrap-icons@1.11.3 \
+            maplibre-gl@5.0.0 \
+            html5-qrcode@2.3.8 \
+            qrcodejs@1.0.0 \
+            @fontsource/inter@5 \
+            @fontsource/prata@5 \
+            @fontsource/nunito@5
+
+      - name: Copy CSS JavaScript icons and fonts to public vendor
+        run: |
+          rm -rf public/vendor
+          mkdir -p \
+            public/vendor/bootstrap \
+            public/vendor/bootstrap-icons \
+            public/vendor/maplibre-gl \
+            public/vendor/html5-qrcode \
+            public/vendor/qrcodejs \
+            public/vendor/fonts/inter \
+            public/vendor/fonts/prata \
+            public/vendor/fonts/nunito \
+            public/vendor/licenses
+
+          cp node_modules/bootstrap/dist/css/bootstrap.min.css public/vendor/bootstrap/bootstrap.min.css
+          cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js public/vendor/bootstrap/bootstrap.bundle.min.js
+          cp -f node_modules/bootstrap/dist/css/bootstrap.min.css.map public/vendor/bootstrap/ 2>/dev/null || true
+          cp -f node_modules/bootstrap/dist/js/bootstrap.bundle.min.js.map public/vendor/bootstrap/ 2>/dev/null || true
+
+          cp node_modules/bootstrap-icons/font/bootstrap-icons.min.css public/vendor/bootstrap-icons/bootstrap-icons.min.css
+          cp -R node_modules/bootstrap-icons/font/fonts public/vendor/bootstrap-icons/fonts
+
+          cp node_modules/maplibre-gl/dist/maplibre-gl.css public/vendor/maplibre-gl/maplibre-gl.css
+          cp node_modules/maplibre-gl/dist/maplibre-gl.js public/vendor/maplibre-gl/maplibre-gl.js
+          cp -f node_modules/maplibre-gl/dist/maplibre-gl.js.map public/vendor/maplibre-gl/ 2>/dev/null || true
+
+          cp node_modules/html5-qrcode/html5-qrcode.min.js public/vendor/html5-qrcode/html5-qrcode.min.js
+          cp node_modules/qrcodejs/qrcode.min.js public/vendor/qrcodejs/qrcode.min.js
+
+          for weight in 400 500 600 700; do
+            cp "node_modules/@fontsource/inter/${weight}.css" "public/vendor/fonts/inter/${weight}.css"
+          done
+          cp -R node_modules/@fontsource/inter/files public/vendor/fonts/inter/files
+
+          cp node_modules/@fontsource/prata/400.css public/vendor/fonts/prata/400.css
+          cp -R node_modules/@fontsource/prata/files public/vendor/fonts/prata/files
+
+          for weight in 400 600 700; do
+            cp "node_modules/@fontsource/nunito/${weight}.css" "public/vendor/fonts/nunito/${weight}.css"
+          done
+          cp -R node_modules/@fontsource/nunito/files public/vendor/fonts/nunito/files
+
+          cat > public/vendor/fonts/palomnik-fonts.css <<'CSS'
+          /* Local fonts: no request to Google Fonts or another CDN. */
+          @import url('./inter/400.css');
+          @import url('./inter/500.css');
+          @import url('./inter/600.css');
+          @import url('./inter/700.css');
+          @import url('./prata/400.css');
+          @import url('./nunito/400.css');
+          @import url('./nunito/600.css');
+          @import url('./nunito/700.css');
+          CSS
+
+          cp -f node_modules/bootstrap/LICENSE public/vendor/licenses/bootstrap-LICENSE 2>/dev/null || true
+          cp -f node_modules/bootstrap-icons/LICENSE.md public/vendor/licenses/bootstrap-icons-LICENSE.md 2>/dev/null || true
+          cp -f node_modules/maplibre-gl/LICENSE.txt public/vendor/licenses/maplibre-gl-LICENSE.txt 2>/dev/null || true
+          cp -f node_modules/html5-qrcode/LICENSE public/vendor/licenses/html5-qrcode-LICENSE 2>/dev/null || true
+          cp -f node_modules/qrcodejs/LICENSE public/vendor/licenses/qrcodejs-LICENSE 2>/dev/null || true
+
+      - name: Replace every external CSS and JavaScript reference
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def load(filename):
+              return Path(filename).read_text(encoding='utf-8')
+
+          def save(filename, text):
+              Path(filename).write_text(text, encoding='utf-8')
+
+          common_css = """    <link href=\"{{ asset('vendor/fonts/palomnik-fonts.css') }}\" rel=\"stylesheet\">
+              <link href=\"{{ asset('vendor/bootstrap/bootstrap.min.css') }}\" rel=\"stylesheet\">
+              <link href=\"{{ asset('vendor/bootstrap-icons/bootstrap-icons.min.css') }}\" rel=\"stylesheet\">""".replace('              ', '    ')
+
+          def localize_common_layout(filename, css_marker, js_marker=None):
+              text = load(filename)
+              text = re.sub(r'^\s*<link rel="preconnect" href="https://fonts\.googleapis\.com">\s*\n?', '', text, flags=re.M)
+              text = re.sub(r'^\s*<link rel="preconnect" href="https://fonts\.gstatic\.com" crossorigin>\s*\n?', '', text, flags=re.M)
+              text = re.sub(r'^\s*<link href="https://fonts\.googleapis\.com/[^"]+" rel="stylesheet">\s*\n?', '', text, flags=re.M)
+              text = re.sub(r'^\s*<link href="https://cdn\.jsdelivr\.net/npm/bootstrap@[^\"]+/bootstrap\.min\.css" rel="stylesheet">\s*\n?', '', text, flags=re.M)
+              text = re.sub(r'^\s*<link href="https://cdn\.jsdelivr\.net/npm/bootstrap-icons@[^\"]+/bootstrap-icons\.min\.css" rel="stylesheet">\s*\n?', '', text, flags=re.M)
+              text = re.sub(r'^\s*<link href="\{\{ mix\(\'css/app\.css\'\) \}\}" rel="stylesheet">\s*\n?', '', text, flags=re.M)
+
+              if "vendor/fonts/palomnik-fonts.css" not in text:
+                  if css_marker not in text:
+                      raise SystemExit(f'CSS marker not found: {filename}')
+                  text = text.replace(css_marker, common_css + '\n' + css_marker, 1)
+
+              if js_marker:
+                  text = re.sub(r'^\s*<script src="https://cdn\.jsdelivr\.net/npm/bootstrap@[^\"]+/bootstrap\.bundle\.min\.js"></script>\s*\n?', '', text, flags=re.M)
+                  text = re.sub(r'^\s*<script src="\{\{ mix\(\'js/app\.js\'\) \}\}"></script>\s*\n?', '', text, flags=re.M)
+                  local_bootstrap = "<script src=\"{{ asset('vendor/bootstrap/bootstrap.bundle.min.js') }}\"></script>"
+                  if "vendor/bootstrap/bootstrap.bundle.min.js" not in text:
+                      if js_marker not in text:
+                          raise SystemExit(f'JS marker not found: {filename}')
+                      text = text.replace(js_marker, local_bootstrap + '\n' + js_marker, 1)
+
+              save(filename, text)
+
+          localize_common_layout(
+              'resources/views/site/layouts/app.blade.php',
+              '    <link href="{{ asset(\'css/pilgrim-site.css\') }}" rel="stylesheet">',
+              '<script src="{{ asset(\'js/together-chat.js\') }}"></script>',
+          )
+          localize_common_layout(
+              'resources/views/admin/layouts/app.blade.php',
+              '    <style>',
+              "@stack('scripts')",
+          )
+          localize_common_layout(
+              'resources/views/admin/auth/login.blade.php',
+              '    <style>',
+          )
+
+          filename = 'resources/views/site/map.blade.php'
+          text = load(filename)
+          text = re.sub(r'^\s*<link href="https://unpkg\.com/maplibre-gl@[^\"]+/maplibre-gl\.css" rel="stylesheet">\s*\n?', '', text, flags=re.M)
+          text = re.sub(r'^\s*<script src="https://unpkg\.com/maplibre-gl@[^\"]+/maplibre-gl\.js"></script>\s*\n?', '', text, flags=re.M)
+          if "vendor/maplibre-gl/maplibre-gl.css" not in text:
+              text = text.replace("@push('styles')\n", "@push('styles')\n<link href=\"{{ asset('vendor/maplibre-gl/maplibre-gl.css') }}\" rel=\"stylesheet\">\n", 1)
+          if "vendor/maplibre-gl/maplibre-gl.js" not in text:
+              text = text.replace("@push('scripts')\n", "@push('scripts')\n<script src=\"{{ asset('vendor/maplibre-gl/maplibre-gl.js') }}\"></script>\n", 1)
+          save(filename, text)
+
+          filename = 'resources/views/service/tickets/scanner.blade.php'
+          text = load(filename)
+          text = re.sub(r'^\s*<script src="https://unpkg\.com/html5-qrcode@[^\"]+/html5-qrcode\.min\.js"></script>\s*\n?', '', text, flags=re.M)
+          if "vendor/html5-qrcode/html5-qrcode.min.js" not in text:
+              text = text.replace("@push('scripts')\n", "@push('scripts')\n<script src=\"{{ asset('vendor/html5-qrcode/html5-qrcode.min.js') }}\"></script>\n", 1)
+          save(filename, text)
+
+          filename = 'resources/views/site/tickets/show.blade.php'
+          text = load(filename)
+          text = re.sub(r'^\s*<script src="https://cdn\.jsdelivr\.net/npm/qrcodejs@[^\"]+/qrcode\.min\.js"></script>\s*\n?', '', text, flags=re.M)
+          if "vendor/qrcodejs/qrcode.min.js" not in text:
+              text = text.replace("@push('scripts')\n", "@push('scripts')\n<script src=\"{{ asset('vendor/qrcodejs/qrcode.min.js') }}\"></script>\n", 1)
+          save(filename, text)
+
+          filename = 'resources/views/welcome.blade.php'
+          text = load(filename)
+          text = re.sub(r'^\s*<link href="https://fonts\.googleapis\.com/[^"]+" rel="stylesheet">\s*\n?', '', text, flags=re.M)
+          text = re.sub(r'^\s*<link href="\{\{ mix\(\'css/app\.css\'\) \}\}" rel="stylesheet">\s*\n?', '', text, flags=re.M)
+          if "vendor/fonts/palomnik-fonts.css" not in text:
+              text = text.replace('        <!-- Styles -->', "        <link href=\"{{ asset('vendor/fonts/palomnik-fonts.css') }}\" rel=\"stylesheet\">\n\n        <!-- Styles -->", 1)
+          save(filename, text)
+          PY
+
+      - name: Update offline cache and verify local files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('public/sw.js')
+          text = path.read_text(encoding='utf-8')
+          text = re.sub(r"const CACHE_VERSION = 'palomnik-v\d+';", "const CACHE_VERSION = 'palomnik-v5';", text, count=1)
+          marker = "  '/manifest.webmanifest',"
+          for asset in [
+              '/vendor/fonts/palomnik-fonts.css',
+              '/vendor/bootstrap/bootstrap.min.css',
+              '/vendor/bootstrap/bootstrap.bundle.min.js',
+              '/vendor/bootstrap-icons/bootstrap-icons.min.css',
+              '/vendor/maplibre-gl/maplibre-gl.css',
+              '/vendor/maplibre-gl/maplibre-gl.js',
+              '/vendor/html5-qrcode/html5-qrcode.min.js',
+              '/vendor/qrcodejs/qrcode.min.js',
+          ]:
+              line = f"  '{asset}',"
+              if line not in text:
+                  text = text.replace(marker, line + '\n' + marker, 1)
+          if "url.pathname.startsWith('/vendor/')" not in text:
+              text = text.replace("  if (url.pathname.startsWith('/css/')", "  if (url.pathname.startsWith('/css/')\n      || url.pathname.startsWith('/vendor/')", 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          test -s public/vendor/bootstrap/bootstrap.min.css
+          test -s public/vendor/bootstrap/bootstrap.bundle.min.js
+          test -s public/vendor/bootstrap-icons/bootstrap-icons.min.css
+          test -s public/vendor/bootstrap-icons/fonts/bootstrap-icons.woff2
+          test -s public/vendor/maplibre-gl/maplibre-gl.css
+          test -s public/vendor/maplibre-gl/maplibre-gl.js
+          test -s public/vendor/html5-qrcode/html5-qrcode.min.js
+          test -s public/vendor/qrcodejs/qrcode.min.js
+          test -s public/vendor/fonts/palomnik-fonts.css
+          test "$(find public/vendor/fonts -type f -name '*.woff2' | wc -l)" -gt 0
+
+      - name: Audit templates for external CSS or JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          violations = []
+          pattern = re.compile(r'<(script|link)\b[^>]*(?:src|href)=["\'](https?://[^"\']+)["\'][^>]*>', re.I)
+          for root in [Path('resources/views'), Path('resources/js'), Path('resources/css')]:
+              if not root.exists():
+                  continue
+              for path in root.rglob('*'):
+                  if not path.is_file() or path.suffix.lower() not in {'.php', '.js', '.css', '.html'}:
+                      continue
+                  text = path.read_text(encoding='utf-8', errors='ignore')
+                  for line_number, line in enumerate(text.splitlines(), 1):
+                      for match in pattern.finditer(line):
+                          tag, url = match.groups()
+                          lower = line.lower()
+                          if tag.lower() == 'script' or 'rel="stylesheet"' in lower or "rel='stylesheet'" in lower or url.split('?')[0].endswith(('.css', '.js')):
+                              violations.append(f'{path}:{line_number}: {url}')
+          if violations:
+              raise SystemExit('External CSS/JS remains:\n' + '\n'.join(violations))
+          print('All CSS and JavaScript references are local.')
+          PY
+
+      - name: Validate Blade compilation
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php artisan optimize:clear
+          php artisan view:cache
+
+      - name: Commit self-hosted assets
+        run: |
+          rm -f package-lock.json
+          rm -f .github/workflows/self-host-assets-final.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(assets): serve all CSS and JavaScript from the site"
+          git push origin HEAD:main

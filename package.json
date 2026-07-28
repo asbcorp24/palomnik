@@ -21,6 +21,8 @@
         "lodash": "^4.17.19",
         "maplibre-gl": "^5.0.0",
         "postcss": "^8.1.14",
-        "qrcodejs": "1.0.0"
+        "qrcodejs": "1.0.0",
+        "webpack": "5.76.2",
+        "webpack-cli": "4.10.0"
     }
 }

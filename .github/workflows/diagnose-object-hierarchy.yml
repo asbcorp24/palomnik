@@ -1,0 +1,91 @@
+name: Diagnose object hierarchy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-object-hierarchy.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, fileinfo, gd, pdo_sqlite
+          coverage: none
+
+      - name: Run diagnostics
+        shell: bash
+        run: |
+          set +e
+          REPORT=object-hierarchy-verification.txt
+          : > "$REPORT"
+
+          composer install --no-interaction --prefer-dist >> "$REPORT" 2>&1
+          COMPOSER_STATUS=$?
+
+          if [ "$COMPOSER_STATUS" -eq 0 ]; then
+            cp .env.example .env
+            php artisan key:generate >> "$REPORT" 2>&1
+            touch database/database.sqlite
+            sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+            sed -i 's|^DB_DATABASE=.*|DB_DATABASE='"$GITHUB_WORKSPACE"'/database/database.sqlite|' .env
+
+            php -l app/Models/PilgrimageObject.php >> "$REPORT" 2>&1
+            MODEL_STATUS=$?
+            php -l app/Services/PilgrimageObjectSearchService.php >> "$REPORT" 2>&1
+            SEARCH_STATUS=$?
+            php -l app/Services/PilgrimageObjectFuzzySearch.php >> "$REPORT" 2>&1
+            FUZZY_STATUS=$?
+            php -l app/Http/Controllers/Admin/PilgrimageObjectController.php >> "$REPORT" 2>&1
+            ADMIN_STATUS=$?
+            php -l app/Http/Controllers/Site/ObjectController.php >> "$REPORT" 2>&1
+            SITE_STATUS=$?
+            php -l app/Http/Controllers/Api/V1/PilgrimageObjectController.php >> "$REPORT" 2>&1
+            API_STATUS=$?
+            php -l app/Http/Resources/PilgrimageObjectResource.php >> "$REPORT" 2>&1
+            RESOURCE_STATUS=$?
+            php -l database/migrations/2026_07_31_124500_add_parent_object_id_to_pilgrimage_objects_table.php >> "$REPORT" 2>&1
+            MIGRATION_STATUS=$?
+            php -l tests/Feature/ObjectHierarchySearchTest.php >> "$REPORT" 2>&1
+            TEST_SYNTAX_STATUS=$?
+
+            php artisan view:cache >> "$REPORT" 2>&1
+            VIEW_STATUS=$?
+            php artisan test --filter=ObjectHierarchySearchTest >> "$REPORT" 2>&1
+            FEATURE_STATUS=$?
+          else
+            MODEL_STATUS=99
+            SEARCH_STATUS=99
+            FUZZY_STATUS=99
+            ADMIN_STATUS=99
+            SITE_STATUS=99
+            API_STATUS=99
+            RESOURCE_STATUS=99
+            MIGRATION_STATUS=99
+            TEST_SYNTAX_STATUS=99
+            VIEW_STATUS=99
+            FEATURE_STATUS=99
+          fi
+
+          printf '\nRESULT composer=%s model=%s search=%s fuzzy=%s admin=%s site=%s api=%s resource=%s migration=%s test_syntax=%s views=%s feature=%s\n' \
+            "$COMPOSER_STATUS" "$MODEL_STATUS" "$SEARCH_STATUS" "$FUZZY_STATUS" "$ADMIN_STATUS" "$SITE_STATUS" "$API_STATUS" "$RESOURCE_STATUS" "$MIGRATION_STATUS" "$TEST_SYNTAX_STATUS" "$VIEW_STATUS" "$FEATURE_STATUS" >> "$REPORT"
+
+      - name: Commit diagnostic report
+        run: |
+          rm -f .github/workflows/diagnose-object-hierarchy.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add object-hierarchy-verification.txt .github/workflows/diagnose-object-hierarchy.yml
+          git commit -m "test(objects): record hierarchy verification"
+          git push origin HEAD:main

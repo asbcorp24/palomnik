@@ -98,9 +98,7 @@ class ObjectController extends Controller
             'pointsOfInterest' => fn ($query) => $query->published()->ordered(),
         ]);
 
-        // The view keeps the historical variable name for backwards compatibility,
-        // but the collection now contains real geographically nearby places.
-        $similarObjects = $this->nearbyObjects($object);
+        $nearbyObjects = $this->nearbyObjects($object);
 
         $userReview = auth()->check()
             ? auth()->user()->reviews()->where('pilgrimage_object_id', $object->id)->first()
@@ -117,7 +115,7 @@ class ObjectController extends Controller
 
         return view('site.objects.show', [
             'object' => $object,
-            'similarObjects' => $similarObjects,
+            'nearbyObjects' => $nearbyObjects,
             'userReview' => $userReview,
             'favoriteLists' => $favoriteLists,
             'isFavorite' => $isFavorite,
@@ -127,17 +125,26 @@ class ObjectController extends Controller
 
     private function nearbyObjects(PilgrimageObject $object, float $radiusKm = 25, int $limit = 6): Collection
     {
+        $latitude = (float) $object->latitude;
+        $longitude = (float) $object->longitude;
+        $latitudeDelta = $radiusKm / 111.32;
+        $longitudeScale = max(0.1, cos(deg2rad($latitude)));
+        $longitudeDelta = $radiusKm / (111.32 * $longitudeScale);
+
         return PilgrimageObject::query()
             ->published()
             ->where('id', '<>', $object->id)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
+            ->whereBetween('latitude', [$latitude - $latitudeDelta, $latitude + $latitudeDelta])
+            ->whereBetween('longitude', [$longitude - $longitudeDelta, $longitude + $longitudeDelta])
             ->with(['objectType', 'vicariate', 'coverMedia', 'parentObject.objectType'])
+            ->withCount('publishedChildObjects')
             ->get()
-            ->map(function (PilgrimageObject $candidate) use ($object) {
+            ->map(function (PilgrimageObject $candidate) use ($latitude, $longitude) {
                 $candidate->setAttribute('distance_km', $this->distanceKm(
-                    (float) $object->latitude,
-                    (float) $object->longitude,
+                    $latitude,
+                    $longitude,
                     (float) $candidate->latitude,
                     (float) $candidate->longitude,
                 ));

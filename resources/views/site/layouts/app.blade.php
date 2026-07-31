@@ -38,7 +38,7 @@
                 <ul class="navbar-nav mx-auto gap-xl-1">
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}" href="{{ route('home') }}">Главная</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('map') ? 'active' : '' }}" href="{{ route('map') }}">Карта</a></li>
-                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('objects.*') ? 'active' : '' }}" href="{{ route('objects.index') }}">Храмы и святыни</a></li>
+                    <li class="nav-item"><a class="nav-link {{ request()->routeIs('objects.*') ? 'active' : '' }}" href="{{ route('objects.index') }}">Храмы и монастыри</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('routes.*') ? 'active' : '' }}" href="{{ route('routes.index') }}">Маршруты</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('calendar.*') ? 'active' : '' }}" href="{{ route('calendar.index') }}">Календарь</a></li>
                     <li class="nav-item"><a class="nav-link {{ request()->routeIs('community.*') || request()->routeIs('together.*') ? 'active' : '' }}" href="{{ route('community.index') }}">Сообщество</a></li>

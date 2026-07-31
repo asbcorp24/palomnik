@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\PilgrimageObject;
-use Illuminate\Support\Collection;
 
 class PilgrimageObjectSearchService
 {
@@ -21,9 +20,7 @@ class PilgrimageObjectSearchService
         'm' => 'м', 'o' => 'о', 'p' => 'р', 't' => 'т', 'x' => 'х', 'y' => 'у',
     ];
 
-    /**
-     * @return array<int>
-     */
+    /** @return array<int> */
     public function matchingIds(string $term): array
     {
         $variants = $this->queryVariants($term);
@@ -35,6 +32,7 @@ class PilgrimageObjectSearchService
         return PilgrimageObject::query()
             ->select([
                 'id',
+                'object_type_id',
                 'name',
                 'address',
                 'short_description',
@@ -42,7 +40,12 @@ class PilgrimageObjectSearchService
                 'history',
                 'schedule_text',
             ])
-            ->with('sanctities:id,name')
+            ->with([
+                'objectType:id,name,slug',
+                'sanctities:id,name',
+                'publishedChildObjects.objectType:id,name,slug',
+                'publishedChildObjects.sanctities:id,name',
+            ])
             ->get()
             ->mapWithKeys(function (PilgrimageObject $object) use ($variants) {
                 $score = $this->scoreObject($object, $variants);
@@ -56,9 +59,7 @@ class PilgrimageObjectSearchService
             ->all();
     }
 
-    /**
-     * @return array<string>
-     */
+    /** @return array<string> */
     private function queryVariants(string $term): array
     {
         $lower = mb_strtolower(trim($term), 'UTF-8');
@@ -77,21 +78,39 @@ class PilgrimageObjectSearchService
             ->all();
     }
 
-    /**
-     * @param array<string> $variants
-     */
+    /** @param array<string> $variants */
     private function scoreObject(PilgrimageObject $object, array $variants): ?int
     {
         $name = $this->normalize((string) $object->name);
+        $type = $this->normalize(implode(' ', array_filter([
+            $object->objectType?->name,
+            $object->objectType?->slug,
+        ])));
         $sanctities = $this->normalize($object->sanctities->pluck('name')->implode(' '));
+        $children = $this->normalize($object->publishedChildObjects->map(function (PilgrimageObject $child) {
+            return implode(' ', array_filter([
+                $child->name,
+                $child->objectType?->name,
+                $child->objectType?->slug,
+                $child->address,
+                $child->short_description,
+                $child->description,
+                $child->history,
+                $child->schedule_text,
+                $child->sanctities->pluck('name')->implode(' '),
+            ]));
+        })->implode(' '));
         $allText = $this->normalize(implode(' ', array_filter([
             $object->name,
+            $object->objectType?->name,
+            $object->objectType?->slug,
             $object->address,
             $object->short_description,
             $object->description,
             $object->history,
             $object->schedule_text,
             $object->sanctities->pluck('name')->implode(' '),
+            $children,
         ])));
 
         $bestScore = null;
@@ -109,8 +128,16 @@ class PilgrimageObjectSearchService
                 $score += 180;
             }
 
+            if ($variant !== '' && str_contains($type, $variant)) {
+                $score += 300;
+            }
+
             if ($variant !== '' && str_contains($sanctities, $variant)) {
                 $score += 250;
+            }
+
+            if ($this->tokenMatchScore($variant, $children) !== null) {
+                $score += 120;
             }
 
             $bestScore = max($bestScore ?? 0, $score);
@@ -194,9 +221,7 @@ class PilgrimageObjectSearchService
         return trim($value);
     }
 
-    /**
-     * @return array<string>
-     */
+    /** @return array<string> */
     private function words(string $value): array
     {
         return preg_split('/\s+/u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];

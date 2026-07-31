@@ -1,4 +1,4 @@
-name: Apply mobile nearby places
+name: Verify mobile hierarchy
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  apply:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,33 +18,36 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Add hierarchy and nearby sections
-        run: |
-          git pull --rebase origin main
-          if ! grep -q "final nearby = _list(item\['nearby'\])" mobile/lib/src/screens/user_features.dart; then
-            echo 'H4sICMNzbGoAA21vYmlsZV9uZWFyYnlfcGF0Y2gucHkA7VjdbtxEFL7fpzhESPaK4NA75GqJEARRCUpF9y5E1tg7uzswHlsz49BVFSn0BgmQeAFaeIRWakVoSy94AvuNOOPxZu3GdrxJhQTiXGSzZ87PnO+c+ezZuUxiSIlechYCi9NEariDX0cjo4RJ+cV14iRknO6h0Z6S0Z6KJKVC7WWKymBOic4kVd6MSO2MR5re0+ho/D1JySwwCpeKKJkxsZg4mZ6/+z7ajYiIlolE0x2oZM4E4aBwQTPNqMK1gDOlXaZpfOhsFpyj8c2vxM5I0pSTiMZUmJQ7O1eLNGp6pURivC/Cr2lkogYxSSs3uxIk5VKLZ7RkfGYdX89YLlWebUkFJTJcveZklaU11jZic6gwE4kGJsAg65eBJGGKwt2VQr+De0yvWwbHRDISckSgco2ZUtiHTaPMh1cB6VqjXagBuws3Gs3agLwR3Jlr+1zhi7Y6mFEcFJZqlgisAd6agMg4H4PneYdlQQrBwEWDleM47WHr3fCYup3ogzjVqyrKRR+ACCNq+MSO5ac4gViu6+QP88dQPMifFafFaX6G/70yn/mZM95tDfMRkTO3dQVso334DFs1RZS7zAC4Te9Xm7qFH675ozwSRUmGwxQSjtjSXbTgifThwzSdLhF4b2HOWMfejOD8curD1KDuvH2/jhNODompcwT7+wjsSVeFRlQWVoHsDm24/Lf8Vf60ROlZ/qL4qfguf45Y/QGoflL8gMrnxYO+sBoHkrcXHi3psUxEINliqXtCJGJKUh+adSmeLbCuiR2lTl8j+5eb+OCOYfIB3CbHbEF0Ir00U8vubm4EKzHj3r37jXxONMUzyO+QBf0yyXTPtNQlzHDEKA6EG5R7tAh8TDUCe7fkX9eA4cOF3luMeru+kQFGnSYdC63qozalOd91zrzW+X60mcziR8j/3PK4Y7rGVgzru8eEZ3QM9zsAqLH++kFhPW5e7jBdpXTtVCoOHY2qxqOhKZJiwaKXlwBiIhdMrI/dwWxBbwlFsZ5E8JUbJlonsQ833uvp+2Byq9Fbeb5TxheSxTjnFsRSWUYbb09vFwiuAmkws9W5rRHDIN+Ik/+aP85fILW9xKk5K77HoWnlu0vSvQHOO2e9qtgt6G4Q4V2H8rYivSvT3nbE14BpIOMN4rxeo25CbD+6J9sxon3ruxYX/mJGGDkPKfC0+Bmf5DjbPcRXZRxOedah+Yo8hPmsX5366pH+owxYL/FNEGETsqvzYe8hOM9zDbYclmBdyAzRNm/CwTcxZqouC0hqDvz1O/QanwDmf+kgtxkI+hD4x/i7udv/abyfxtvQ+vexOV5hr3RFP78Fb3VDP/d6B9YqvKeXv7p8K/EWbq/jZaPh4o8vfwO7wdOg+BEAAA==' | base64 -d | gzip -d > /tmp/mobile-nearby.py
-            python3 /tmp/mobile-nearby.py
-          fi
-
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - name: Verify Flutter
-        working-directory: mobile
+      - name: Run Flutter verification
+        shell: bash
         run: |
-          flutter pub get
-          dart format lib/src/screens/user_features.dart
-          flutter analyze
-          flutter test
+          set +e
+          REPORT=mobile/hierarchy-verification.txt
+          : > "$REPORT"
 
-      - name: Commit implementation
+          cd mobile
+          flutter --version >> hierarchy-verification.txt 2>&1
+          flutter pub get >> hierarchy-verification.txt 2>&1
+          PUB_GET=$?
+          dart format --output=none --set-exit-if-changed lib/src/screens/user_features.dart >> hierarchy-verification.txt 2>&1
+          FORMAT=$?
+          flutter analyze >> hierarchy-verification.txt 2>&1
+          ANALYZE=$?
+          flutter test >> hierarchy-verification.txt 2>&1
+          TESTS=$?
+          printf '\nRESULT pub_get=%s format=%s analyze=%s tests=%s\n' "$PUB_GET" "$FORMAT" "$ANALYZE" "$TESTS" >> hierarchy-verification.txt
+
+      - name: Commit report and remove workflow
         run: |
           rm -f .github/workflows/apply-mobile-nearby.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add mobile/lib/src/screens/user_features.dart .github/workflows/apply-mobile-nearby.yml
-          git commit -m "feat(mobile): show hierarchy and nearby places"
+          git add mobile/hierarchy-verification.txt .github/workflows/apply-mobile-nearby.yml
+          git commit -m "test(mobile): record hierarchy verification"
           git pull --rebase origin main
           git push origin HEAD:main

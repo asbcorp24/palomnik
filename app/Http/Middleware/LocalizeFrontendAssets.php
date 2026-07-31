@@ -48,7 +48,17 @@ class LocalizeFrontendAssets
 
         $content = $response->getContent();
         if (is_string($content) && $content !== '') {
-            $response->setContent($this->assets->localizeHtml($content));
+            $content = $this->assets->localizeHtml($content);
+
+            if ($request->routeIs('objects.show')) {
+                $content = str_replace(
+                    ['Продолжить знакомство', 'Похожие места'],
+                    ['Поблизости', 'Места рядом'],
+                    $content
+                );
+            }
+
+            $response->setContent($content);
             $response->headers->remove('Content-Length');
         }
 

@@ -24,14 +24,19 @@ class PilgrimageObjectController extends Controller
 
         $query = PilgrimageObject::query()
             ->published()
-            ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'sanctities'])
+            ->with([
+                'objectType',
+                'vicariate',
+                'deanery',
+                'coverMedia',
+                'sanctities',
+                'parentObject.objectType',
+                'publishedChildObjects.objectType',
+            ])
+            ->withCount('publishedChildObjects')
             ->search($validated['q'] ?? null);
 
-        $query->when($validated['type'] ?? null, function (Builder $query, string $slug) {
-            $query->whereHas('objectType', function (Builder $query) use ($slug) {
-                $query->where('slug', $slug);
-            });
-        });
+        $query->typeOrParentOfType($validated['type'] ?? null);
 
         $query->when($validated['vicariate'] ?? null, function (Builder $query, string $slug) {
             $query->whereHas('vicariate', function (Builder $query) use ($slug) {
@@ -71,6 +76,8 @@ class PilgrimageObjectController extends Controller
 
         $pilgrimageObject->load([
             'objectType',
+            'parentObject.objectType',
+            'publishedChildObjects.objectType',
             'vicariate',
             'deanery',
             'coverMedia',

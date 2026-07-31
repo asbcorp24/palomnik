@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""Create Laravel seed JSON from a local OpenStreetMap PBF extract.
+"""Create strict Laravel seed JSON from a local OpenStreetMap PBF extract.
 
-This importer does not use Overpass. Download a Moscow + Moscow Oblast extract
-in .osm.pbf format, then run this script locally.
+Only these pilgrimage object types are exported:
+- Orthodox temples/cathedrals;
+- Orthodox monasteries;
+- holy springs.
+
+Church shops, side-altars (приделы), refectories, parish buildings, bell towers,
+chapels and other auxiliary objects are deliberately excluded.
 
 Example:
     python scripts/fetch_moscow_region_churches_from_pbf.py storage/app/moscow-region.osm.pbf
@@ -15,7 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,12 +36,55 @@ except ImportError as exc:  # pragma: no cover - user-facing dependency check
 
 import fetch_moscow_region_churches as base
 
+ORTHODOX_DENOMINATIONS = {
+    "orthodox",
+    "russian_orthodox",
+    "eastern_orthodox",
+    "old_believers",
+}
+
+EXCLUDED_NAME_RE = re.compile(
+    r"("
+    r"лавк|магазин|киоск|"
+    r"придел|предел|"
+    r"трапезн|просфорн|крестильн|"
+    r"воскресн\w*\s+школ|"
+    r"духовн\w*[-\s]+просветитель|"
+    r"администрац|канцеляр|"
+    r"приходск\w*\s+дом|дом\s+причта|"
+    r"колокольн|звонниц|"
+    r"часовн|chapel"
+    r")",
+    re.IGNORECASE,
+)
+
+NON_ORTHODOX_NAME_RE = re.compile(
+    r"("
+    r"католич|кост[её]л|кирх|лютеран|протестант|баптист|"
+    r"евангель|адвентист|пятидесят|армянск|мормон|иегов|"
+    r"англикан|методист|пресвитериан|реформат|"
+    r"мечет|синагог|дацан|буддий"
+    r")",
+    re.IGNORECASE,
+)
+
+HOLY_SPRING_NAME_RE = re.compile(
+    r"("
+    r"свят\w*\s+(источник|ключ|родник)|"
+    r"(источник|ключ|родник)\s+свят|"
+    r"источник\s+во\s+имя|"
+    r"купел\w*\s+у\s+(источник|родник)|"
+    r"holy\s+spring"
+    r")",
+    re.IGNORECASE,
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Сформировать JSON православных храмов, часовен и монастырей "
-            "из локального файла OpenStreetMap .osm.pbf."
+            "Сформировать JSON православных храмов, монастырей и святых "
+            "источников из локального файла OpenStreetMap .osm.pbf."
         )
     )
     parser.add_argument("input", help="Путь к скачанному файлу .osm.pbf")
@@ -104,6 +152,66 @@ def geometry_center(geometry: dict[str, Any]) -> tuple[float, float] | None:
     )
 
 
+def classify_target(tags: dict[str, Any], name: str) -> str | None:
+    """Return a strict project type or None for auxiliary/non-target objects."""
+    if EXCLUDED_NAME_RE.search(name) or NON_ORTHODOX_NAME_RE.search(name):
+        return None
+
+    if not base.is_active(tags):
+        return None
+
+    religion = str(tags.get("religion") or "").strip().casefold()
+    denomination = str(tags.get("denomination") or "").strip().casefold()
+
+    if religion and religion != "christian":
+        return None
+    if denomination in base.NON_ORTHODOX_DENOMINATIONS:
+        return None
+
+    # Commercial/service objects must never become pilgrimage objects merely
+    # because their names contain the words "церковный" or "храм".
+    if tags.get("shop") or tags.get("office"):
+        return None
+
+    building = str(tags.get("building") or "").strip().casefold()
+    amenity = str(tags.get("amenity") or "").strip().casefold()
+    natural = str(tags.get("natural") or "").strip().casefold()
+    place = str(tags.get("place") or "").strip().casefold()
+    historic = str(tags.get("historic") or "").strip().casefold()
+
+    # Holy springs require a real spring/water tag and a religious name or
+    # explicit Orthodox/Christian tagging. A cafe named "Святой источник"
+    # therefore cannot pass this rule.
+    if natural == "spring" or amenity in {"drinking_water", "fountain"}:
+        if (
+            HOLY_SPRING_NAME_RE.search(name)
+            or denomination in ORTHODOX_DENOMINATIONS
+            or religion == "christian"
+        ):
+            return "holy-spring"
+        return None
+
+    if (
+        amenity == "monastery"
+        or building == "monastery"
+        or place == "monastery"
+    ):
+        return "monastery"
+
+    # A temple needs an actual place-of-worship/building tag. Name matching is
+    # intentionally not used as a positive condition.
+    if building in {"church", "cathedral"}:
+        return "temple"
+
+    if amenity == "place_of_worship" and building != "chapel":
+        return "temple"
+
+    if historic in {"church", "cathedral"} and amenity == "place_of_worship":
+        return "temple"
+
+    return None
+
+
 class OrthodoxPlaceHandler(osmium.SimpleHandler):
     def __init__(self) -> None:
         super().__init__()
@@ -127,11 +235,10 @@ class OrthodoxPlaceHandler(osmium.SimpleHandler):
         if not name:
             self.skipped["unnamed"] += 1
             return
-        if not base.is_active(tags):
-            self.skipped["inactive"] += 1
-            return
-        if not base.is_orthodox_candidate(tags, name):
-            self.skipped["non_orthodox"] += 1
+
+        object_type = classify_target(tags, name)
+        if object_type is None:
+            self.skipped["not_target_object"] += 1
             return
 
         source_id = f"{osm_type}/{osm_id}"
@@ -147,7 +254,7 @@ class OrthodoxPlaceHandler(osmium.SimpleHandler):
             "osm_id": osm_id,
             "source_url": f"https://www.openstreetmap.org/{osm_type}/{osm_id}",
             "region": region,
-            "type": base.infer_object_type(tags, name),
+            "type": object_type,
             "name": name,
             "address": base.build_address(tags, region),
             "latitude": round(latitude, 7),
@@ -263,6 +370,15 @@ def main() -> int:
             "type_counts": dict(type_counts),
             "region_counts": dict(region_counts),
             "skipped": dict(handler.skipped),
+            "included_types": ["temple", "monastery", "holy-spring"],
+            "excluded_examples": [
+                "church shops",
+                "side-altars",
+                "refectories",
+                "parish buildings",
+                "bell towers",
+                "chapels",
+            ],
             "notice": (
                 "Это снимок OpenStreetMap, а не официальный реестр. "
                 "Записи требуют редакционной проверки."

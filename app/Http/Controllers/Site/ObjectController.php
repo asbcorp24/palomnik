@@ -67,6 +67,7 @@ class ObjectController extends Controller
             'media',
             'reviews' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
             'userMedia' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
+            'pointsOfInterest' => fn ($query) => $query->published()->ordered(),
         ]);
 
         $similarObjects = PilgrimageObject::query()

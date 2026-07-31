@@ -1,0 +1,69 @@
+name: Apply mobile map changes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-mobile-map-now.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Reuse prepared map patch
+        shell: bash
+        run: |
+          awk '
+            /^          python3 - <<.PY./ {capture=1; next}
+            /^          PY$/ {capture=0}
+            capture {sub(/^          /, ""); print}
+          ' .github/workflows/sync-mobile-map.yml > /tmp/mobile_map_patch.py
+          test -s /tmp/mobile_map_patch.py
+          python3 /tmp/mobile_map_patch.py
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('mobile/lib/src/screens/maplibre_map.dart')
+          text = path.read_text(encoding='utf-8')
+          text, count = re.subn(
+              r"\nColor _markerColor\(Map<String, dynamic> object\) \{.*?\n\}\n(?=\nString _message)",
+              "\n",
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('Old unused marker color helper not found')
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Verify generated sources
+        run: |
+          node --check public/js/together-chat.js
+          node --check public/sw.js
+          grep -q "List<Map<String, dynamic>> _pointsOfInterest" mobile/lib/src/screens/maplibre_map.dart
+          grep -q "WidgetLayer(markers: pointMarkers" mobile/lib/src/screens/maplibre_map.dart
+          grep -q "WidgetLayer(markers: objectMarkers" mobile/lib/src/screens/maplibre_map.dart
+          grep -q "class ObjectMiniMap" mobile/lib/src/screens/user_features.dart
+          grep -q "path == '/points-of-interest'" mobile/lib/src/core/api_client.dart
+          grep -q "this.moveLayer(primaryLayerId)" public/js/together-chat.js
+
+      - name: Commit implementation
+        run: |
+          rm -f .github/workflows/apply-mobile-map-now.yml
+          rm -f .github/workflows/sync-mobile-map.yml
+          rm -f .github/workflows/sync-pwa-map-layer-order.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(mobile): sync maps with website"
+          git push origin HEAD:main

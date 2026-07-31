@@ -9,7 +9,15 @@
     <div class="p-4">
         <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
             <span class="badge rounded-pill object-type-badge">{{ optional($object->objectType)->name ?: 'Паломнический объект' }}</span>
-            @if($object->vicariate)
+            @if($object->getAttribute('distance_km') !== null)
+                @php
+                    $distanceKm = (float) $object->getAttribute('distance_km');
+                    $distanceLabel = $distanceKm < 1
+                        ? max(1, (int) round($distanceKm * 1000)).' м'
+                        : number_format($distanceKm, 1, ',', ' ').' км';
+                @endphp
+                <span class="badge rounded-pill text-bg-light"><i class="bi bi-signpost-2 me-1"></i>{{ $distanceLabel }}</span>
+            @elseif($object->vicariate)
                 <span class="small text-secondary text-truncate">{{ $object->vicariate->name }}</span>
             @endif
         </div>

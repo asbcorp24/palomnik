@@ -76,6 +76,7 @@ class PilgrimageObjectController extends Controller
             'coverMedia',
             'sanctities',
             'media',
+            'publishedPointsOfInterest.pilgrimageObject',
         ]);
 
         return new PilgrimageObjectResource($pilgrimageObject);

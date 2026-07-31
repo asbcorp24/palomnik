@@ -14,7 +14,12 @@
             @endif
         </div>
         <h3 class="object-title mb-2"><a class="text-decoration-none" href="{{ route('objects.show', $object) }}">{{ $object->name }}</a></h3>
-        <div class="object-meta mb-3"><i class="bi bi-geo-alt me-1"></i>{{ $object->address }}</div>
+        <div class="object-meta mb-2"><i class="bi bi-geo-alt me-1"></i>{{ $object->address }}</div>
+        @if($object->parentObject)
+            <div class="small text-secondary mb-3"><i class="bi bi-diagram-2 me-1"></i>В составе: {{ $object->parentObject->name }}</div>
+        @elseif(($object->published_child_objects_count ?? 0) > 0)
+            <div class="small text-secondary mb-3"><i class="bi bi-diagram-3 me-1"></i>На территории: {{ $object->published_child_objects_count }} связанных объектов</div>
+        @endif
         @if($object->short_description)
             <p class="text-secondary small mb-3">{{ \Illuminate\Support\Str::limit($object->short_description, 145) }}</p>
         @endif

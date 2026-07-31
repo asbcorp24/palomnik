@@ -164,6 +164,9 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
         final cover = _map(item['cover']);
         final media = _list(item['media']);
         final sanctities = _list(item['sanctities']);
+        final parentObject = _map(item['parent_object']);
+        final childObjects = _list(item['child_objects']);
+        final nearby = _list(item['nearby']);
         final lat = location['latitude'];
         final lon = location['longitude'];
 
@@ -252,6 +255,76 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
                       latitude: lat.toDouble(),
                       longitude: lon.toDouble(),
                     ),
+                  ],
+                  if (parentObject.isNotEmpty) ...[
+                    const FeatureHeading('На территории'),
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.account_balance, color: AppTheme.green),
+                        title: Text('${parentObject['name'] ?? ''}'),
+                        subtitle: const Text('Родительский объект'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: parentObject['slug'] == null
+                            ? null
+                            : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ObjectDetailScreen(slug: '${parentObject['slug']}'),
+                                  ),
+                                ),
+                      ),
+                    ),
+                  ],
+                  if (childObjects.isNotEmpty) ...[
+                    const FeatureHeading('Объекты на территории'),
+                    ...childObjects.map((value) {
+                      final child = _map(value);
+                      final childType = _map(child['type']);
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          leading: Icon(pilgrimageObjectIcon(child), color: AppTheme.green),
+                          title: Text('${child['name'] ?? ''}'),
+                          subtitle: Text('${childType['name'] ?? 'Паломнический объект'}'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: child['slug'] == null
+                              ? null
+                              : () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ObjectDetailScreen(slug: '${child['slug']}'),
+                                    ),
+                                  ),
+                        ),
+                      );
+                    }),
+                  ],
+                  if (nearby.isNotEmpty) ...[
+                    const FeatureHeading('Места рядом'),
+                    ...nearby.map((value) {
+                      final nearbyObject = _map(value);
+                      final nearbyType = _map(nearbyObject['type']);
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          leading: Icon(pilgrimageObjectIcon(nearbyObject), color: AppTheme.green),
+                          title: Text('${nearbyObject['name'] ?? ''}'),
+                          subtitle: Text(
+                            '${nearbyType['name'] ?? 'Паломнический объект'}'
+                            '${nearbyObject['distance_km'] != null ? ' · ${nearbyObject['distance_km']} км' : ''}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: nearbyObject['slug'] == null
+                              ? null
+                              : () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ObjectDetailScreen(slug: '${nearbyObject['slug']}'),
+                                    ),
+                                  ),
+                        ),
+                      );
+                    }),
                   ],
                   if (_text(item['short_description']) != null) ...[
                     const SizedBox(height: 24),

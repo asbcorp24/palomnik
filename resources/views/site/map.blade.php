@@ -14,6 +14,8 @@
     .map-layer-control .btn { background:rgba(255,253,249,.94); border-color:rgba(38,68,59,.22); box-shadow:0 5px 18px rgba(30,25,20,.12); }
     .route-stop-marker { width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:50% 50% 50% 12%; transform:rotate(-45deg); background:#26443b; color:#fff; border:3px solid #fffdf9; box-shadow:0 6px 18px rgba(38,68,59,.35); cursor:pointer; font-size:12px; font-weight:800; }
     .route-stop-marker span { transform:rotate(45deg); }
+    .poi-filter-row { display:flex; align-items:center; gap:9px; padding:5px 0; }
+    .poi-filter-dot { width:11px; height:11px; border-radius:50%; box-shadow:0 0 0 2px #fff,0 0 0 3px rgba(38,35,30,.12); }
     @media (max-width:991.98px) { .map-layer-control { top:68px; } }
 </style>
 @endpush
@@ -111,6 +113,19 @@
             <div class="small text-secondary mt-2">Маршрут рассчитывается движком Valhalla по данным OpenStreetMap.</div>
         </div>
 
+        <div class="info-card p-3 mb-3">
+            <div class="small fw-semibold mb-2"><i class="bi bi-pin-map-fill me-2"></i>Точки интереса рядом</div>
+            @foreach($poiCategories as $key => $category)
+                <label class="poi-filter-row small">
+                    <input class="form-check-input mt-0" type="checkbox" data-poi-category value="{{ $key }}" checked>
+                    <span class="poi-filter-dot" style="background:{{ $category['color'] }}"></span>
+                    <i class="bi {{ $category['icon'] }}"></i>
+                    <span>{{ $category['label'] }}</span>
+                </label>
+            @endforeach
+            <div class="small text-secondary mt-2">Найдено точек: <strong>{{ $pointsOfInterest->count() }}</strong>. Каждая точка привязана к храму или другому базовому объекту.</div>
+        </div>
+
         <div class="info-card p-3 mb-4">
             <div class="small fw-semibold mb-2"><i class="bi bi-layers me-2"></i>Слои карты</div>
             <div class="small text-secondary">Основной слой использует единый стиль MapLibre. Спутниковый и исторический слои появятся после задания лицензированных URL тайлов в <code>.env</code>.</div>
@@ -184,7 +199,10 @@
 
     const objects = @json($objects, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     const selectedRoute = @json($selectedRoute, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    const pointsOfInterest = @json($pointsOfInterest, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    const focusedPointOfInterest = @json($focusedPointOfInterest, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     const objectIndex = new Map(objects.map(item => [String(item.id), item]));
+    const pointOfInterestIndex = new Map(pointsOfInterest.map(item => [String(item.id), item]));
     const styleUrl = @json(config('palomnik.maps.style_url') ?: route('api.v1.map.style'));
     const routeUrl = @json(route('api.v1.map.route'));
     const satelliteUrl = @json(config('palomnik.maps.satellite_tiles'));
@@ -210,6 +228,21 @@
                     url: item.url,
                     marker_color: item.marker_color || '#b58a32',
                     sanctities: Array.from(item.sanctities || []).join(', '),
+                }
+            }))
+    };
+
+    const poiGeojson = {
+        type: 'FeatureCollection',
+        features: pointsOfInterest
+            .filter(item => Number.isFinite(Number(item.latitude)) && Number.isFinite(Number(item.longitude)))
+            .map(item => ({
+                type: 'Feature',
+                geometry: {type: 'Point', coordinates: [Number(item.longitude), Number(item.latitude)]},
+                properties: {
+                    id: String(item.id),
+                    category: item.category,
+                    marker_color: item.marker_color || '#7c3aed'
                 }
             }))
     };
@@ -249,6 +282,31 @@
         new maplibregl.Popup({offset:22, maxWidth:'320px'})
             .setLngLat([Number(item.longitude), Number(item.latitude)])
             .setHTML(popupHtml({...item, sanctities:Array.from(item.sanctities || []).join(', ')}))
+            .addTo(map);
+    }
+
+    function pointOfInterestPopupHtml(item) {
+        const description = item.description
+            ? `<div class="small text-secondary mb-2">${escapeHtml(item.description)}</div>`
+            : '';
+        const schedule = item.schedule
+            ? `<div class="small text-secondary mb-2"><i class="bi bi-clock me-1"></i>${escapeHtml(item.schedule)}</div>`
+            : '';
+        const website = item.website
+            ? `<a class="btn btn-sm btn-light" href="${escapeHtml(item.website)}" target="_blank" rel="noopener">Сайт</a>`
+            : '';
+        const phone = item.phone
+            ? `<a class="btn btn-sm btn-light" href="tel:${escapeHtml(String(item.phone).replace(/[^+0-9]/g, ''))}">Позвонить</a>`
+            : '';
+
+        return `<article class="map-popup"><div class="map-popup-body"><div class="small fw-semibold mb-1" style="color:${escapeHtml(item.marker_color)}">${escapeHtml(item.category_label)}</div><div class="fw-bold mb-2">${escapeHtml(item.name)}</div>${description}<div class="small text-secondary mb-2"><i class="bi bi-geo-alt me-1"></i>${escapeHtml(item.address)}</div>${schedule}<div class="small mb-3">Рядом с: <strong>${escapeHtml(item.base_object_name || '')}</strong></div><div class="d-flex gap-2 flex-wrap"><a class="btn btn-sm btn-pm-green" href="${escapeHtml(item.base_object_url || '#')}">Открыть объект</a>${website}${phone}</div></div></article>`;
+    }
+
+    function showPointOfInterest(item) {
+        map.easeTo({center:[Number(item.longitude), Number(item.latitude)], zoom:16});
+        new maplibregl.Popup({offset:18, maxWidth:'330px'})
+            .setLngLat([Number(item.longitude), Number(item.latitude)])
+            .setHTML(pointOfInterestPopupHtml(item))
             .addTo(map);
     }
 
@@ -296,6 +354,23 @@
             }
         });
 
+        map.addSource('points-of-interest', {
+            type:'geojson',
+            data:poiGeojson
+        });
+
+        map.addLayer({
+            id:'points-of-interest',
+            type:'circle',
+            source:'points-of-interest',
+            paint:{
+                'circle-color':['coalesce',['get','marker_color'],'#7c3aed'],
+                'circle-radius':7,
+                'circle-stroke-width':2.5,
+                'circle-stroke-color':'#fffdf9'
+            }
+        });
+
         if (satelliteUrl) {
             map.addSource('satellite', {type:'raster', tiles:[satelliteUrl], tileSize:256, attribution});
             map.addLayer({id:'satellite', type:'raster', source:'satellite', layout:{visibility:'none'}});
@@ -306,9 +381,13 @@
             map.addLayer({id:'historic', type:'raster', source:'historic', layout:{visibility:'none'}, paint:{'raster-opacity':0.88}});
         }
 
+        if (focusedPointOfInterest) {
+            window.setTimeout(() => showPointOfInterest(focusedPointOfInterest), 150);
+        }
+
         if (selectedRoute?.points?.length >= 2) {
             buildPublishedRoute(selectedRoute);
-        } else if (geojson.features.length > 1) {
+        } else if (!focusedPointOfInterest && geojson.features.length > 1) {
             const bounds = geojson.features.reduce(
                 (bounds, feature) => bounds.extend(feature.geometry.coordinates),
                 new maplibregl.LngLatBounds(geojson.features[0].geometry.coordinates, geojson.features[0].geometry.coordinates)
@@ -331,7 +410,14 @@
         if (item) showObject(item);
     });
 
-    ['pilgrim-clusters','pilgrim-points'].forEach(layer => {
+    map.on('click', 'points-of-interest', event => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const item = pointOfInterestIndex.get(String(feature.properties.id));
+        if (item) showPointOfInterest(item);
+    });
+
+    ['pilgrim-clusters','pilgrim-points','points-of-interest'].forEach(layer => {
         map.on('mouseenter', layer, () => map.getCanvas().style.cursor = 'pointer');
         map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
     });
@@ -339,6 +425,17 @@
     document.querySelectorAll('[data-map-object]').forEach(button => button.addEventListener('click', () => {
         const item = objectIndex.get(button.dataset.mapObject);
         if (item) showObject(item);
+    }));
+
+    document.querySelectorAll('[data-poi-category]').forEach(input => input.addEventListener('change', () => {
+        if (!map.getLayer('points-of-interest')) return;
+        const selected = Array.from(document.querySelectorAll('[data-poi-category]:checked')).map(item => item.value);
+        map.setFilter(
+            'points-of-interest',
+            selected.length
+                ? ['in', ['get','category'], ['literal', selected]]
+                : ['==', ['get','category'], '__none__']
+        );
     }));
 
     document.querySelectorAll('[data-layer-mode]').forEach(button => button.addEventListener('click', () => {

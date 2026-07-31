@@ -83,14 +83,14 @@ class PilgrimageObjectController extends Controller
 
     public function show(PilgrimageObject $object): View
     {
-        $object->load(['objectType', 'vicariate', 'deanery', 'sanctities', 'media']);
+        $object->load(['objectType', 'vicariate', 'deanery', 'sanctities', 'media', 'pointsOfInterest']);
 
         return view('admin.objects.show', compact('object'));
     }
 
     public function edit(PilgrimageObject $object): View
     {
-        $object->load(['sanctities', 'media']);
+        $object->load(['sanctities', 'media', 'pointsOfInterest']);
 
         return $this->formView($object);
     }

@@ -7,6 +7,7 @@ use App\Http\Resources\PilgrimageObjectResource;
 use App\Models\PilgrimageObject;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class PilgrimageObjectController extends Controller
 {
@@ -19,7 +20,7 @@ class PilgrimageObjectController extends Controller
             'deanery' => ['nullable', 'string', 'max:255'],
             'sanctity' => ['nullable', 'string', 'max:255'],
             'sort' => ['nullable', 'in:name,newest'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $query = PilgrimageObject::query()
@@ -86,6 +87,48 @@ class PilgrimageObjectController extends Controller
             'publishedPointsOfInterest.pilgrimageObject',
         ]);
 
+        $pilgrimageObject->setRelation(
+            'nearbyObjects',
+            $this->nearbyObjects($pilgrimageObject)
+        );
+
         return new PilgrimageObjectResource($pilgrimageObject);
+    }
+
+    private function nearbyObjects(PilgrimageObject $object, float $radiusKm = 25, int $limit = 6): Collection
+    {
+        return PilgrimageObject::query()
+            ->published()
+            ->where('id', '<>', $object->id)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->with(['objectType', 'coverMedia', 'parentObject.objectType'])
+            ->get()
+            ->map(function (PilgrimageObject $candidate) use ($object) {
+                $candidate->setAttribute('distance_km', $this->distanceKm(
+                    (float) $object->latitude,
+                    (float) $object->longitude,
+                    (float) $candidate->latitude,
+                    (float) $candidate->longitude,
+                ));
+
+                return $candidate;
+            })
+            ->filter(fn (PilgrimageObject $candidate) => (float) $candidate->distance_km <= $radiusKm)
+            ->sortBy('distance_km')
+            ->take($limit)
+            ->values();
+    }
+
+    private function distanceKm(float $latitude1, float $longitude1, float $latitude2, float $longitude2): float
+    {
+        $latitudeDelta = deg2rad($latitude2 - $latitude1);
+        $longitudeDelta = deg2rad($longitude2 - $longitude1);
+        $a = sin($latitudeDelta / 2) ** 2
+            + cos(deg2rad($latitude1))
+            * cos(deg2rad($latitude2))
+            * sin($longitudeDelta / 2) ** 2;
+
+        return 6371 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 }

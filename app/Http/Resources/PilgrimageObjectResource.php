@@ -35,6 +35,36 @@ class PilgrimageObjectResource extends JsonResource
                     'slug' => $this->deanery->slug,
                 ] : null;
             }),
+            'parent_object' => $this->whenLoaded('parentObject', function () {
+                return $this->parentObject ? [
+                    'id' => $this->parentObject->id,
+                    'slug' => $this->parentObject->slug,
+                    'name' => $this->parentObject->name,
+                    'type' => $this->parentObject->objectType ? [
+                        'id' => $this->parentObject->objectType->id,
+                        'name' => $this->parentObject->objectType->name,
+                        'slug' => $this->parentObject->objectType->slug,
+                    ] : null,
+                ] : null;
+            }),
+            'child_objects' => $this->whenLoaded('publishedChildObjects', function () {
+                return $this->publishedChildObjects->map(function ($child) {
+                    return [
+                        'id' => $child->id,
+                        'slug' => $child->slug,
+                        'name' => $child->name,
+                        'type' => $child->objectType ? [
+                            'id' => $child->objectType->id,
+                            'name' => $child->objectType->name,
+                            'slug' => $child->objectType->slug,
+                        ] : null,
+                    ];
+                })->values();
+            }),
+            'child_objects_count' => $this->when(
+                array_key_exists('published_child_objects_count', $this->getAttributes()),
+                (int) ($this->published_child_objects_count ?? 0)
+            ),
             'short_description' => $this->short_description,
             'description' => $this->when($request->routeIs('api.v1.objects.show'), $this->description),
             'history' => $this->when($request->routeIs('api.v1.objects.show'), $this->history),

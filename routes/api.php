@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\MobileProfileController;
 use App\Http\Controllers\Api\V1\MobileTogetherController;
 use App\Http\Controllers\Api\V1\PilgrimageObjectController;
 use App\Http\Controllers\Api\V1\PilgrimagePhotoController;
+use App\Http\Controllers\Api\V1\PointOfInterestController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->name('api.v1.')->group(function () {
@@ -48,6 +49,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/deaneries', [DirectoryController::class, 'deaneries'])->name('deaneries');
         Route::get('/sanctities', [DirectoryController::class, 'sanctities'])->name('sanctities');
     });
+
+    Route::get('/points-of-interest', [PointOfInterestController::class, 'index'])->name('points-of-interest.index');
+    Route::get('/points-of-interest/{pointOfInterest}', [PointOfInterestController::class, 'show'])
+        ->whereNumber('pointOfInterest')
+        ->name('points-of-interest.show');
 
     Route::get('/objects', [PilgrimageObjectController::class, 'index'])->name('objects.index');
     Route::get('/objects/{pilgrimageObject:slug}', [PilgrimageObjectController::class, 'show'])->name('objects.show');

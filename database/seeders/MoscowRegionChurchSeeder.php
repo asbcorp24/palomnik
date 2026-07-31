@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 use JsonException;
 use RuntimeException;
 
@@ -55,6 +56,8 @@ class MoscowRegionChurchSeeder extends Seeder
         $created = 0;
         $updated = 0;
         $skipped = 0;
+        $removed = 0;
+        $importedSlugs = [];
 
         foreach ($objects as $item) {
             if (! is_array($item)) {
@@ -71,6 +74,8 @@ class MoscowRegionChurchSeeder extends Seeder
                 continue;
             }
 
+            $importedSlugs[$slug] = true;
+
             $object = PilgrimageObject::withTrashed()
                 ->where('slug', $slug)
                 ->first();
@@ -84,6 +89,13 @@ class MoscowRegionChurchSeeder extends Seeder
             $incoming = [
                 'object_type_id' => $typeIds[$type],
                 'name' => $name,
+                'short_description' => $this->nullableString(
+                    $item['short_description'] ?? null
+                ),
+                'description' => $this->nullableString(
+                    $item['description'] ?? null
+                ),
+                'history' => $this->nullableString($item['history'] ?? null),
                 'address' => trim((string) ($item['address'] ?? ''))
                     ?: 'Адрес уточняется',
                 'latitude' => (float) ($item['latitude'] ?? 0),
@@ -107,7 +119,7 @@ class MoscowRegionChurchSeeder extends Seeder
             }
 
             // Тип и координаты синхронизируем всегда. Заполненные редакторские
-            // поля не затираем данными из OpenStreetMap.
+            // поля не затираем данными из OpenStreetMap или Ollama.
             $updates = [
                 'object_type_id' => $incoming['object_type_id'],
                 'latitude' => $incoming['latitude'],
@@ -115,8 +127,17 @@ class MoscowRegionChurchSeeder extends Seeder
             ];
 
             foreach (
-                ['name', 'address', 'phone', 'email', 'website', 'schedule_text']
-                as $field
+                [
+                    'name',
+                    'short_description',
+                    'description',
+                    'history',
+                    'address',
+                    'phone',
+                    'email',
+                    'website',
+                    'schedule_text',
+                ] as $field
             ) {
                 if (blank($object->{$field}) && filled($incoming[$field])) {
                     $updates[$field] = $incoming[$field];
@@ -127,9 +148,29 @@ class MoscowRegionChurchSeeder extends Seeder
             $updated++;
         }
 
+        // Очистку выполняем только после явной проверки Ollama. Обычный сырой
+        // OSM-файл не может случайно удалить ранее импортированные объекты.
+        if (isset($snapshot['meta']['ollama_review'])) {
+            PilgrimageObject::query()
+                ->where('slug', 'like', 'osm-%')
+                ->select(['id', 'slug'])
+                ->chunkById(500, function (Collection $rows) use (
+                    $importedSlugs,
+                    &$removed
+                ): void {
+                    foreach ($rows as $row) {
+                        if (! isset($importedSlugs[$row->slug])) {
+                            $row->delete();
+                            $removed++;
+                        }
+                    }
+                });
+        }
+
         $this->command?->info(
             "Импорт объектов завершён: создано {$created}, "
-            ."обновлено {$updated}, пропущено {$skipped}."
+            ."обновлено {$updated}, удалено после проверки {$removed}, "
+            ."пропущено {$skipped}."
         );
     }
 

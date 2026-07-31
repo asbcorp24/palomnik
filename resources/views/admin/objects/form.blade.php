@@ -37,6 +37,18 @@
                         <input class="form-control" id="name" name="name" value="{{ old('name', $object->name) }}" maxlength="255" required>
                     </div>
                     <div class="col-12">
+                        <label class="form-label" for="parent_object_id">Родительский объект</label>
+                        <select class="form-select" id="parent_object_id" name="parent_object_id">
+                            <option value="">Нет — самостоятельный объект</option>
+                            @foreach($parentObjects as $parentObject)
+                                <option value="{{ $parentObject->id }}" @selected((string)old('parent_object_id', $object->parent_object_id) === (string)$parentObject->id)>
+                                    {{ $parentObject->name }}@if($parentObject->objectType) — {{ $parentObject->objectType->name }}@endif
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">Для храма на территории монастыря выберите монастырь родительским объектом.</div>
+                    </div>
+                    <div class="col-12">
                         <label class="form-label" for="slug">Slug</label>
                         <input class="form-control" id="slug" name="slug" value="{{ old('slug', $object->slug) }}" maxlength="255" placeholder="создастся автоматически">
                     </div>

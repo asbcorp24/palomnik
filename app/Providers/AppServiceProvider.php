@@ -20,31 +20,21 @@ class AppServiceProvider extends ServiceProvider
     {
         Paginator::useBootstrapFive();
 
-        if ($this->app->runningInConsole() || ! $this->app->bound('request')) {
+        if ($this->app->runningInConsole()) {
             return;
         }
 
-        $request = request();
-        $isBackOffice = $request->is('admin')
-            || $request->is('admin/*')
-            || $request->is('service')
-            || $request->is('service/*');
-
-        if ($isBackOffice) {
-            return;
-        }
-
-        ObjectType::addGlobalScope('public_without_holy_springs', function (Builder $query): void {
+        ObjectType::addGlobalScope('without_holy_springs', function (Builder $query): void {
             $query->where('slug', '<>', 'holy-spring');
         });
 
-        Sanctity::addGlobalScope('public_without_holy_springs', function (Builder $query): void {
+        Sanctity::addGlobalScope('without_holy_springs', function (Builder $query): void {
             $query->where('slug', '<>', 'holy-spring');
         });
 
-        PilgrimageObject::addGlobalScope('public_without_holy_springs', function (Builder $query): void {
+        PilgrimageObject::addGlobalScope('without_holy_springs', function (Builder $query): void {
             $query->whereDoesntHave('objectType', function (Builder $typeQuery): void {
-                $typeQuery->withoutGlobalScope('public_without_holy_springs')
+                $typeQuery->withoutGlobalScope('without_holy_springs')
                     ->where('slug', 'holy-spring');
             });
         });

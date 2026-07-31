@@ -128,6 +128,16 @@ class PilgrimageObject extends Model
         return $this->hasMany(Review::class);
     }
 
+    public function pointsOfInterest(): HasMany
+    {
+        return $this->hasMany(PointOfInterest::class)->ordered();
+    }
+
+    public function publishedPointsOfInterest(): HasMany
+    {
+        return $this->hasMany(PointOfInterest::class)->published()->ordered();
+    }
+
     public function userMedia(): HasMany
     {
         return $this->hasMany(UserMedia::class);

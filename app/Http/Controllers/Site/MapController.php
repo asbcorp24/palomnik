@@ -7,6 +7,7 @@ use App\Models\Deanery;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use App\Models\PilgrimageRoute;
+use App\Models\PointOfInterest;
 use App\Models\Sanctity;
 use App\Models\Vicariate;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,6 +26,7 @@ class MapController extends Controller
             'deanery' => ['nullable', 'string', 'max:255'],
             'sanctity' => ['nullable', 'string', 'max:255'],
             'route' => ['nullable', 'string', 'max:255'],
+            'focus_poi' => ['nullable', 'integer', 'exists:points_of_interest,id'],
         ]);
 
         $query = PilgrimageObject::query()
@@ -54,6 +56,41 @@ class MapController extends Controller
                 'url' => route('objects.show', $object),
             ];
         })->values();
+
+        $pointsOfInterest = PointOfInterest::query()
+            ->published()
+            ->with('pilgrimageObject')
+            ->whereIn('pilgrimage_object_id', $objects->pluck('id'))
+            ->ordered()
+            ->get()
+            ->map(function (PointOfInterest $point) {
+                return [
+                    'id' => $point->id,
+                    'category' => $point->category,
+                    'category_label' => $point->category_label,
+                    'icon' => $point->category_icon,
+                    'marker_color' => $point->marker_color,
+                    'name' => $point->name,
+                    'description' => $point->description,
+                    'address' => $point->address,
+                    'latitude' => (float) $point->latitude,
+                    'longitude' => (float) $point->longitude,
+                    'phone' => $point->phone,
+                    'website' => $point->website,
+                    'schedule' => $point->schedule_text,
+                    'base_object_id' => $point->pilgrimage_object_id,
+                    'base_object_name' => optional($point->pilgrimageObject)->name,
+                    'base_object_url' => $point->pilgrimageObject
+                        ? route('objects.show', $point->pilgrimageObject)
+                        : null,
+                ];
+            })
+            ->values();
+
+        $focusedPointOfInterest = $pointsOfInterest->firstWhere(
+            'id',
+            (int) ($filters['focus_poi'] ?? 0)
+        );
 
         $routes = PilgrimageRoute::query()
             ->published()
@@ -99,6 +136,9 @@ class MapController extends Controller
             'sanctities' => Sanctity::query()->orderBy('name')->limit(300)->get(),
             'routes' => $routes,
             'selectedRoute' => $selectedRoute,
+            'pointsOfInterest' => $pointsOfInterest,
+            'focusedPointOfInterest' => $focusedPointOfInterest,
+            'poiCategories' => PointOfInterest::CATEGORIES,
         ]);
     }
 

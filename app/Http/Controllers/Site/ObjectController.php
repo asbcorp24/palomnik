@@ -116,7 +116,6 @@ class ObjectController extends Controller
         return view('site.objects.show', [
             'object' => $object,
             'nearbyObjects' => $nearbyObjects,
-            'similarObjects' => $nearbyObjects,
             'userReview' => $userReview,
             'favoriteLists' => $favoriteLists,
             'isFavorite' => $isFavorite,

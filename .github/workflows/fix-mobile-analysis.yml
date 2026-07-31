@@ -1,0 +1,58 @@
+name: Fix mobile analysis
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-mobile-analysis.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve duplicate RouteBuilderScreen import
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('mobile/lib/src/screens/enhanced_root_shell.dart')
+          text = path.read_text(encoding='utf-8')
+          old = "import 'content_features.dart';"
+          new = "import 'content_features.dart' hide RouteBuilderScreen;"
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('content_features import not found')
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Format and verify Flutter
+        working-directory: mobile
+        run: |
+          flutter pub get
+          dart format lib/src/screens/user_features.dart lib/src/screens/enhanced_root_shell.dart
+          flutter analyze --no-fatal-warnings --no-fatal-infos
+          flutter test
+
+      - name: Commit verified changes
+        run: |
+          rm -f .github/workflows/fix-mobile-analysis.yml
+          rm -f .github/workflows/apply-mobile-nearby.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mobile/lib/src/screens/user_features.dart mobile/lib/src/screens/enhanced_root_shell.dart .github/workflows/fix-mobile-analysis.yml .github/workflows/apply-mobile-nearby.yml
+          git commit -m "fix(mobile): resolve route builder import conflict"
+          git pull --rebase origin main
+          git push origin HEAD:main

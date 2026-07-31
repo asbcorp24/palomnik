@@ -17,8 +17,9 @@ class MoscowRegionChurchSeeder extends Seeder
 
         if (! is_file($path)) {
             throw new RuntimeException(
-                'Не найден JSON со списком храмов. Сначала выполните: '
-                .'python scripts/fetch_moscow_region_churches_from_pbf.py storage/app/moscow-region.osm.pbf'
+                'Не найден JSON со списком объектов. Сначала выполните: '
+                .'python scripts/fetch_moscow_region_churches_from_pbf.py '
+                .'storage/app/moscow-region.osm.pbf'
             );
         }
 
@@ -31,10 +32,12 @@ class MoscowRegionChurchSeeder extends Seeder
 
         $objects = $snapshot['objects'] ?? null;
         if (! is_array($objects)) {
-            throw new RuntimeException('Некорректный формат JSON: отсутствует массив objects.');
+            throw new RuntimeException(
+                'Некорректный формат JSON: отсутствует массив objects.'
+            );
         }
 
-        $allowedTypes = ['temple', 'monastery', 'holy-spring'];
+        $allowedTypes = ['temple', 'monastery', 'chapel', 'holy-spring'];
 
         $typeIds = ObjectType::query()
             ->whereIn('slug', $allowedTypes)
@@ -43,7 +46,8 @@ class MoscowRegionChurchSeeder extends Seeder
         foreach ($allowedTypes as $slug) {
             if (! $typeIds->has($slug)) {
                 throw new RuntimeException(
-                    'Не найден тип объекта '.$slug.'. Сначала выполните CatalogSeeder.'
+                    'Не найден тип объекта '.$slug
+                    .'. Сначала выполните CatalogSeeder.'
                 );
             }
         }
@@ -80,13 +84,16 @@ class MoscowRegionChurchSeeder extends Seeder
             $incoming = [
                 'object_type_id' => $typeIds[$type],
                 'name' => $name,
-                'address' => trim((string) ($item['address'] ?? '')) ?: 'Адрес уточняется',
+                'address' => trim((string) ($item['address'] ?? ''))
+                    ?: 'Адрес уточняется',
                 'latitude' => (float) ($item['latitude'] ?? 0),
                 'longitude' => (float) ($item['longitude'] ?? 0),
                 'phone' => $this->nullableString($item['phone'] ?? null),
                 'email' => $this->nullableString($item['email'] ?? null),
                 'website' => $this->nullableString($item['website'] ?? null),
-                'schedule_text' => $this->nullableString($item['schedule_text'] ?? null),
+                'schedule_text' => $this->nullableString(
+                    $item['schedule_text'] ?? null
+                ),
             ];
 
             if (! $object) {
@@ -99,15 +106,18 @@ class MoscowRegionChurchSeeder extends Seeder
                 continue;
             }
 
-            // Тип и координаты синхронизируем всегда. Редакторские поля не затираем:
-            // они заполняются из OSM только пока остаются пустыми.
+            // Тип и координаты синхронизируем всегда. Заполненные редакторские
+            // поля не затираем данными из OpenStreetMap.
             $updates = [
                 'object_type_id' => $incoming['object_type_id'],
                 'latitude' => $incoming['latitude'],
                 'longitude' => $incoming['longitude'],
             ];
 
-            foreach (['name', 'address', 'phone', 'email', 'website', 'schedule_text'] as $field) {
+            foreach (
+                ['name', 'address', 'phone', 'email', 'website', 'schedule_text']
+                as $field
+            ) {
                 if (blank($object->{$field}) && filled($incoming[$field])) {
                     $updates[$field] = $incoming[$field];
                 }
@@ -118,7 +128,8 @@ class MoscowRegionChurchSeeder extends Seeder
         }
 
         $this->command?->info(
-            "Импорт завершён: создано {$created}, обновлено {$updated}, пропущено {$skipped}."
+            "Импорт объектов завершён: создано {$created}, "
+            ."обновлено {$updated}, пропущено {$skipped}."
         );
     }
 

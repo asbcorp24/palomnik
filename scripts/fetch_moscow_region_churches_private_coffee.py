@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Run the Moscow-region church importer through one fixed Overpass endpoint."""
+"""Run the cached tiled importer through Overpass Private Coffee."""
 
 from __future__ import annotations
 
-import fetch_moscow_region_churches as importer
+from fetch_moscow_region_churches_grid import main
 
 
 if __name__ == "__main__":
-    importer.OVERPASS_ENDPOINTS = (
-        "https://overpass.private.coffee/api/interpreter",
-    )
-    raise SystemExit(importer.main())
+    raise SystemExit(main())

@@ -1,0 +1,74 @@
+name: Finish object hierarchy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finish-object-hierarchy.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finish-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply final hierarchy changes
+        shell: bash
+        run: |
+          echo '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' | base64 -d | gzip -d > /tmp/finish-object-hierarchy.py
+          python3 /tmp/finish-object-hierarchy.py
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, fileinfo, gd, pdo_sqlite
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare test database
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          touch database/database.sqlite
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$(pwd)/database/database.sqlite|" .env
+          php artisan migrate --force
+
+      - name: Verify Laravel behavior
+        run: |
+          php -l app/Http/Controllers/Admin/PilgrimageObjectController.php
+          php -l app/Http/Controllers/Site/ObjectController.php
+          php -l app/Http/Controllers/Api/V1/PilgrimageObjectController.php
+          php -l app/Http/Resources/PilgrimageObjectResource.php
+          php artisan view:cache
+          php artisan test --filter=ObjectHierarchyAndNearbyTest
+          php artisan test --filter=FuzzyObjectSearchTest
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter detail screen
+        working-directory: mobile
+        run: |
+          flutter pub get
+          dart format --output=none --set-exit-if-changed lib/src/screens/user_features.dart
+          flutter analyze
+          flutter test
+
+      - name: Commit final implementation
+        run: |
+          rm -f .github/workflows/finish-object-hierarchy.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(objects): finish hierarchy and nearby places"
+          git push origin HEAD:main

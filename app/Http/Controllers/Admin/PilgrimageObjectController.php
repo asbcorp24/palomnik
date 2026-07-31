@@ -27,15 +27,15 @@ class PilgrimageObjectController extends Controller
         ]);
 
         $objects = PilgrimageObject::query()
-            ->with(['objectType', 'vicariate', 'deanery', 'coverMedia'])
-            ->when($filters['q'] ?? null, function (Builder $query, string $term) {
-                $term = trim($term);
-                $query->where(function (Builder $query) use ($term) {
-                    $query->where('name', 'like', "%{$term}%")
-                        ->orWhere('address', 'like', "%{$term}%");
+            ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'parentObject.objectType'])
+            ->withCount('childObjects')
+            ->search($filters['q'] ?? null)
+            ->when($filters['type'] ?? null, function (Builder $query, int $type) {
+                $query->where(function (Builder $query) use ($type) {
+                    $query->where('object_type_id', $type)
+                        ->orWhereHas('childObjects', fn (Builder $query) => $query->where('object_type_id', $type));
                 });
             })
-            ->when($filters['type'] ?? null, fn (Builder $query, int $type) => $query->where('object_type_id', $type))
             ->when(($filters['status'] ?? null) === 'published', fn (Builder $query) => $query->where('is_published', true))
             ->when(($filters['status'] ?? null) === 'draft', fn (Builder $query) => $query->where('is_published', false))
             ->latest('updated_at')
@@ -83,14 +83,29 @@ class PilgrimageObjectController extends Controller
 
     public function show(PilgrimageObject $object): View
     {
-        $object->load(['objectType', 'vicariate', 'deanery', 'sanctities', 'media', 'pointsOfInterest']);
+        $object->load([
+            'objectType',
+            'parentObject.objectType',
+            'childObjects.objectType',
+            'vicariate',
+            'deanery',
+            'sanctities',
+            'media',
+            'pointsOfInterest',
+        ]);
 
         return view('admin.objects.show', compact('object'));
     }
 
     public function edit(PilgrimageObject $object): View
     {
-        $object->load(['sanctities', 'media', 'pointsOfInterest']);
+        $object->load([
+            'parentObject.objectType',
+            'childObjects.objectType',
+            'sanctities',
+            'media',
+            'pointsOfInterest',
+        ]);
 
         return $this->formView($object);
     }
@@ -131,9 +146,18 @@ class PilgrimageObjectController extends Controller
 
     private function formView(PilgrimageObject $object): View
     {
+        $excludedParentIds = $object->exists
+            ? array_merge([$object->id], $this->descendantIds($object))
+            : [];
+
         return view('admin.objects.form', [
             'object' => $object,
             'types' => ObjectType::query()->orderBy('sort_order')->orderBy('name')->get(),
+            'parentObjects' => PilgrimageObject::query()
+                ->with('objectType')
+                ->when($excludedParentIds !== [], fn (Builder $query) => $query->whereNotIn('id', $excludedParentIds))
+                ->orderBy('name')
+                ->get(),
             'vicariates' => Vicariate::query()->orderBy('name')->get(),
             'deaneries' => Deanery::query()->with('vicariate')->orderBy('name')->get(),
             'sanctities' => Sanctity::query()->orderBy('name')->get(),
@@ -156,8 +180,37 @@ class PilgrimageObjectController extends Controller
             $deaneryRule->where(fn ($query) => $query->where('vicariate_id', $vicariateId));
         }
 
+        $parentRules = [
+            'nullable',
+            'integer',
+            Rule::exists('pilgrimage_objects', 'id')->whereNull('deleted_at'),
+            function (string $attribute, mixed $value, $fail) use ($object) {
+                if (! $object?->exists || ! $value) {
+                    return;
+                }
+
+                $candidate = PilgrimageObject::query()->find((int) $value);
+                $visited = [];
+
+                while ($candidate) {
+                    if ($candidate->id === $object->id) {
+                        $fail('Нельзя выбрать сам объект или его дочерний объект в качестве родителя.');
+                        return;
+                    }
+
+                    if (isset($visited[$candidate->id])) {
+                        return;
+                    }
+
+                    $visited[$candidate->id] = true;
+                    $candidate = $candidate->parentObject;
+                }
+            },
+        ];
+
         return $request->validate([
             'object_type_id' => ['required', 'integer', 'exists:object_types,id'],
+            'parent_object_id' => $parentRules,
             'vicariate_id' => ['nullable', 'required_with:deanery_id', 'integer', 'exists:vicariates,id'],
             'deanery_id' => ['nullable', 'integer', $deaneryRule],
             'name' => ['required', 'string', 'max:255'],
@@ -181,6 +234,31 @@ class PilgrimageObjectController extends Controller
             'media_files' => ['nullable', 'array', 'max:20'],
             'media_files.*' => ['file', 'max:51200', 'mimes:jpg,jpeg,png,webp,gif,mp3,wav,m4a,mp4,mov,avi,pdf,doc,docx'],
         ]);
+    }
+
+    /** @return array<int> */
+    private function descendantIds(PilgrimageObject $object): array
+    {
+        $descendants = [];
+        $frontier = [$object->id];
+
+        while ($frontier !== []) {
+            $frontier = PilgrimageObject::withTrashed()
+                ->whereIn('parent_object_id', $frontier)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $newIds = array_values(array_diff($frontier, $descendants));
+            if ($newIds === []) {
+                break;
+            }
+
+            $descendants = array_values(array_unique(array_merge($descendants, $newIds)));
+            $frontier = $newIds;
+        }
+
+        return $descendants;
     }
 
     private function uniqueSlug(?string $slug, string $name, ?int $ignoreId = null): string

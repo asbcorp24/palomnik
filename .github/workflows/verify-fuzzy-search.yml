@@ -1,0 +1,73 @@
+name: Verify fuzzy object search
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-fuzzy-search.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Install and verify
+        run: |
+          set +e
+          : > fuzzy-search-verification.log
+          composer install --no-interaction --prefer-dist --no-progress >> fuzzy-search-verification.log 2>&1
+          composer_status=$?
+
+          cp .env.example .env >> fuzzy-search-verification.log 2>&1
+          php artisan key:generate >> fuzzy-search-verification.log 2>&1
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i 's|^DB_DATABASE=.*|DB_DATABASE=:memory:|' .env
+          php artisan optimize:clear >> fuzzy-search-verification.log 2>&1
+
+          php -l app/Services/PilgrimageObjectSearchService.php >> fuzzy-search-verification.log 2>&1
+          php -l app/Models/PilgrimageObject.php >> fuzzy-search-verification.log 2>&1
+          php -l tests/Feature/FuzzyObjectSearchTest.php >> fuzzy-search-verification.log 2>&1
+          lint_status=$?
+
+          php artisan view:cache >> fuzzy-search-verification.log 2>&1
+          view_status=$?
+
+          DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test --filter=FuzzyObjectSearchTest >> fuzzy-search-verification.log 2>&1
+          test_status=$?
+
+          echo "composer_status=$composer_status" >> fuzzy-search-verification.log
+          echo "lint_status=$lint_status" >> fuzzy-search-verification.log
+          echo "view_status=$view_status" >> fuzzy-search-verification.log
+          echo "test_status=$test_status" >> fuzzy-search-verification.log
+          echo "$composer_status $lint_status $view_status $test_status" > fuzzy-search-verification.status
+
+      - name: Record result
+        run: |
+          read composer_status lint_status view_status test_status < fuzzy-search-verification.status
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ "$composer_status" = "0" ] && [ "$lint_status" = "0" ] && [ "$view_status" = "0" ] && [ "$test_status" = "0" ]; then
+            rm -f .github/workflows/verify-fuzzy-search.yml fuzzy-search-verification.log fuzzy-search-verification.status
+            git add -A
+            git commit -m "test(search): verify fuzzy object search"
+            git push origin HEAD:main
+          else
+            rm -f fuzzy-search-verification.status
+            git add fuzzy-search-verification.log
+            git commit -m "ci(search): record fuzzy search verification failure"
+            git push origin HEAD:main
+            exit 1
+          fi

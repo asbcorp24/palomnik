@@ -28,11 +28,19 @@ class ObjectController extends Controller
 
         $query = PilgrimageObject::query()
             ->published()
-            ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'sanctities'])
+            ->with([
+                'objectType',
+                'vicariate',
+                'deanery',
+                'coverMedia',
+                'sanctities',
+                'parentObject.objectType',
+                'publishedChildObjects.objectType',
+                'publishedChildObjects.sanctities',
+            ])
+            ->withCount('publishedChildObjects')
             ->withAvg(['reviews as published_rating' => fn ($query) => $query->where('status', 'published')], 'rating')
-            ->when($filters['type'] ?? null, function (Builder $query, string $slug) {
-                $query->whereHas('objectType', fn (Builder $query) => $query->where('slug', $slug));
-            })
+            ->typeOrParentOfType($filters['type'] ?? null)
             ->when($filters['vicariate'] ?? null, function (Builder $query, string $slug) {
                 $query->whereHas('vicariate', fn (Builder $query) => $query->where('slug', $slug));
             })
@@ -78,6 +86,8 @@ class ObjectController extends Controller
 
         $object->load([
             'objectType',
+            'parentObject.objectType',
+            'publishedChildObjects.objectType',
             'vicariate',
             'deanery',
             'coverMedia',

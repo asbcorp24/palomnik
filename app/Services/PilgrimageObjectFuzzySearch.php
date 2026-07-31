@@ -7,9 +7,7 @@ use Illuminate\Support\Collection;
 
 class PilgrimageObjectFuzzySearch
 {
-    /**
-     * Rank objects by similarity to the supplied search phrase.
-     */
+    /** Rank objects by similarity to the supplied search phrase. */
     public function rank(Collection $objects, string $term): Collection
     {
         $queryVariants = $this->queryVariants($term);
@@ -22,11 +20,27 @@ class PilgrimageObjectFuzzySearch
             ->map(function (PilgrimageObject $object) use ($queryVariants) {
                 $score = max(
                     $this->fieldScore($object->name, $queryVariants, 120),
+                    $this->fieldScore($object->objectType?->name, $queryVariants, 115),
+                    $this->fieldScore($object->objectType?->slug, $queryVariants, 105),
                     $this->fieldScore($object->address, $queryVariants, 85),
                     $this->fieldScore($object->short_description, $queryVariants, 65),
                     $this->fieldScore($object->description, $queryVariants, 45),
                     $object->sanctities
                         ->map(fn ($sanctity) => $this->fieldScore($sanctity->name, $queryVariants, 105))
+                        ->max() ?? 0,
+                    $object->publishedChildObjects
+                        ->map(function (PilgrimageObject $child) use ($queryVariants) {
+                            return max(
+                                $this->fieldScore($child->name, $queryVariants, 90),
+                                $this->fieldScore($child->objectType?->name, $queryVariants, 100),
+                                $this->fieldScore($child->objectType?->slug, $queryVariants, 90),
+                                $this->fieldScore($child->address, $queryVariants, 60),
+                                $this->fieldScore($child->short_description, $queryVariants, 55),
+                                $child->sanctities
+                                    ->map(fn ($sanctity) => $this->fieldScore($sanctity->name, $queryVariants, 75))
+                                    ->max() ?? 0,
+                            );
+                        })
                         ->max() ?? 0,
                 );
 

@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Административная панель') — Московский паломник</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prata&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="{{ asset('assets/vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ asset('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') }}" rel="stylesheet">
     <style>
         :root { --pilgrim-cream:#f7f0e6;--pilgrim-paper:#fffdf9;--pilgrim-gold:#b08a3e;--pilgrim-gold-dark:#8c6b2d;--pilgrim-green:#26443b;--pilgrim-green-soft:#355e52;--pilgrim-brown:#6f4d37;--pilgrim-ink:#25211d;--pilgrim-muted:#746c64;--pilgrim-border:rgba(111,77,55,.14); }
         body { min-height:100vh;background:#f6f3ed;color:var(--pilgrim-ink);font-family:Inter,sans-serif; }
@@ -120,7 +117,7 @@
         </div>
     </main>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ asset('assets/vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 @stack('scripts')
 </body>
 </html>

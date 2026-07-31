@@ -9,11 +9,8 @@
     <title>@yield('title', 'Московский паломник')</title>
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
     <link rel="icon" href="{{ asset('icons/pilgrim.svg') }}" type="image/svg+xml">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prata&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="{{ asset('assets/vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ asset('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ asset('css/pilgrim-site.css') }}" rel="stylesheet">
     <link href="{{ asset('css/pilgrim-account.css') }}" rel="stylesheet">
     @stack('styles')
@@ -101,7 +98,7 @@
     <a class="{{ request()->routeIs('profile.*') || request()->routeIs('route-plans.*') || request()->routeIs('notifications.*') || request()->routeIs('tickets.*') ? 'active' : '' }} position-relative" href="{{ auth()->check() ? route('profile.dashboard') : route('login') }}"><i class="bi bi-person"></i><span>Профиль</span>@if($unreadNotificationCount)<span class="position-absolute top-0 end-0 badge rounded-pill bg-danger">{{ $unreadNotificationCount > 9 ? '9+' : $unreadNotificationCount }}</span>@endif</a>
 </nav>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ asset('assets/vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ asset('js/together-chat.js') }}"></script>
 <script>
 (function () {

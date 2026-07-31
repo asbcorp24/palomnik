@@ -18,7 +18,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="{{ asset('assets/vendor/html5-qrcode/html5-qrcode.min.js') }}"></script>
 <script>
 (() => {
     const lookupUrl = @json(route('service.tickets.lookup'));

@@ -3,7 +3,7 @@
 @section('title', 'Интерактивная карта — Московский паломник')
 
 @push('styles')
-<link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
+<link href="{{ asset('assets/vendor/maplibre/maplibre-gl.css') }}" rel="stylesheet">
 <style>
     .maplibregl-popup-content { border-radius:18px; padding:0; overflow:hidden; box-shadow:0 18px 50px rgba(38,35,30,.2); }
     .map-popup { width:min(300px,75vw); font-family:Inter,Arial,sans-serif; }
@@ -177,7 +177,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="{{ asset('assets/vendor/maplibre/maplibre-gl.js') }}"></script>
 <script>
 (function () {
     const vicariate = document.getElementById('mapVicariate');

@@ -35,7 +35,7 @@ $title=optional(optional($trip)->pilgrimageRoute)->title ?: optional($trip)->tit
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="{{ asset('assets/vendor/qrcodejs/qrcode.min.js') }}"></script>
 <script>
 new QRCode(document.getElementById('ticketQr'), {text:@json($qrPayload),width:228,height:228,correctLevel:QRCode.CorrectLevel.H});
 </script>

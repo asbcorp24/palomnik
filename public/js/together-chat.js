@@ -130,3 +130,19 @@
         if (!document.hidden) refreshMessages();
     });
 })();
+
+(function () {
+    const objectSidebar = document.querySelector('section.section-space aside.col-lg-4 > .d-grid.position-sticky');
+    const objectTitle = document.querySelector('.page-hero .section-title');
+
+    if (!objectSidebar || !objectTitle || document.querySelector('script[data-object-mini-map-loader]')) {
+        return;
+    }
+
+    const currentScriptUrl = new URL(document.currentScript?.src || window.location.href, window.location.origin);
+    const applicationPath = currentScriptUrl.pathname.replace(/\/js\/together-chat\.js$/, '');
+    const script = document.createElement('script');
+    script.src = `${currentScriptUrl.origin}${applicationPath}/js/object-mini-map.js`;
+    script.dataset.objectMiniMapLoader = '1';
+    document.head.appendChild(script);
+})();

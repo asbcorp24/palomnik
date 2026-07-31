@@ -37,6 +37,8 @@ class SiteSetting extends Model
         'organization_same_as' => null,
     ];
 
+    protected $table = 'site_seo_settings';
+
     protected $fillable = ['key', 'value'];
 
     protected $casts = ['value' => 'array'];

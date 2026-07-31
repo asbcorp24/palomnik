@@ -18,7 +18,7 @@ class MoscowRegionChurchSeeder extends Seeder
         if (! is_file($path)) {
             throw new RuntimeException(
                 'Не найден JSON со списком храмов. Сначала выполните: '
-                .'python3 scripts/fetch_moscow_region_churches.py'
+                .'python scripts/fetch_moscow_region_churches_from_pbf.py storage/app/moscow-region.osm.pbf'
             );
         }
 
@@ -34,11 +34,13 @@ class MoscowRegionChurchSeeder extends Seeder
             throw new RuntimeException('Некорректный формат JSON: отсутствует массив objects.');
         }
 
+        $allowedTypes = ['temple', 'monastery', 'holy-spring'];
+
         $typeIds = ObjectType::query()
-            ->whereIn('slug', ['temple', 'monastery', 'chapel'])
+            ->whereIn('slug', $allowedTypes)
             ->pluck('id', 'slug');
 
-        foreach (['temple', 'monastery', 'chapel'] as $slug) {
+        foreach ($allowedTypes as $slug) {
             if (! $typeIds->has($slug)) {
                 throw new RuntimeException(
                     'Не найден тип объекта '.$slug.'. Сначала выполните CatalogSeeder.'
@@ -116,7 +118,7 @@ class MoscowRegionChurchSeeder extends Seeder
         }
 
         $this->command?->info(
-            "Импорт храмов завершён: создано {$created}, обновлено {$updated}, пропущено {$skipped}."
+            "Импорт завершён: создано {$created}, обновлено {$updated}, пропущено {$skipped}."
         );
     }
 

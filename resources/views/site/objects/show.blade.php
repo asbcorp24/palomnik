@@ -460,23 +460,23 @@
             </aside>
         </div>
 
-        @if($similarObjects->isNotEmpty())
+        @if($nearbyObjects->isNotEmpty())
             <section class="mt-5 pt-5 border-top">
                 <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
                     <div>
-                        <div class="section-kicker mb-2">Продолжить знакомство</div>
-                        <h2 class="h2 mb-0">Похожие места</h2>
+                        <div class="section-kicker mb-2">В радиусе до 25 км</div>
+                        <h2 class="h2 mb-0">Места рядом</h2>
                     </div>
 
-                    <a class="btn btn-outline-pm" href="{{ route('objects.index', ['type' => optional($object->objectType)->slug]) }}">
-                        Смотреть все
+                    <a class="btn btn-outline-pm" href="{{ route('map', ['q' => $object->name]) }}">
+                        <i class="bi bi-map me-1"></i>Открыть на карте
                     </a>
                 </div>
 
                 <div class="row g-4">
-                    @foreach($similarObjects as $similarObject)
+                    @foreach($nearbyObjects as $nearbyObject)
                         <div class="col-md-6 col-xl-4">
-                            @include('site.partials.object-card', ['object' => $similarObject])
+                            @include('site.partials.object-card', ['object' => $nearbyObject])
                         </div>
                     @endforeach
                 </div>

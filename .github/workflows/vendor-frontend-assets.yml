@@ -70,7 +70,7 @@ jobs:
           test "$(wc -c < public/assets/vendor/bootstrap-icons/fonts/bootstrap-icons.woff2)" -gt 50000
           test "$(wc -c < public/assets/vendor/maplibre/maplibre-gl.js)" -gt 500000
 
-          grep -q '../fonts/bootstrap-icons.woff2' public/assets/vendor/bootstrap-icons/bootstrap-icons.min.css
+          grep -q 'fonts/bootstrap-icons.woff2' public/assets/vendor/bootstrap-icons/bootstrap-icons.min.css
 
       - name: Commit vendor assets
         run: |

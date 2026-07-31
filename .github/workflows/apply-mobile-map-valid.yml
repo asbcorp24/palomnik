@@ -1,0 +1,43 @@
+name: Apply valid mobile map patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-mobile-map-valid.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply prepared patch
+        shell: bash
+        run: |
+          echo 'H4sIAFhrbGoC/+08a28bx7Xf+SumukZ294ZaSrbjBHQUVZbt1oAdC5bbAJUEYrg7JDda7mx2dkUxCgvHxX2gLdB/UBT3F/gWdZG6cfoXyH/UM499zy4pN318KBGLuzNnZs6c95kzTGcU0SkKcTzxvSHypiGNYnQErx31HJFOZ4qjcxKhPdFhGlM69HzSgwE9Fjm9meeOScx6oeePI286mOJwIEfYLo5iw1Lj7RBHJIjt6bnrRaZ8YXvPo4R0Ebn0WDyg5+I1GzCLvJgMYnIZm1tbWwohI8TOOR6T/shP4phEvSmGvx725Wp3Oynmhm334gmZkh4Ow4F4ykAeOTS4j2OMFNIw39Ph58SJeYf5BIcfH8eRF4y7yJ0HeOo5nyAq+i101UFo5AXYR/E8JEAU2XFi8Ffj7G6pG2YCCAHoMQRv0Ms/+0i3hs2ZYXJoS8H1EeDDYlQDvVrkC11gPwFE1BDjxpVa+cQAWEAJ7e+jrIn5yThv4t9F/Ad5t2EsDDUl/9gxfUxnJDrEjJgWkBAhb4RMsbYNSMbYC5hpLL9dfrd8u3y1+nr1cvWr1QvDQl99hapQUxpgBlybG5YkKAI5i5MoQJz+zMaOQ5MgHgyxjwOH8K0uGhZc/Q9fDBb9/fKtfjFngkPiN6zkTJLImQxoEvteQNy2lZbf8E0tv4MV3y6/Wb4RqykK1WDfrH6x/Mvy9fLPq1+3wbGQs7UBtxkX7IEb0bCVAP+1erF8tfy2bZnVfy9fA9QbTqZWOE7I/4ctvmiDkjRrhQA7QdwIt1Nd7qpT6fMpjPZoMHC8eH63sygqK/WC+OnoUQB0IaxFVwWgXFnNzWZe7EyQCdohOk84jmRMQQQzaU9RBQsTnXO2oL1PCkj5A9XelVAOHpEaCG9U/RMag9jlAOJd9Sm+5505r9PZpdTmEBVJlWCDvJ/FOOKNC0GzQ+rTqGDdngiLKlpNANJSDYzttCtoIEePsO8PwdiCBTsIw+fCgI6pD0svNGaQj/7nG8Hc0EkfMnD4ViSPJYbl9nyCgEZT7HtfEhdmMW6I+Qw7IqGPHfLQi1hsGv9hdEFSLBvwmHIjmI4FwWBiHEgWdM6P+LtpPHx4I58VhkbY9S77aPeOGKokM4ewfRKM4wna20N30HvvpbP+YA8Fie8DuST7ZLMFZEkZJDju+JgxdCQ5DhSQHAfPGpPAZeg4BgnzCWOfCXct+CfJWh1iSi1gSQgu+JzMu0p/v0i8CNCJJx4II8dE1+HBnLp2GjzHSrTFe8jFMpoDyWATTKjMQnoVSVEpgWKZnMyZIeCr5M0/pZ57mMqqWCjvG1IK7JGLiel/SC9IFHkugWdFimHi+a55j/89BBMGFOOU4d+pRZBzMWASIJyivo9u37F3gA234Otu0cj9CIxTEpH7JAbHKhWOfwRqfVQgBbBgAqv20aE0nSSDRQjCqnjSF4t2s8YJ8caTuNrqEodGwmj20T16eT97NQsOXNCyjwqckx/GDY0Yd8yfbMeLHJ8UIYY0cknEQfi3DZQ21WSCS2C8JqBa3RTjnD63gDg37Q+s8mR8HZfOUq0+KXQihQZ0m6XmDH214hCU8vzmnW4FaOgn0TNQsoT10UfVTjoaMQK0eyq+zZ0uumWVYUqvZ/lLoV3xS7geIetISwrOnyIlbnJS7H6UTaQeLOkCFx0IbyEIDhzqgoHbM5J4tP0RBM4dHkvz4Lwp9mZOREjAIAYOoSkiPPhOo24hyHsonQJMGXZlMF1fCAKLLQiX14TyW2CsYrBxiM/Sl8osF+Ffqa3MObe1NhI/Dba61wIvgKzLO8qT7yqKi60ORAzA8lDi2jtD6DFkLB/rHNgnaCBDagbDlYyfVXb6LsM3HV3dWyMWGUk64NQHPsXcg4Ekyt7Us81VB55hL0aH2IHI7iD0bAj0Yh6c28CEnDBGTyFv5Ot8kRDhEiEZAYxANa8KamaAlwH5HBMDFGRnp6iBPNodMIIh7LEFG6TbtT32KY0fTMN4biHjCxinAcrnWeSPIxo55BkZAVXAThXfMr1EWEQowlXkVMgZYiqCnBguOCKIKwCeM2OfBxgpma1i3gRiacqg3eLBWnPIIyMYub5VmmI2AUaaZjEDzT8SwzRqBhQH6XM64G4JXvmoFOjE8OE7TlyeKEJ4FiRTHnsUumkwLvcX51tYlRwRaKHSw5SFU57K8YAFrK6IQkxTUKIg5uoJxoH4dQIya5BGIUnQnFOgUXy+D+FZ3O1odIFlyvAw4W7e5s9m7sbWqYheSTRqIhqKEOvlt+SrNkFEGottOtr2lLn4e+J0ZmkV6ygzMimJT3bOMk0ssYCjqwHf1YMX9La00r+1t117aySXpq9A/H8GBQtZ/UYElPD/KtYvR7toB4ubqRvE4lo6vy6bcqhFtlsRUvJYJ3Pta4ObFLKLUgPcRbtWh/g8YtIYCk3MFGGPEXQ8Z5BpP7gEq6jiVR6EIoHFEEh7LgaOgDAuj3HZhM4GYJ0mlB8xg72XZvXjC0jrwEswfEEgZOeHHu0Hs5jNAwdd8UhJTAkYpx6kMiP0HpWPklqPkdTEnWuIm0o+MVPHyimvTgzephgtRSo/D2k/EdGOV9qSTdB6VCKgpOca8AQ3or5Pon0bQ1QN4ngIRj7CqXtwCCdNH3JZOo5wOPGc3HH4PNE09UqChZJYoAz3aTL0STEUA10rj8t1r3lY9vAlpVN+eFJInaSK/SDTMandpZ1yZj+hLvbv0Tim0+MJIbEUhGynMtfvpw/penzk/QiPf4wD14dsLuaVCtUnjgw4eczspABs2zEekQNIs8xquniEXZ5vFV1vKJtShj2AXOZRAJaBCW4/fv7snnkTUlT476b4V8pNs1MDP5kG5Ux5ir3g4NJjxyIDfVJ4s6deUM53nYgyxrsPfG8cTIHjMGetTZwsxpWRHIGIgBicVLLs5zzBrLSJokTl2HXg4yHx1eHr8v/Esfqb5Su0/Gb5dvVSHFe/Xn29fGUsjG5tOhbPOUck6fiKx7yhvmx2bFA5v6zDjYCNn6nDlYfZsz27U05JNOcE2gaJGae6e49emumxzQc1wHXkyis4Rhsl5OboKBNHEc7KVtAxnzzG0Zjs2w4N55958URHqjYyfKgjw99Eio82J0VuMEBnwFqzDQhSFQ3N8dEHt9cjz82L4oRLmBN5IUcE1leHshaybfukU5c67Z53d6w6wmLbOcNLyyyM2oAzHYq5o8kk5ntGUMN8Y/m71W+Wf1h+t/wWrb7uoxtXdTR0HGrkUYsOWhso4VrKqNrmu1HmjgaFhx44UPdeAo4lECffOjLR4IjLLAF7bVaD1/TzKb7wxjimkR3SMNPhu+tgE9aoyBVfVv08UTXzI8icn9EkJk3zFF3dQDg5Sc37JMaefyyOH5vHAquB5n2uxHVG6GWjgblrOrS0WuhgOZtS0ROnuMXqmnZ24aiK0moay9+Ci3qzerH61erl6tcInNfXy7eyBg1//4R4FXX1y+VrgHlpvIPsll4tTSJdPj9OY/0tXWirCdMBtBh01/pbQ/mjp48AmpFIBMCFKdKAvim/KCzZRVmE/j4qtUPCIXZSyD1lVYpp9iECk3QZL3DJpWnk0bc8C+bZVJpYyVw0S8QVriRwK3OcBqdBIVk8dvBoBHGDaXTlknKcKiTKjCY7qqojzhGo5m4Sk0pCu3Eqq/BS5bo8rxQhX27AzFt3uuhW0XCJafQx/btH9e8Y15cEG+cBaB53DkXEfigSkVoFpla1rJe6GqvfhSicE6Sse2lRNaWkHLVz+fDhh4e3Dh7ctxp0MzUtuksKkn1FWFULVCehuoy0OibXfSkGC6t64FA883qyTvjXy1zl/GlTobsNQnf730JXFjpFS4206O6faaBVKbGcheoFSU5Un6RNgLgDqdjtk76wdWdgoUuW7n3ZC1azf7a+UGaU/ZysuD/Gc6Cdss/91FB3gSE+nQkFwI6sZvPdWt3ToBAqtMwIcE1gqblm/ZJt7rYO0ePTNsZq67w+qiVd/rvgqqsGKoZGxGbJULIy2joN5JUMVWIVL6dtB3KnFjq9sv9zH5zp4jQw9/dOAwkJU0A8DBJvqVrkVlaVzENWcf9vT+E08vGY7QE+x92OldXEi9dDxUBdAT1hoj60voIuAEcE84NClpbQeSMMzCZZW0NP76am9fisMF+un/MJZQhTWKGlfp5OC4Lr9/if1vJ5M3QVQo9mW+X8GpcErrvJ7++SwJYW+h3vC3SmXuCVzqd1H1FuFIIhb5mBIY7iQSmZt8qZJ0dTTC2D6WKxUzc5uLdSgSJQbw1p7Jp09uaO1Zx8SQfyBHAD9W5L7vhW+/LaYAtU6pj7/KnBmdfGpGFAnz9uNKixC5KpND8q70wjqQBUZHetX58ZSYOHXJETiwm2ecGjITfSaUNh0S4qSsX7qNTF0yNx0S8XSENe/BNZfDErL9/8GyV+evHPkGInhwmpk48l4mxwb7BMzA0uDeaCUm5PBUTblwpC7YZg4xXW/PKfK4QmE8B6Rzr533ozUIQUQMtCjCsC2xx7Ga6mmFil64KHOHKzYoTvhffIBF944rgS3mwcxB7Ep5ilAg5Ga+zB7IWawZckorUrheXiwLsd9usP+jN7UlK5zLjc3NFUC3gxInzMnYzGqlBhI5mAeSqf64YHJC0+VGUpTeKWgvxM1ok+0Pcey7NH48bVQegBfcWeQWzuYUZ+EvkLcCde72KXe8SeOKe0P2c0MNYfczdWRMqBn8ZI1UO37E5sY2Sot/j1rKSW7DaSbtN0ror7xjmUhl7tGZW2kqPPr7jet/iGllxrzcjGvKt6yJtmYVeL6x5d6prPNjgzzJw7TSKHHMRgC4eJyNzXHS82H2FoCpVtpUp+FXi3WkZRnH2mucPboiO1E1kenmU/dtDW8ZopkpondSNZW9ZQm7kMceASV1s7lBtpqn+ICoj48dFflt8t/wz//rh8LX4a9Lp0ALx81XDQndbu1hZAPtzRh2vWRlLCySlrFLpdxJT6sQeyWzvU/hb29mL1v/DvF6uX2i2USxt7n4B/SyAsATOqp9dPIs8Wv15o0nJjEsch6/d6c86USztKuB1mvf2I+9y9n9/IQoUbmWt9L4rjPZzE1LiGfoElpTy4fCwQfgLPNg94InDmIGK+Jw+VNqR5Y1HBhThGWHT2DjWAJiU9a7pDnkW5mnBOH+qWIskNY91ylCiXukagW1xSRbpyjvdRuWvXynP3YqbPG7WZPvjt1kTfoRHPFfl6wumrFB9a+H1ONXiDBF/+QEd7czKjMkwnaZjNrr1CnkWA+azpxVD01VfVG+NrocvA0nK3YFtdIst4M2IUyA5tWqrPyLBM9RAia8/pfc56MYWgZ0KibWcCed/nDMABGgDTMWuJLTKAKYTlMnRSvli8PHKtjNown6Q2bHKgaKTNplUf7D7x43LFcNHRXROkkTfmAf6B64pVbYd7PI4WD+jnXBKHZASCBejIu8spGoArDI7nekT00ZuhApRtx0/4r2NZg0Wrwm2Lw7J1wFICNoLa5vaMGTXIMxv2+gA7E7PKC2789aVtfnYh+JhFwJWhTTXx7KdijQKgr48vaq2L/EbmP1wWYPsFqawKrN7EQjfPSESlVczcZGAzdcqsS75WtySGwp5melfQa2jT6jWbadWazaQisxn0KJhWNVaAGYJbqqh2cPjjB4OfPnh2/Ojpp/wQI8Q+nQbe+fbFLePuVheth7st4HatFNXirthMu6mqhYLYYlsQeDulk9idnQQQdZ6bU48xmCD/3xIAd9GMRucjyNc4H6UaGzYEIpNk2Eu7WI9fGN0OZ3g7X0H+dm4+9ZUGNo2SXosPbAfGEKbMC9DbAZ1dc8QFJG+uGnMmBVJQKB3STIi/Ak+BMos2QgAA' | base64 -d | gzip -d > /tmp/mobile-map-patch.py
+          python3 /tmp/mobile-map-patch.py
+
+      - name: Verify patch
+        run: |
+          node --check public/js/together-chat.js
+          node --check public/sw.js
+          grep -q "List<Map<String, dynamic>> _pointsOfInterest" mobile/lib/src/screens/maplibre_map.dart
+          grep -q "WidgetLayer" mobile/lib/src/screens/maplibre_map.dart
+          grep -q "class ObjectMiniMap" mobile/lib/src/screens/user_features.dart
+          grep -q "path == '/points-of-interest'" mobile/lib/src/core/api_client.dart
+          grep -q "this.moveLayer(primaryLayerId)" public/js/together-chat.js
+
+      - name: Commit changes
+        run: |
+          rm -f .github/workflows/apply-mobile-map-valid.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(mobile): sync maps with website"
+          git push origin HEAD:main

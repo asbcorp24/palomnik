@@ -3,6 +3,12 @@
     gap: .45rem !important;
 }
 
+/* Главная открывается по логотипу «Московский паломник», поэтому отдельную
+   плитку в верхнем меню не показываем. */
+.site-header .navbar-nav.mx-auto > .nav-item:first-child {
+    display: none;
+}
+
 .site-header .navbar-nav.mx-auto > .nav-item {
     display: flex;
 }
@@ -42,7 +48,6 @@
     transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
 
-.site-header .navbar-nav.mx-auto > .nav-item:nth-child(1) > .nav-link::before { background-image: url("../image/nav-home.png"); }
 .site-header .navbar-nav.mx-auto > .nav-item:nth-child(2) > .nav-link::before { background-image: url("../image/nav-map.png"); }
 .site-header .navbar-nav.mx-auto > .nav-item:nth-child(3) > .nav-link::before { background-image: url("../image/nav-objects.png"); }
 .site-header .navbar-nav.mx-auto > .nav-item:nth-child(4) > .nav-link::before { background-image: url("../image/nav-routes.png"); }

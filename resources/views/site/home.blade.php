@@ -1,7 +1,7 @@
 @extends('site.layouts.app')
 
 @section('title', 'Московский паломник — храмы, события и маршруты')
-@section('meta_description', 'Интерактивная карта храмов и святынь, календарь православных событий, паломнические маршруты и электронные билеты.')
+@section('meta_description', 'Интерактивная карта храмов и монастырей, календарь православных событий, паломнические маршруты и электронные билеты.')
 
 @section('content')
 <section class="hero">
@@ -13,7 +13,7 @@
                 <p class="hero-lead mb-4">Найдите храм, узнайте о святынях и расписании, выберите событие, подготовьте маршрут и получите электронный билет.</p>
                 <form class="search-panel d-flex align-items-center gap-2" action="{{ route('objects.index') }}" method="GET">
                     <i class="bi bi-search ms-3 text-secondary"></i>
-                    <input class="form-control" name="q" placeholder="Название, адрес или святыня — можно с опечаткой" aria-label="Поиск храмов и святынь">
+                    <input class="form-control" name="q" placeholder="Название, адрес или святыня — можно с опечаткой" aria-label="Поиск храмов и монастырей">
                     <button class="btn btn-pm-gold px-4 py-3 rounded-4" type="submit">Найти</button>
                 </form>
                 <div class="d-flex flex-wrap gap-3 mt-4">
@@ -79,7 +79,7 @@
 <section class="section-space section-soft">
     <div class="container">
         <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-5">
-            <div><div class="section-kicker mb-2">Единый каталог</div><h2 class="section-title mb-2">Храмы и святыни</h2><p class="section-lead mb-0">Карточки объектов наполняются через административную панель и используются сайтом и мобильным API.</p></div>
+            <div><div class="section-kicker mb-2">Единый каталог</div><h2 class="section-title mb-2">Храмы и монастыри</h2><p class="section-lead mb-0">Карточки объектов наполняются через административную панель и используются сайтом и мобильным API.</p></div>
             <a class="btn btn-outline-pm" href="{{ route('objects.index') }}">Весь каталог <i class="bi bi-arrow-right ms-1"></i></a>
         </div>
         <div class="row g-4">

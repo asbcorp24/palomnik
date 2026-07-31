@@ -23,9 +23,14 @@
         const routeUrl = new URL(routeLink.href, window.location.origin);
         const routeText = routeUrl.searchParams.get('rtext') || '';
         const destination = routeText.split('~').pop()?.replace(/^~/, '') || '';
-        const coordinates = destination.split(',').map(Number);
-        latitude = coordinates[0];
-        longitude = coordinates[1];
+        const coordinateParts = destination.split(',').map((value) => value.trim());
+
+        if (coordinateParts.length !== 2 || coordinateParts.some((value) => value === '')) {
+            return;
+        }
+
+        latitude = Number(coordinateParts[0]);
+        longitude = Number(coordinateParts[1]);
     } catch (error) {
         return;
     }

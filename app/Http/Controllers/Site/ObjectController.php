@@ -98,14 +98,9 @@ class ObjectController extends Controller
             'pointsOfInterest' => fn ($query) => $query->published()->ordered(),
         ]);
 
-        $similarObjects = PilgrimageObject::query()
-            ->published()
-            ->where('object_type_id', $object->object_type_id)
-            ->where('id', '<>', $object->id)
-            ->with(['objectType', 'coverMedia'])
-            ->orderByDesc('published_at')
-            ->limit(3)
-            ->get();
+        // The view keeps the historical variable name for backwards compatibility,
+        // but the collection now contains real geographically nearby places.
+        $similarObjects = $this->nearbyObjects($object);
 
         $userReview = auth()->check()
             ? auth()->user()->reviews()->where('pilgrimage_object_id', $object->id)->first()
@@ -128,6 +123,43 @@ class ObjectController extends Controller
             'isFavorite' => $isFavorite,
             'rating' => $object->reviews->avg('rating'),
         ]);
+    }
+
+    private function nearbyObjects(PilgrimageObject $object, float $radiusKm = 25, int $limit = 6): Collection
+    {
+        return PilgrimageObject::query()
+            ->published()
+            ->where('id', '<>', $object->id)
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->with(['objectType', 'vicariate', 'coverMedia', 'parentObject.objectType'])
+            ->get()
+            ->map(function (PilgrimageObject $candidate) use ($object) {
+                $candidate->setAttribute('distance_km', $this->distanceKm(
+                    (float) $object->latitude,
+                    (float) $object->longitude,
+                    (float) $candidate->latitude,
+                    (float) $candidate->longitude,
+                ));
+
+                return $candidate;
+            })
+            ->filter(fn (PilgrimageObject $candidate) => (float) $candidate->distance_km <= $radiusKm)
+            ->sortBy('distance_km')
+            ->take($limit)
+            ->values();
+    }
+
+    private function distanceKm(float $latitude1, float $longitude1, float $latitude2, float $longitude2): float
+    {
+        $latitudeDelta = deg2rad($latitude2 - $latitude1);
+        $longitudeDelta = deg2rad($longitude2 - $longitude1);
+        $a = sin($latitudeDelta / 2) ** 2
+            + cos(deg2rad($latitude1))
+            * cos(deg2rad($latitude2))
+            * sin($longitudeDelta / 2) ** 2;
+
+        return 6371 * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
     private function paginateCollection(Collection $items, Request $request, int $perPage): LengthAwarePaginator

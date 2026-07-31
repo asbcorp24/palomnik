@@ -8,9 +8,14 @@
         <h1 class="page-title">Храмы и объекты</h1>
         <div class="page-subtitle">Каталог храмов, монастырей, часовен и святых источников.</div>
     </div>
-    <a class="btn btn-gold" href="{{ route('admin.objects.create') }}">
-        <i class="bi bi-plus-lg me-1"></i> Добавить объект
-    </a>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-green" href="{{ route('admin.points-of-interest.index') }}">
+            <i class="bi bi-pin-map-fill me-1"></i>Точки интереса
+        </a>
+        <a class="btn btn-gold" href="{{ route('admin.objects.create') }}">
+            <i class="bi bi-plus-lg me-1"></i>Добавить объект
+        </a>
+    </div>
 </div>
 
 <div class="card-soft p-3 mb-3">
@@ -91,6 +96,7 @@
                         </td>
                         <td class="small text-secondary">{{ optional($object->updated_at)->format('d.m.Y H:i') }}</td>
                         <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-light" href="{{ route('admin.points-of-interest.create', ['object_id' => $object->id]) }}" title="Добавить точку интереса"><i class="bi bi-pin-map-fill"></i></a>
                             <a class="btn btn-sm btn-light" href="{{ route('admin.objects.show', $object) }}" title="Просмотр"><i class="bi bi-eye"></i></a>
                             <a class="btn btn-sm btn-light" href="{{ route('admin.objects.edit', $object) }}" title="Редактировать"><i class="bi bi-pencil"></i></a>
                             <form class="d-inline" method="POST" action="{{ route('admin.objects.destroy', $object) }}" onsubmit="return confirm('Переместить объект «{{ addslashes($object->name) }}» в архив?')">

@@ -1,0 +1,105 @@
+name: Sync PWA map layer priority
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-pwa-map-layer-order.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Keep POI below primary objects
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          js_path = Path('public/js/together-chat.js')
+          js = js_path.read_text(encoding='utf-8')
+          anchor = """                if (!this.getLayer('point-of-interest-icons')) {
+                    originalAddLayer.call(this, {
+                        id: 'point-of-interest-icons',
+                        type: 'symbol',
+                        source: 'points-of-interest',
+                        layout: {
+                            'icon-image': ['concat', 'pilgrim-', ['coalesce', ['get', 'marker_icon'], 'attraction']],
+                            'icon-size': .86,
+                            'icon-allow-overlap': true,
+                            'icon-ignore-placement': true
+                        }
+                    }, beforeId);
+                }
+
+                return result;
+"""
+          replacement = """                if (!this.getLayer('point-of-interest-icons')) {
+                    originalAddLayer.call(this, {
+                        id: 'point-of-interest-icons',
+                        type: 'symbol',
+                        source: 'points-of-interest',
+                        layout: {
+                            'icon-image': ['concat', 'pilgrim-', ['coalesce', ['get', 'marker_icon'], 'attraction']],
+                            'icon-size': .86,
+                            'icon-allow-overlap': true,
+                            'icon-ignore-placement': true
+                        }
+                    }, beforeId);
+                }
+
+                // Points of interest are auxiliary. Keep primary pilgrimage
+                // objects and their cluster labels above both POI layers.
+                ['pilgrim-clusters', 'pilgrim-cluster-count', 'pilgrim-points', 'pilgrim-point-icons']
+                    .forEach((primaryLayerId) => {
+                        if (this.getLayer(primaryLayerId)) {
+                            this.moveLayer(primaryLayerId);
+                        }
+                    });
+
+                return result;
+"""
+          if anchor not in js:
+              raise SystemExit('Map layer anchor not found')
+          js_path.write_text(js.replace(anchor, replacement, 1), encoding='utf-8')
+
+          sw_path = Path('public/sw.js')
+          sw = sw_path.read_text(encoding='utf-8')
+          sw = sw.replace("const CACHE_VERSION = 'palomnik-v3';", "const CACHE_VERSION = 'palomnik-v4';", 1)
+          sw = sw.replace(
+              "  '/icons/pilgrim.svg'\n];",
+              "  '/icons/pilgrim.svg',\n  '/js/together-chat.js',\n  '/js/object-mini-map.js',\n  '/assets/vendor/maplibre/maplibre-gl.css',\n  '/assets/vendor/maplibre/maplibre-gl.js'\n];",
+              1
+          )
+          sw = sw.replace(
+              "  if (url.pathname.startsWith('/css/')\n      || url.pathname.startsWith('/icons/')\n      || url.pathname === '/manifest.webmanifest') {",
+              "  if (url.pathname.startsWith('/css/')\n      || url.pathname.startsWith('/js/')\n      || url.pathname.startsWith('/icons/')\n      || url.pathname.startsWith('/assets/vendor/')\n      || url.pathname === '/manifest.webmanifest') {",
+              1
+          )
+          sw_path.write_text(sw, encoding='utf-8')
+          PY
+
+      - name: Verify JavaScript and cache update
+        run: |
+          node --check public/js/together-chat.js
+          node --check public/js/object-mini-map.js
+          node --check public/sw.js
+          grep -q "this.moveLayer(primaryLayerId)" public/js/together-chat.js
+          grep -q "palomnik-v4" public/sw.js
+          grep -q "'/js/together-chat.js'" public/sw.js
+          grep -q "url.pathname.startsWith('/assets/vendor/')" public/sw.js
+
+      - name: Commit synchronized site and PWA behavior
+        run: |
+          rm -f .github/workflows/sync-pwa-map-layer-order.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/js/together-chat.js public/sw.js .github/workflows/sync-pwa-map-layer-order.yml
+          git commit -m "fix(map): keep POI below primary objects in site and PWA"
+          git push origin HEAD:main

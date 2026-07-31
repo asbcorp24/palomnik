@@ -1,0 +1,432 @@
+name: Sync mobile map features
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-mobile-map.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update website and Flutter maps
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          marker = Path('mobile/lib/src/widgets/pilgrim_map_marker.dart')
+          marker.parent.mkdir(parents=True, exist_ok=True)
+          marker.write_text(r'''import 'package:flutter/material.dart';
+
+import '../theme/app_theme.dart';
+
+IconData pilgrimageObjectIcon(Map<String, dynamic> object) {
+  final type = object['type'];
+  final typeMap = type is Map ? Map<String, dynamic>.from(type) : const <String, dynamic>{};
+  final value = '${typeMap['name'] ?? typeMap['slug'] ?? type ?? object['type_slug'] ?? ''}'.toLowerCase();
+
+  if (value.contains('монастыр') || value.contains('monastery')) return Icons.account_balance;
+  if (value.contains('часовн') || value.contains('chapel')) return Icons.church_outlined;
+  if (value.contains('источник') || value.contains('купель') || value.contains('spring')) return Icons.water_drop;
+  if (value.contains('храм') || value.contains('церков') || value.contains('собор') || value.contains('church') || value.contains('cathedral')) {
+    return Icons.church;
+  }
+
+  return Icons.location_city;
+}
+
+IconData pointOfInterestIcon(Map<String, dynamic> point) {
+  return switch ('${point['category'] ?? ''}') {
+    'parking' => Icons.local_parking,
+    'cafe' => Icons.local_cafe,
+    'hotel' => Icons.hotel,
+    'spring' => Icons.water_drop,
+    'chapel' => Icons.church_outlined,
+    _ => Icons.star,
+  };
+}
+
+Color pilgrimageMarkerColor(Map<String, dynamic> item, {Color fallback = AppTheme.gold}) {
+  final type = item['type'];
+  final typeMap = type is Map ? Map<String, dynamic>.from(type) : const <String, dynamic>{};
+  final value = typeMap['marker_color'] ?? item['marker_color'];
+  final normalized = '$value'.replaceFirst('#', '').trim();
+  final parsed = int.tryParse('FF$normalized', radix: 16);
+  return normalized.length == 6 && parsed != null ? Color(parsed) : fallback;
+}
+
+class PilgrimMapMarker extends StatelessWidget {
+  const PilgrimMapMarker({
+    super.key,
+    required this.color,
+    required this.icon,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = primary ? 46.0 : 36.0;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: primary ? 3 : 2.5),
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3))],
+        ),
+        child: Icon(icon, color: Colors.white, size: primary ? 23 : 18),
+      ),
+    );
+  }
+}
+''', encoding='utf-8')
+
+          map_path = Path('mobile/lib/src/screens/maplibre_map.dart')
+          text = map_path.read_text(encoding='utf-8')
+          text = text.replace("import '../theme/app_theme.dart';\n", "import '../theme/app_theme.dart';\nimport '../widgets/pilgrim_map_marker.dart';\n", 1)
+          text = text.replace("  List<Map<String, dynamic>> _objects = const [];\n", "  List<Map<String, dynamic>> _objects = const [];\n  List<Map<String, dynamic>> _pointsOfInterest = const [];\n", 1)
+
+          old_load = '''      final payload = await CachedApi.instance.get(
+        '/objects',
+        queryParameters: {
+          'per_page': 100,
+          if (_search.text.trim().isNotEmpty) 'q': _search.text.trim(),
+        },
+        forceRefresh: forceRefresh,
+      ) as Map;
+
+      final objects = (payload['data'] as List? ?? const [])
+          .map((value) => Map<String, dynamic>.from(value as Map))
+          .where((object) {
+            final location = _location(object);
+            return location['latitude'] is num && location['longitude'] is num;
+          })
+          .toList();
+
+      if (mounted) setState(() => _objects = objects);
+'''
+          new_load = '''      final query = {
+        'per_page': 100,
+        if (_search.text.trim().isNotEmpty) 'q': _search.text.trim(),
+      };
+      final payloads = await Future.wait([
+        CachedApi.instance.get('/objects', queryParameters: query, forceRefresh: forceRefresh),
+        CachedApi.instance.get('/points-of-interest', queryParameters: query, forceRefresh: forceRefresh),
+      ]);
+
+      final objectPayload = payloads[0] as Map;
+      final pointPayload = payloads[1] as Map;
+      final objects = (objectPayload['data'] as List? ?? const [])
+          .map((value) => Map<String, dynamic>.from(value as Map))
+          .where((object) {
+            final location = _location(object);
+            return location['latitude'] is num && location['longitude'] is num;
+          })
+          .toList();
+      final points = (pointPayload['data'] as List? ?? const [])
+          .map((value) => Map<String, dynamic>.from(value as Map))
+          .where((point) {
+            final location = _location(point);
+            return location['latitude'] is num && location['longitude'] is num;
+          })
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _objects = objects;
+          _pointsOfInterest = points;
+        });
+      }
+'''
+          if old_load not in text:
+              raise SystemExit('mobile map load block not found')
+          text = text.replace(old_load, new_load, 1)
+
+          show_anchor = "  Future<void> _saveOffline(Map<String, dynamic> object) async {\n"
+          show_poi = r'''  Future<void> _showPointOfInterest(Map<String, dynamic> point) async {
+    final location = _location(point);
+    final baseObject = point['base_object'] is Map
+        ? Map<String, dynamic>.from(point['base_object'] as Map)
+        : const <String, dynamic>{};
+    await _controller?.animateCamera(
+      center: Geographic(
+        lon: (location['longitude'] as num).toDouble(),
+        lat: (location['latitude'] as num).toDouble(),
+      ),
+      zoom: 16,
+    );
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${point['category_label'] ?? 'Точка интереса'}', style: const TextStyle(color: AppTheme.gold, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 5),
+              Text('${point['name'] ?? ''}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text('${location['address'] ?? ''}', style: const TextStyle(color: Colors.black54)),
+              if (point['description'] != null) ...[
+                const SizedBox(height: 10),
+                Text('${point['description']}'),
+              ],
+              if (baseObject['name'] != null) ...[
+                const SizedBox(height: 10),
+                Text('Рядом с: ${baseObject['name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+              if (baseObject['slug'] != null) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => ObjectDetailScreen(slug: '${baseObject['slug']}')));
+                  },
+                  icon: const Icon(Icons.church),
+                  label: const Text('Открыть основной объект'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+'''
+          if show_anchor not in text:
+              raise SystemExit('mobile POI insertion anchor not found')
+          text = text.replace(show_anchor, show_poi + show_anchor, 1)
+
+          start = text.index('    final markers = _objects.map((object) {')
+          end = text.index('\n\n    return Scaffold(', start)
+          marker_block = r'''    final pointMarkers = _pointsOfInterest.map((point) {
+      final location = _location(point);
+      return Marker(
+        size: const Size(36, 36),
+        point: Geographic(
+          lon: (location['longitude'] as num).toDouble(),
+          lat: (location['latitude'] as num).toDouble(),
+        ),
+        alignment: Alignment.bottomCenter,
+        child: PilgrimMapMarker(
+          color: pilgrimageMarkerColor(point, fallback: const Color(0xFF7C3AED)),
+          icon: pointOfInterestIcon(point),
+          onTap: () => _showPointOfInterest(point),
+        ),
+      );
+    }).toList();
+
+    final objectMarkers = _objects.map((object) {
+      final location = _location(object);
+      return Marker(
+        size: const Size(46, 46),
+        point: Geographic(
+          lon: (location['longitude'] as num).toDouble(),
+          lat: (location['latitude'] as num).toDouble(),
+        ),
+        alignment: Alignment.bottomCenter,
+        child: PilgrimMapMarker(
+          color: pilgrimageMarkerColor(object),
+          icon: pilgrimageObjectIcon(object),
+          primary: true,
+          onTap: () => _showObject(object),
+        ),
+      );
+    }).toList();'''
+          text = text[:start] + marker_block + text[end:]
+          text = text.replace(
+              '              WidgetLayer(markers: markers, allowInteraction: true),\n',
+              '              WidgetLayer(markers: pointMarkers, allowInteraction: true),\n              WidgetLayer(markers: objectMarkers, allowInteraction: true),\n',
+              1,
+          )
+          map_path.write_text(text, encoding='utf-8')
+
+          user_path = Path('mobile/lib/src/screens/user_features.dart')
+          user = user_path.read_text(encoding='utf-8')
+          user = user.replace("import 'package:intl/intl.dart';\n", "import 'package:intl/intl.dart';\nimport 'package:maplibre/maplibre.dart';\n", 1)
+          user = user.replace("import '../theme/app_theme.dart';\n", "import '../theme/app_theme.dart';\nimport '../widgets/pilgrim_map_marker.dart';\n", 1)
+          mini_anchor = """                      if (_text(item['short_description']) != null) ...[
+"""
+          mini_insert = r'''                      if (lat is num && lon is num) ...[
+                        const SizedBox(height: 20),
+                        ObjectMiniMap(
+                          item: item,
+                          latitude: lat.toDouble(),
+                          longitude: lon.toDouble(),
+                        ),
+                      ],
+'''
+          if mini_anchor not in user:
+              raise SystemExit('object detail mini-map anchor not found')
+          user = user.replace(mini_anchor, mini_insert + mini_anchor, 1)
+          class_anchor = 'class RouteDetailScreen extends StatefulWidget {'
+          mini_class = r'''class ObjectMiniMap extends StatelessWidget {
+  const ObjectMiniMap({
+    super.key,
+    required this.item,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final Map<String, dynamic> item;
+  final double latitude;
+  final double longitude;
+
+  @override
+  Widget build(BuildContext context) {
+    final point = Geographic(lon: longitude, lat: latitude);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 220,
+            child: MapLibreMap(
+              options: MapOptions(
+                initCenter: point,
+                initZoom: 15,
+                initStyle: '${ApiClient.siteBaseUrl}/api/v1/map/style.json',
+              ),
+              children: [
+                WidgetLayer(
+                  allowInteraction: false,
+                  markers: [
+                    Marker(
+                      point: point,
+                      size: const Size(46, 46),
+                      alignment: Alignment.bottomCenter,
+                      child: PilgrimMapMarker(
+                        color: pilgrimageMarkerColor(item),
+                        icon: pilgrimageObjectIcon(item),
+                        primary: true,
+                        onTap: () {},
+                      ),
+                    ),
+                  ],
+                ),
+                const SourceAttribution(),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                const Icon(Icons.map_outlined, color: AppTheme.gold),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('Расположение объекта', style: TextStyle(fontWeight: FontWeight.w700))),
+                IconButton(
+                  tooltip: 'Открыть маршрут',
+                  onPressed: () => launchUrl(
+                    Uri.parse('https://yandex.ru/maps/?rtext=~$latitude,$longitude&rtt=auto'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  icon: const Icon(Icons.directions),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+'''
+          if class_anchor not in user:
+              raise SystemExit('ObjectMiniMap class anchor not found')
+          user = user.replace(class_anchor, mini_class + class_anchor, 1)
+          user_path.write_text(user, encoding='utf-8')
+
+          api_path = Path('mobile/lib/src/core/api_client.dart')
+          api = api_path.read_text(encoding='utf-8')
+          api = api.replace("    return path == '/objects' ||\n", "    return path == '/objects' ||\n        path == '/points-of-interest' ||\n", 1)
+          api_path.write_text(api, encoding='utf-8')
+
+          web_path = Path('public/js/together-chat.js')
+          web = web_path.read_text(encoding='utf-8')
+          poi_return = """                return result;
+            }
+
+            return originalAddLayer.call(this, layer, beforeId);
+"""
+          poi_priority = """                ['pilgrim-clusters', 'pilgrim-cluster-count', 'pilgrim-points', 'pilgrim-point-icons']
+                    .forEach((primaryLayerId) => {
+                        if (this.getLayer(primaryLayerId)) this.moveLayer(primaryLayerId);
+                    });
+
+                return result;
+            }
+
+            return originalAddLayer.call(this, layer, beforeId);
+"""
+          if poi_return not in web:
+              raise SystemExit('website POI layer anchor not found')
+          web_path.write_text(web.replace(poi_return, poi_priority, 1), encoding='utf-8')
+
+          sw_path = Path('public/sw.js')
+          sw = sw_path.read_text(encoding='utf-8')
+          sw = sw.replace("const CACHE_VERSION = 'palomnik-v3';", "const CACHE_VERSION = 'palomnik-v4';", 1)
+          sw_path.write_text(sw, encoding='utf-8')
+
+          Path('public/js/map-layer-priority.js').unlink(missing_ok=True)
+          Path('.github/workflows/sync-pwa-map-layer-order.yml').unlink(missing_ok=True)
+          PY
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter application
+        working-directory: mobile
+        run: |
+          flutter pub get
+          dart format lib/src/core/api_client.dart lib/src/screens/maplibre_map.dart lib/src/screens/user_features.dart lib/src/widgets/pilgrim_map_marker.dart
+          flutter analyze
+          flutter test
+
+      - name: Verify website JavaScript
+        run: |
+          node --check public/js/together-chat.js
+          node --check public/sw.js
+          grep -q "this.moveLayer(primaryLayerId)" public/js/together-chat.js
+          grep -q "palomnik-v4" public/sw.js
+          grep -q "WidgetLayer(markers: pointMarkers" mobile/lib/src/screens/maplibre_map.dart
+          grep -q "WidgetLayer(markers: objectMarkers" mobile/lib/src/screens/maplibre_map.dart
+          grep -q "class ObjectMiniMap" mobile/lib/src/screens/user_features.dart
+
+      - name: Commit changes
+        run: |
+          rm -f .github/workflows/sync-mobile-map.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(mobile): sync maps with website"
+          git push origin HEAD:main

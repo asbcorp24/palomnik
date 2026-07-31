@@ -48,7 +48,14 @@ class LocalizeFrontendAssets
 
         $content = $response->getContent();
         if (is_string($content) && $content !== '') {
-            $response->setContent($this->assets->localizeHtml($content));
+            $content = $this->assets->localizeHtml($content);
+
+            if ($request->routeIs('map') && ! str_contains($content, '/js/map-layer-priority.js')) {
+                $script = '<script src="'.asset('js/map-layer-priority.js').'"></script>';
+                $content = str_replace('</head>', $script."\n</head>", $content);
+            }
+
+            $response->setContent($content);
             $response->headers->remove('Content-Length');
         }
 

@@ -75,7 +75,7 @@ class SeoController extends Controller
             ->chunk(500, function ($items) use ($urls): void {
                 foreach ($items as $item) {
                     $urls->push([
-                        'loc' => route('community.show', $item),
+                        'loc' => route('community.show', ['post' => $item->slug]),
                         'lastmod' => optional($item->updated_at)->toAtomString(),
                         'priority' => '0.6',
                         'changefreq' => 'monthly',

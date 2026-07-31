@@ -51,9 +51,12 @@ class PointOfInterestController extends Controller
     public function show(PointOfInterest $pointOfInterest): PointOfInterestResource
     {
         abort_if(! $pointOfInterest->is_published, 404);
+        abort_unless(
+            $pointOfInterest->pilgrimageObject()->published()->exists(),
+            404
+        );
 
         $pointOfInterest->load('pilgrimageObject');
-        abort_if(! $pointOfInterest->pilgrimageObject || ! $pointOfInterest->pilgrimageObject->is_published, 404);
 
         return new PointOfInterestResource($pointOfInterest);
     }

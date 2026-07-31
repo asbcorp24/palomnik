@@ -15,7 +15,7 @@
             <div class="col-lg-8">
                 <div class="section-kicker mb-2">Единый реестр</div>
                 <h1 class="section-title mb-3">Храмы, монастыри и святыни</h1>
-                <p class="section-lead mb-0">Ищите объекты по названию, адресу, типу, викариатству и благочинию.</p>
+                <p class="section-lead mb-0">Ищите объекты по названию, адресу, типу, викариатству и благочинию. Регистр букв и небольшие опечатки не влияют на результат.</p>
             </div>
             <div class="col-lg-4 text-lg-end">
                 <a class="btn btn-pm-green" href="{{ route('map') }}"><i class="bi bi-map me-2"></i>Показать на карте</a>
@@ -30,7 +30,7 @@
             <div class="row g-3 align-items-end">
                 <div class="col-lg-4">
                     <label class="form-label" for="q">Поиск</label>
-                    <input class="form-control" id="q" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Название, адрес или святыня">
+                    <input class="form-control" id="q" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Название, адрес или святыня — можно с опечаткой">
                 </div>
                 <div class="col-md-6 col-lg-2">
                     <label class="form-label" for="type">Тип</label>

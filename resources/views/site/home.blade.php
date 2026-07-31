@@ -13,7 +13,7 @@
                 <p class="hero-lead mb-4">Найдите храм, узнайте о святынях и расписании, выберите событие, подготовьте маршрут и получите электронный билет.</p>
                 <form class="search-panel d-flex align-items-center gap-2" action="{{ route('objects.index') }}" method="GET">
                     <i class="bi bi-search ms-3 text-secondary"></i>
-                    <input class="form-control" name="q" placeholder="Название храма, адрес или святыня" aria-label="Поиск храмов и святынь">
+                    <input class="form-control" name="q" placeholder="Название, адрес или святыня — можно с опечаткой" aria-label="Поиск храмов и святынь">
                     <button class="btn btn-pm-gold px-4 py-3 rounded-4" type="submit">Найти</button>
                 </form>
                 <div class="d-flex flex-wrap gap-3 mt-4">

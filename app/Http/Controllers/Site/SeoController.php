@@ -17,22 +17,23 @@ class SeoController extends Controller
         $seo = SiteSetting::seo();
         abort_unless($seo['sitemap_enabled'] ?? true, 404);
 
+        $base = rtrim((string) ($seo['canonical_base_url'] ?: url('/')), '/');
         $urls = collect([
-            ['loc' => route('home'), 'priority' => '1.0', 'changefreq' => 'daily'],
-            ['loc' => route('map'), 'priority' => '0.9', 'changefreq' => 'daily'],
-            ['loc' => route('objects.index'), 'priority' => '0.9', 'changefreq' => 'daily'],
-            ['loc' => route('routes.index'), 'priority' => '0.9', 'changefreq' => 'daily'],
-            ['loc' => route('calendar.index'), 'priority' => '0.8', 'changefreq' => 'daily'],
-            ['loc' => route('community.index'), 'priority' => '0.7', 'changefreq' => 'daily'],
+            ['loc' => $base.'/', 'priority' => '1.0', 'changefreq' => 'daily'],
+            ['loc' => $base.'/map', 'priority' => '0.9', 'changefreq' => 'daily'],
+            ['loc' => $base.'/objects', 'priority' => '0.9', 'changefreq' => 'daily'],
+            ['loc' => $base.'/routes', 'priority' => '0.9', 'changefreq' => 'daily'],
+            ['loc' => $base.'/calendar', 'priority' => '0.8', 'changefreq' => 'daily'],
+            ['loc' => $base.'/community', 'priority' => '0.7', 'changefreq' => 'daily'],
         ]);
 
         PilgrimageObject::query()->published()
             ->select(['slug', 'updated_at'])
             ->orderBy('id')
-            ->chunk(500, function ($items) use ($urls): void {
+            ->chunk(500, function ($items) use ($urls, $base): void {
                 foreach ($items as $item) {
                     $urls->push([
-                        'loc' => route('objects.show', $item),
+                        'loc' => $base.'/objects/'.rawurlencode($item->slug),
                         'lastmod' => optional($item->updated_at)->toAtomString(),
                         'priority' => '0.8',
                         'changefreq' => 'weekly',
@@ -43,10 +44,10 @@ class SeoController extends Controller
         PilgrimageRoute::query()->published()
             ->select(['slug', 'updated_at'])
             ->orderBy('id')
-            ->chunk(500, function ($items) use ($urls): void {
+            ->chunk(500, function ($items) use ($urls, $base): void {
                 foreach ($items as $item) {
                     $urls->push([
-                        'loc' => route('routes.show', $item),
+                        'loc' => $base.'/routes/'.rawurlencode($item->slug),
                         'lastmod' => optional($item->updated_at)->toAtomString(),
                         'priority' => '0.8',
                         'changefreq' => 'weekly',
@@ -57,10 +58,10 @@ class SeoController extends Controller
         CalendarEvent::query()->published()
             ->select(['slug', 'updated_at'])
             ->orderBy('id')
-            ->chunk(500, function ($items) use ($urls): void {
+            ->chunk(500, function ($items) use ($urls, $base): void {
                 foreach ($items as $item) {
                     $urls->push([
-                        'loc' => route('calendar.show', $item),
+                        'loc' => $base.'/calendar/'.rawurlencode($item->slug),
                         'lastmod' => optional($item->updated_at)->toAtomString(),
                         'priority' => '0.7',
                         'changefreq' => 'weekly',
@@ -70,12 +71,15 @@ class SeoController extends Controller
 
         BlogPost::query()
             ->where('status', 'published')
+            ->where(function ($query): void {
+                $query->whereNull('published_at')->orWhere('published_at', '<=', now());
+            })
             ->select(['slug', 'updated_at'])
             ->orderBy('id')
-            ->chunk(500, function ($items) use ($urls): void {
+            ->chunk(500, function ($items) use ($urls, $base): void {
                 foreach ($items as $item) {
                     $urls->push([
-                        'loc' => route('community.show', ['post' => $item->slug]),
+                        'loc' => $base.'/community/'.rawurlencode($item->slug),
                         'lastmod' => optional($item->updated_at)->toAtomString(),
                         'priority' => '0.6',
                         'changefreq' => 'monthly',
@@ -103,6 +107,7 @@ class SeoController extends Controller
     public function robots(): Response
     {
         $seo = SiteSetting::seo();
+        $base = rtrim((string) ($seo['canonical_base_url'] ?: url('/')), '/');
         $allowIndexing = (bool) ($seo['robots_index'] ?? true);
         $lines = [
             'User-agent: *',
@@ -114,7 +119,7 @@ class SeoController extends Controller
         ];
 
         if ($seo['sitemap_enabled'] ?? true) {
-            $lines[] = 'Sitemap: '.route('sitemap');
+            $lines[] = 'Sitemap: '.$base.'/sitemap.xml';
         }
 
         return response(implode("\n", $lines)."\n", 200, [

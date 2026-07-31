@@ -4,7 +4,7 @@ import '../core/session_controller.dart';
 import '../theme/app_theme.dart';
 import 'advanced_features.dart';
 import 'app_sections.dart';
-import 'content_features.dart';
+import 'content_features.dart' hide RouteBuilderScreen;
 import 'maplibre_map.dart';
 import 'pilgrimage_photos.dart';
 import 'user_features.dart';

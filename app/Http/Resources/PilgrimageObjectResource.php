@@ -83,6 +83,9 @@ class PilgrimageObjectResource extends JsonResource
                     ];
                 })->values();
             }),
+            'points_of_interest' => PointOfInterestResource::collection(
+                $this->whenLoaded('publishedPointsOfInterest')
+            ),
             'published_at' => optional($this->published_at)->toIso8601String(),
             'updated_at' => optional($this->updated_at)->toIso8601String(),
         ];

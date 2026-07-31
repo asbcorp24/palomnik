@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\PilgrimageObjectSearchService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -167,13 +168,12 @@ class PilgrimageObject extends Model
             return $query;
         }
 
-        return $query->where(function (Builder $query) use ($term) {
-            $query->where('name', 'like', "%{$term}%")
-                ->orWhere('address', 'like', "%{$term}%")
-                ->orWhere('short_description', 'like', "%{$term}%")
-                ->orWhereHas('sanctities', function (Builder $query) use ($term) {
-                    $query->where('name', 'like', "%{$term}%");
-                });
-        });
+        $matchingIds = app(PilgrimageObjectSearchService::class)->matchingIds($term);
+
+        if ($matchingIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereKey($matchingIds);
     }
 }

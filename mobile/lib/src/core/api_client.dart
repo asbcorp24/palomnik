@@ -10,15 +10,23 @@ class ApiClient {
         onResponse: (response, handler) async {
           if (_canCache(response.requestOptions) && response.data != null) {
             final preferences = await SharedPreferences.getInstance();
-            await preferences.setString(_cacheKey(response.requestOptions), jsonEncode(response.data));
-            await preferences.setInt('${_cacheKey(response.requestOptions)}:saved_at', DateTime.now().millisecondsSinceEpoch);
+            await preferences.setString(
+              _cacheKey(response.requestOptions),
+              jsonEncode(response.data),
+            );
+            await preferences.setInt(
+              '${_cacheKey(response.requestOptions)}:saved_at',
+              DateTime.now().millisecondsSinceEpoch,
+            );
           }
           handler.next(response);
         },
         onError: (error, handler) async {
           if (_canCache(error.requestOptions) && _isConnectionError(error)) {
             final preferences = await SharedPreferences.getInstance();
-            final cached = preferences.getString(_cacheKey(error.requestOptions));
+            final cached = preferences.getString(
+              _cacheKey(error.requestOptions),
+            );
             if (cached != null) {
               handler.resolve(
                 Response<dynamic>(
@@ -115,7 +123,9 @@ class ApiClient {
   String _cacheKey(RequestOptions options) {
     final query = options.queryParameters.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
-    final suffix = query.map((entry) => '${entry.key}=${entry.value}').join('&');
+    final suffix = query
+        .map((entry) => '${entry.key}=${entry.value}')
+        .join('&');
     return 'api-cache:${options.path}${suffix.isEmpty ? '' : '?$suffix'}';
   }
 }

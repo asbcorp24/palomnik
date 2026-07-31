@@ -122,7 +122,9 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
             children: [
               Text(
                 '${object['name'] ?? ''}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               Text(
@@ -138,7 +140,10 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
                         Navigator.pop(context);
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => ObjectDetailScreen(slug: '${object['slug']}')),
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ObjectDetailScreen(slug: '${object['slug']}'),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.church),
@@ -175,7 +180,10 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
                         Navigator.pop(context);
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => GeoVisitScreen(initialObject: object)),
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                GeoVisitScreen(initialObject: object),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.where_to_vote_outlined),
@@ -226,9 +234,9 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
               const SizedBox(height: 5),
               Text(
                 '${point['name'] ?? ''}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               Text(
@@ -254,9 +262,8 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ObjectDetailScreen(
-                          slug: '${baseObject['slug']}',
-                        ),
+                        builder: (_) =>
+                            ObjectDetailScreen(slug: '${baseObject['slug']}'),
                       ),
                     );
                   },
@@ -273,16 +280,20 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
 
   Future<void> _saveOffline(Map<String, dynamic> object) async {
     try {
-      final payload = await CachedApi.instance.get(
-        '/objects/${object['slug']}',
-        forceRefresh: true,
-      ) as Map;
+      final payload =
+          await CachedApi.instance.get(
+                '/objects/${object['slug']}',
+                forceRefresh: true,
+              )
+              as Map;
       await OfflineStore.instance.saveObject(
         Map<String, dynamic>.from(payload['data'] as Map),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Карточка сохранена для работы без сети.')),
+          const SnackBar(
+            content: Text('Карточка сохранена для работы без сети.'),
+          ),
         );
       }
     } catch (error) {
@@ -302,11 +313,14 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
     if (permission == geo.LocationPermission.denied) {
       permission = await geo.Geolocator.requestPermission();
     }
-    if (permission == geo.LocationPermission.denied || permission == geo.LocationPermission.deniedForever) {
+    if (permission == geo.LocationPermission.denied ||
+        permission == geo.LocationPermission.deniedForever) {
       throw Exception('Разрешение на геолокацию не предоставлено.');
     }
 
-    return geo.Geolocator.getCurrentPosition(desiredAccuracy: geo.LocationAccuracy.high);
+    return geo.Geolocator.getCurrentPosition(
+      desiredAccuracy: geo.LocationAccuracy.high,
+    );
   }
 
   Future<void> _showMyLocation() async {
@@ -319,7 +333,9 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_message(error))));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_message(error))));
       }
     }
   }
@@ -339,30 +355,36 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
           'mode': _routeMode,
           'locations': [
             {'latitude': position.latitude, 'longitude': position.longitude},
-            {'latitude': location['latitude'], 'longitude': location['longitude']},
+            {
+              'latitude': location['latitude'],
+              'longitude': location['longitude'],
+            },
           ],
         },
       );
 
       final data = Map<String, dynamic>.from(response.data['data'] as Map);
       final geometry = Map<String, dynamic>.from(data['geometry'] as Map);
-      final coordinates = (geometry['coordinates'] as List)
-          .map((value) {
-            final coordinate = value as List;
-            return Geographic(
-              lon: (coordinate[0] as num).toDouble(),
-              lat: (coordinate[1] as num).toDouble(),
-            );
-          })
-          .toList();
+      final coordinates = (geometry['coordinates'] as List).map((value) {
+        final coordinate = value as List;
+        return Geographic(
+          lon: (coordinate[0] as num).toDouble(),
+          lat: (coordinate[1] as num).toDouble(),
+        );
+      }).toList();
 
       if (coordinates.length < 2) throw Exception('Маршрут не найден.');
 
-      final distance = ((data['distance_meters'] as num?)?.toDouble() ?? 0) / 1000;
-      final minutes = (((data['duration_seconds'] as num?)?.toDouble() ?? 0) / 60).round();
+      final distance =
+          ((data['distance_meters'] as num?)?.toDouble() ?? 0) / 1000;
+      final minutes =
+          (((data['duration_seconds'] as num?)?.toDouble() ?? 0) / 60).round();
       setState(() {
-        _routeFeature = Feature<LineString>(geometry: LineString.from(coordinates));
-        _routeSummary = '${object['name']} · ${distance.toStringAsFixed(1)} км · примерно $minutes мин.';
+        _routeFeature = Feature<LineString>(
+          geometry: LineString.from(coordinates),
+        );
+        _routeSummary =
+            '${object['name']} · ${distance.toStringAsFixed(1)} км · примерно $minutes мин.';
       });
 
       await _controller?.fitBounds(
@@ -432,7 +454,10 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
               PopupMenuItem(value: 'auto', child: Text('Автомобиль')),
               PopupMenuItem(value: 'bicycle', child: Text('Велосипед')),
               PopupMenuItem(value: 'bus', child: Text('Автобус')),
-              PopupMenuItem(value: 'multimodal', child: Text('Общественный транспорт')),
+              PopupMenuItem(
+                value: 'multimodal',
+                child: Text('Общественный транспорт'),
+              ),
             ],
             icon: const Icon(Icons.directions),
           ),
@@ -475,14 +500,8 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
                 ),
             ],
             children: [
-              WidgetLayer(
-                markers: pointMarkers,
-                allowInteraction: true,
-              ),
-              WidgetLayer(
-                markers: objectMarkers,
-                allowInteraction: true,
-              ),
+              WidgetLayer(markers: pointMarkers, allowInteraction: true),
+              WidgetLayer(markers: objectMarkers, allowInteraction: true),
               const SourceAttribution(),
               const MapCompass(),
               const MapControlButtons(),
@@ -511,7 +530,12 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
             ),
           ),
           if (_loading)
-            const Positioned(top: 84, left: 16, right: 16, child: LinearProgressIndicator()),
+            const Positioned(
+              top: 84,
+              left: 16,
+              right: 16,
+              child: LinearProgressIndicator(),
+            ),
           if (_routeSummary != null)
             Positioned(
               left: 14,
@@ -547,7 +571,10 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
                   padding: const EdgeInsets.all(14),
-                  child: Text(_error!, style: TextStyle(color: Colors.red.shade900)),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: Colors.red.shade900),
+                  ),
                 ),
               ),
             ),
@@ -566,7 +593,6 @@ Map<String, dynamic> _location(Map<String, dynamic> object) {
     'address': object['address'],
   };
 }
-
 
 String _message(Object error) {
   final apiMessage = ApiClient.instance.messageFrom(error);

@@ -12,6 +12,8 @@ class PointOfInterest extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $table = 'points_of_interest';
+
     public const CATEGORIES = [
         'attraction' => [
             'label' => 'Точка интереса',

@@ -116,6 +116,33 @@ class PilgrimageObjectResource extends JsonResource
             'points_of_interest' => PointOfInterestResource::collection(
                 $this->whenLoaded('publishedPointsOfInterest')
             ),
+            'nearby' => $this->whenLoaded('nearbyObjects', function () {
+                return $this->nearbyObjects->map(function ($object) {
+                    return [
+                        'id' => $object->id,
+                        'slug' => $object->slug,
+                        'name' => $object->name,
+                        'short_description' => $object->short_description,
+                        'distance_km' => round((float) $object->distance_km, 1),
+                        'type' => $object->objectType ? [
+                            'id' => $object->objectType->id,
+                            'name' => $object->objectType->name,
+                            'slug' => $object->objectType->slug,
+                            'marker_color' => $object->objectType->marker_color,
+                            'icon' => $object->objectType->icon,
+                        ] : null,
+                        'location' => [
+                            'address' => $object->address,
+                            'latitude' => (float) $object->latitude,
+                            'longitude' => (float) $object->longitude,
+                        ],
+                        'cover' => $object->coverMedia ? [
+                            'url' => $object->coverMedia->url,
+                            'title' => $object->coverMedia->title,
+                        ] : null,
+                    ];
+                })->values();
+            }),
             'published_at' => optional($this->published_at)->toIso8601String(),
             'updated_at' => optional($this->updated_at)->toIso8601String(),
         ];

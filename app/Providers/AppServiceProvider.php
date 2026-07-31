@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\ObjectType;
+use App\Models\PilgrimageObject;
+use App\Models\Sanctity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 
@@ -15,5 +19,34 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Paginator::useBootstrapFive();
+
+        if ($this->app->runningInConsole() || ! $this->app->bound('request')) {
+            return;
+        }
+
+        $request = request();
+        $isBackOffice = $request->is('admin')
+            || $request->is('admin/*')
+            || $request->is('service')
+            || $request->is('service/*');
+
+        if ($isBackOffice) {
+            return;
+        }
+
+        ObjectType::addGlobalScope('public_without_holy_springs', function (Builder $query): void {
+            $query->where('slug', '<>', 'holy-spring');
+        });
+
+        Sanctity::addGlobalScope('public_without_holy_springs', function (Builder $query): void {
+            $query->where('slug', '<>', 'holy-spring');
+        });
+
+        PilgrimageObject::addGlobalScope('public_without_holy_springs', function (Builder $query): void {
+            $query->whereDoesntHave('objectType', function (Builder $typeQuery): void {
+                $typeQuery->withoutGlobalScope('public_without_holy_springs')
+                    ->where('slug', 'holy-spring');
+            });
+        });
     }
 }

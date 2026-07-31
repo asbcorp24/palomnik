@@ -1,0 +1,77 @@
+name: Wire points of interest UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/wire-points-of-interest-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Wire Blade partials and navigation
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          # Public object page: useful places before the media gallery.
+          path = Path('resources/views/site/objects/show.blade.php')
+          text = path.read_text()
+          needle = "                @if($officialImages->isNotEmpty())"
+          replacement = "                @include('site.objects._points_of_interest')\n\n                @if($officialImages->isNotEmpty())"
+          if needle not in text:
+              raise SystemExit('Object page insertion point not found')
+          path.write_text(text.replace(needle, replacement, 1))
+
+          # Object editor: linked places section below the main edit form.
+          path = Path('resources/views/admin/objects/form.blade.php')
+          text = path.read_text()
+          needle = "    </div>\n@endif\n@endsection"
+          replacement = "    </div>\n    @include('admin.objects._points_of_interest')\n@endif\n@endsection"
+          if needle not in text:
+              raise SystemExit('Admin object form insertion point not found')
+          path.write_text(text.replace(needle, replacement, 1))
+
+          # Admin sidebar navigation.
+          path = Path('resources/views/admin/layouts/app.blade.php')
+          text = path.read_text()
+          needle = "            <a class=\"sidebar-link {{ request()->routeIs('admin.objects.*') || request()->routeIs('admin.media.*') ? 'active' : '' }}\" href=\"{{ route('admin.objects.index') }}\"><i class=\"bi bi-geo-alt\"></i><span>Храмы и объекты</span></a>"
+          replacement = needle + "\n            <a class=\"sidebar-link {{ request()->routeIs('admin.points-of-interest.*') ? 'active' : '' }}\" href=\"{{ route('admin.points-of-interest.index') }}\"><i class=\"bi bi-pin-map-fill\"></i><span>Точки интереса</span></a>"
+          if needle not in text:
+              raise SystemExit('Admin navigation insertion point not found')
+          path.write_text(text.replace(needle, replacement, 1))
+          PY
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, fileinfo, gd, sqlite3, pdo_sqlite
+          coverage: none
+
+      - name: Verify compiled views and tests
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i 's|^DB_DATABASE=.*|DB_DATABASE=:memory:|' .env
+          php artisan optimize:clear
+          php artisan view:cache
+          DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test --filter=PointOfInterestTest
+
+      - name: Commit wired UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/wire-points-of-interest-ui.yml
+          git add -A
+          git commit -m "feat(poi): show linked places on object pages and admin menu"
+          git push origin HEAD:main

@@ -1,6 +1,6 @@
 @extends('site.layouts.app')
 
-@section('title', 'Храмы и святыни — Московский паломник')
+@section('title', 'Храмы и монастыри — Московский паломник')
 
 @section('content')
 <section class="page-hero">
@@ -8,13 +8,13 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb small mb-3">
                 <li class="breadcrumb-item"><a href="{{ route('home') }}">Главная</a></li>
-                <li class="breadcrumb-item active">Храмы и святыни</li>
+                <li class="breadcrumb-item active">Храмы и монастыри</li>
             </ol>
         </nav>
         <div class="row align-items-end g-4">
             <div class="col-lg-8">
                 <div class="section-kicker mb-2">Единый реестр</div>
-                <h1 class="section-title mb-3">Храмы, монастыри и святыни</h1>
+                <h1 class="section-title mb-3">Храмы и монастыри</h1>
                 <p class="section-lead mb-0">Ищите объекты по названию, адресу, типу, викариатству и благочинию. Регистр букв и небольшие опечатки не влияют на результат.</p>
             </div>
             <div class="col-lg-4 text-lg-end">

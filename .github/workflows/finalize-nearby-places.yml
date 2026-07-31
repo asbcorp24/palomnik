@@ -1,0 +1,98 @@
+name: Finalize nearby places
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finalize-nearby-places.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Update nearby places template
+        shell: bash
+        run: |
+          git pull --rebase origin main
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('resources/views/site/objects/show.blade.php')
+          text = path.read_text(encoding='utf-8')
+
+          old = '''        @if($similarObjects->isNotEmpty())
+            <section class="mt-5 pt-5 border-top">
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+                    <div>
+                        <div class="section-kicker mb-2">Продолжить знакомство</div>
+                        <h2 class="h2 mb-0">Похожие места</h2>
+                    </div>
+
+                    <a class="btn btn-outline-pm" href="{{ route('objects.index', ['type' => optional($object->objectType)->slug]) }}">
+                        Смотреть все
+                    </a>
+                </div>
+
+                <div class="row g-4">
+                    @foreach($similarObjects as $similarObject)
+                        <div class="col-md-6 col-xl-4">
+                            @include('site.partials.object-card', ['object' => $similarObject])
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+        @endif'''
+
+          new = '''        @if($nearbyObjects->isNotEmpty())
+            <section class="mt-5 pt-5 border-top">
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+                    <div>
+                        <div class="section-kicker mb-2">В радиусе до 25 км</div>
+                        <h2 class="h2 mb-0">Места рядом</h2>
+                    </div>
+
+                    <a class="btn btn-outline-pm" href="{{ route('map', ['q' => $object->name]) }}">
+                        <i class="bi bi-map me-1"></i>Открыть на карте
+                    </a>
+                </div>
+
+                <div class="row g-4">
+                    @foreach($nearbyObjects as $nearbyObject)
+                        <div class="col-md-6 col-xl-4">
+                            @include('site.partials.object-card', ['object' => $nearbyObject])
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+        @endif'''
+
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('Nearby block anchor not found')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          grep -q 'Места рядом' resources/views/site/objects/show.blade.php
+          grep -q '\$nearbyObjects' resources/views/site/objects/show.blade.php
+          grep -q 'distance_km' resources/views/site/partials/object-card.blade.php
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          rm -f .github/workflows/finalize-nearby-places.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add resources/views/site/objects/show.blade.php .github/workflows/finalize-nearby-places.yml
+          git commit -m "feat(objects): show real nearby places"
+          git pull --rebase origin main
+          git push origin HEAD:main

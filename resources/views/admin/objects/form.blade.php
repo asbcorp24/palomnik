@@ -243,6 +243,7 @@
             @endforelse
         </div>
     </div>
+    @include('admin.objects._points_of_interest')
 @endif
 @endsection
 

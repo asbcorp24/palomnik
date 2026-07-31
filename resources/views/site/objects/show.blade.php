@@ -164,6 +164,8 @@
                     </section>
                 @endif
 
+                @include('site.objects._points_of_interest')
+
                 @if($officialImages->isNotEmpty())
                     <section class="mb-5">
                         <div class="section-kicker mb-2">Галерея</div>

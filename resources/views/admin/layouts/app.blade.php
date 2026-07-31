@@ -70,6 +70,7 @@
 
             <div class="sidebar-label">Карта и объекты</div>
             <a class="sidebar-link {{ request()->routeIs('admin.objects.*') || request()->routeIs('admin.media.*') ? 'active' : '' }}" href="{{ route('admin.objects.index') }}"><i class="bi bi-geo-alt"></i><span>Храмы и объекты</span></a>
+            <a class="sidebar-link {{ request()->routeIs('admin.points-of-interest.*') ? 'active' : '' }}" href="{{ route('admin.points-of-interest.index') }}"><i class="bi bi-pin-map-fill"></i><span>Точки интереса</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.representatives.*') ? 'active' : '' }}" href="{{ route('admin.representatives.index') }}"><i class="bi bi-person-badge"></i><span>Представители храмов</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.service-review.*') ? 'active' : '' }}" href="{{ route('admin.service-review.index') }}"><i class="bi bi-building-check"></i><span>Изменения от храмов</span></a>
             <a class="sidebar-link" href="{{ route('map') }}" target="_blank" rel="noopener"><i class="bi bi-map"></i><span>Интерактивная карта</span></a>

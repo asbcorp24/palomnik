@@ -20,23 +20,19 @@ class ApplySitePresentationSettings
             return $response;
         }
 
-        $contentType = (string) $response->headers->get('Content-Type');
-        if (! str_contains(strtolower($contentType), 'text/html')) {
-            return $response;
-        }
-
+        $contentType = strtolower((string) $response->headers->get('Content-Type'));
         $html = (string) $response->getContent();
-        if ($html === '' || ! str_contains(strtolower($html), '</head>')) {
+        if (! str_contains($contentType, 'text/html') || ! str_contains(strtolower($html), '</head>')) {
             return $response;
         }
 
-        if ($request->is('admin/*') || $request->is('admin')) {
+        if ($request->is('admin') || $request->is('admin/*')) {
             $response->setContent($this->injectAdminSettingsLink($html, $request));
 
             return $response;
         }
 
-        if ($request->is('service/*') || $request->is('service')) {
+        if ($request->is('service') || $request->is('service/*')) {
             return $response;
         }
 
@@ -45,14 +41,11 @@ class ApplySitePresentationSettings
                 return $response;
             }
 
-            $scheme = SiteColorScheme::active();
-            $seo = SiteSetting::seo();
-
-            if ($scheme) {
+            if ($scheme = SiteColorScheme::active()) {
                 $html = $this->injectTheme($html, $scheme);
             }
-            $html = $this->injectSeo($html, $request, $seo);
-            $response->setContent($html);
+
+            $response->setContent($this->injectSeo($html, $request, SiteSetting::seo()));
         } catch (Throwable $exception) {
             report($exception);
         }
@@ -62,13 +55,14 @@ class ApplySitePresentationSettings
 
     private function injectAdminSettingsLink(string $html, Request $request): string
     {
-        if (str_contains($html, 'href="'.url('/admin/settings').'"')) {
+        $settingsUrl = url('/admin/settings');
+        if (str_contains($html, 'href="'.$settingsUrl.'"')) {
             return $html;
         }
 
         $active = $request->is('admin/settings*') ? ' active' : '';
         $link = '<div class="sidebar-label">Настройки</div>'
-            .'<a class="sidebar-link'.$active.'" href="'.e(url('/admin/settings')).'">'
+            .'<a class="sidebar-link'.$active.'" href="'.e($settingsUrl).'">'
             .'<i class="bi bi-sliders"></i><span>Настройки сайта и SEO</span></a>';
         $needle = '<div class="sidebar-label">Справочники</div>';
 
@@ -83,9 +77,15 @@ class ApplySitePresentationSettings
             ->map(fn (string $value, string $name) => $name.':'.$value)
             ->implode(';');
 
-        $style = '<style id="database-site-color-scheme">:root{'.$declarations.'}'
-            .'body{color:var(--pm-ink)}'
-            .'.site-header{border-color:var(--pm-border)}'
+        $style = '<style id="database-site-color-scheme">'
+            .':root{'.$declarations.'}'
+            .'body{color:var(--pm-ink);background-color:var(--pm-cream)}'
+            .'.site-header,.card-pm,.filter-card,.info-card,.feature-step,.stat-box,'
+            .'.category-card,.search-panel,.phone-card{background-color:var(--pm-paper)}'
+            .'.site-header,.card-pm,.filter-card,.info-card,.feature-step,.stat-box,'
+            .'.category-card{border-color:var(--pm-border)}'
+            .'.section-soft{background-color:var(--pm-cream)}'
+            .'.site-footer{background-color:var(--pm-green)}'
             .'</style>';
 
         return str_replace('</head>', $style."\n</head>", $html);
@@ -94,12 +94,17 @@ class ApplySitePresentationSettings
     private function injectSeo(string $html, Request $request, array $seo): string
     {
         $siteName = trim((string) ($seo['site_name'] ?? 'Московский паломник'));
-        $title = $this->extractTitle($html)
-            ?: trim((string) ($seo['default_title'] ?? $siteName));
+        $currentTitle = $this->extractTitle($html);
+        $defaultTitle = trim((string) ($seo['default_title'] ?? $siteName));
+        $title = in_array($currentTitle, ['', 'Московский паломник', $siteName], true)
+            ? $defaultTitle
+            : $currentTitle;
         $suffix = trim((string) ($seo['title_suffix'] ?? ''));
 
         if ($suffix !== '' && ! str_contains(mb_strtolower($title), mb_strtolower($suffix))) {
             $title .= ' — '.$suffix;
+        }
+        if ($title !== $currentTitle) {
             $html = preg_replace(
                 '/<title>.*?<\/title>/is',
                 '<title>'.e($title).'</title>',
@@ -108,45 +113,45 @@ class ApplySitePresentationSettings
             ) ?: $html;
         }
 
-        $description = $this->extractMeta($html, 'description');
-        $oldDefault = 'Московский паломник — храмы, святыни, маршруты и паломнические поездки по Москве и Московской области.';
-        if ($description === '' || $description === $oldDefault) {
+        $description = $this->extractNamedMeta($html, 'description');
+        $legacyDefault = 'Московский паломник — храмы, святыни, маршруты и паломнические поездки по Москве и Московской области.';
+        if ($description === '' || $description === $legacyDefault) {
             $description = trim((string) ($seo['default_description'] ?? ''));
             $html = $this->replaceOrAddNamedMeta($html, 'description', $description);
         }
 
         $base = rtrim((string) ($seo['canonical_base_url'] ?: $request->getSchemeAndHttpHost()), '/');
-        $path = '/'.ltrim($request->path(), '/');
-        $canonical = $request->path() === '/' ? $base.'/' : $base.$path;
-        $robots = ($seo['robots_index'] ? 'index' : 'noindex')
-            .','.($seo['robots_follow'] ? 'follow' : 'nofollow');
+        $canonical = $request->path() === '/'
+            ? $base.'/'
+            : $base.'/'.ltrim($request->path(), '/');
+        $robots = (($seo['robots_index'] ?? true) ? 'index' : 'noindex')
+            .','.(($seo['robots_follow'] ?? true) ? 'follow' : 'nofollow');
         $keywords = trim((string) ($seo['default_keywords'] ?? ''));
         $ogImage = $this->absoluteUrl($seo['og_image'] ?? null, $base);
-        $twitterSite = trim((string) ($seo['twitter_site'] ?? ''));
 
-        $tags = [];
-        $tags[] = '<link rel="canonical" href="'.e($canonical).'">';
-        $tags[] = '<meta name="robots" content="'.e($robots).'">';
+        $tags = [
+            '<link rel="canonical" href="'.e($canonical).'">',
+            '<meta name="robots" content="'.e($robots).'">',
+            '<meta property="og:locale" content="ru_RU">',
+            '<meta property="og:type" content="'.e((string) ($seo['og_type'] ?? 'website')).'">',
+            '<meta property="og:site_name" content="'.e($siteName).'">',
+            '<meta property="og:title" content="'.e($title).'">',
+            '<meta property="og:description" content="'.e($description).'">',
+            '<meta property="og:url" content="'.e($canonical).'">',
+            '<meta name="twitter:card" content="'.e((string) ($seo['twitter_card'] ?? 'summary_large_image')).'">',
+            '<meta name="twitter:title" content="'.e($title).'">',
+            '<meta name="twitter:description" content="'.e($description).'">',
+        ];
+
         if ($keywords !== '') {
             $tags[] = '<meta name="keywords" content="'.e($keywords).'">';
         }
-        $tags[] = '<meta property="og:locale" content="ru_RU">';
-        $tags[] = '<meta property="og:type" content="'.e((string) ($seo['og_type'] ?? 'website')).'">';
-        $tags[] = '<meta property="og:site_name" content="'.e($siteName).'">';
-        $tags[] = '<meta property="og:title" content="'.e($title).'">';
-        $tags[] = '<meta property="og:description" content="'.e($description).'">';
-        $tags[] = '<meta property="og:url" content="'.e($canonical).'">';
         if ($ogImage) {
             $tags[] = '<meta property="og:image" content="'.e($ogImage).'">';
-        }
-        $tags[] = '<meta name="twitter:card" content="'.e((string) ($seo['twitter_card'] ?? 'summary_large_image')).'">';
-        $tags[] = '<meta name="twitter:title" content="'.e($title).'">';
-        $tags[] = '<meta name="twitter:description" content="'.e($description).'">';
-        if ($twitterSite !== '') {
-            $tags[] = '<meta name="twitter:site" content="'.e($twitterSite).'">';
-        }
-        if ($ogImage) {
             $tags[] = '<meta name="twitter:image" content="'.e($ogImage).'">';
+        }
+        if (filled($seo['twitter_site'] ?? null)) {
+            $tags[] = '<meta name="twitter:site" content="'.e((string) $seo['twitter_site']).'">';
         }
         foreach ([
             'google-site-verification' => $seo['google_site_verification'] ?? null,
@@ -156,7 +161,6 @@ class ApplySitePresentationSettings
                 $tags[] = '<meta name="'.$name.'" content="'.e((string) $value).'">';
             }
         }
-
         if ($seo['structured_data_enabled'] ?? true) {
             $tags[] = $this->structuredData($seo, $base, $siteName);
         }
@@ -166,8 +170,7 @@ class ApplySitePresentationSettings
 
     private function structuredData(array $seo, string $base, string $siteName): string
     {
-        $sameAs = preg_split('/\R+/', trim((string) ($seo['organization_same_as'] ?? '')))
-            ?: [];
+        $sameAs = preg_split('/\R+/', trim((string) ($seo['organization_same_as'] ?? ''))) ?: [];
         $sameAs = array_values(array_filter(array_map('trim', $sameAs)));
 
         $organization = array_filter([
@@ -214,9 +217,10 @@ class ApplySitePresentationSettings
         return trim(html_entity_decode(strip_tags($matches[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
-    private function extractMeta(string $html, string $name): string
+    private function extractNamedMeta(string $html, string $name): string
     {
-        preg_match('/<meta\s+name=["\']'.preg_quote($name, '/').'["\']\s+content=["\'](.*?)["\'][^>]*>/is', $html, $matches);
+        $pattern = '~<meta\s+name=["\']'.preg_quote($name, '~').'["\']\s+content=["\'](.*?)["\'][^>]*>~is';
+        preg_match($pattern, $html, $matches);
 
         return trim(html_entity_decode($matches[1] ?? '', ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
@@ -224,7 +228,7 @@ class ApplySitePresentationSettings
     private function replaceOrAddNamedMeta(string $html, string $name, string $content): string
     {
         $tag = '<meta name="'.e($name).'" content="'.e($content).'">';
-        $pattern = '/<meta\s+name=["\']'.preg_quote($name, '/').'["\'][^>]*>/is';
+        $pattern = '~<meta\s+name=["\']'.preg_quote($name, '~').'["\'][^>]*>~is';
 
         if (preg_match($pattern, $html)) {
             return preg_replace($pattern, $tag, $html, 1) ?: $html;

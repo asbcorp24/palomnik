@@ -1,0 +1,57 @@
+name: Apply nearby Blade block
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-nearby-blade.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Patch object detail template
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('resources/views/site/objects/show.blade.php')
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              '@if($similarObjects->isNotEmpty())': '@if($nearbyObjects->isNotEmpty())',
+              '<div class="section-kicker mb-2">Продолжить знакомство</div>': '<div class="section-kicker mb-2">В радиусе до 25 км</div>',
+              '<h2 class="h2 mb-0">Похожие места</h2>': '<h2 class="h2 mb-0">Места рядом</h2>',
+              '''<a class="btn btn-outline-pm" href="{{ route('objects.index', ['type' => optional($object->objectType)->slug]) }}">
+                        Смотреть все
+                    </a>''': '''<a class="btn btn-outline-pm" href="{{ route('map', ['q' => $object->name]) }}">
+                        <i class="bi bi-map me-1"></i>Открыть на карте
+                    </a>''',
+              '@foreach($similarObjects as $similarObject)': '@foreach($nearbyObjects as $nearbyObject)',
+              "@include('site.partials.object-card', ['object' => $similarObject])": "@include('site.partials.object-card', ['object' => $nearbyObject])",
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'Anchor not found: {old}')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          grep -q 'Места рядом' resources/views/site/objects/show.blade.php
+          grep -q '\$nearbyObjects' resources/views/site/objects/show.blade.php
+
+      - name: Commit source change
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-nearby-blade.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add resources/views/site/objects/show.blade.php .github/workflows/apply-nearby-blade.yml
+          git commit -m "feat(objects): render real nearby places block"
+          git push origin HEAD:main

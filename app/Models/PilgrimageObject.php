@@ -18,6 +18,7 @@ class PilgrimageObject extends Model
 
     protected $fillable = [
         'object_type_id',
+        'parent_object_id',
         'vicariate_id',
         'deanery_id',
         'name',
@@ -53,6 +54,24 @@ class PilgrimageObject extends Model
     public function objectType(): BelongsTo
     {
         return $this->belongsTo(ObjectType::class);
+    }
+
+    public function parentObject(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_object_id');
+    }
+
+    public function childObjects(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_object_id')
+            ->orderBy('name');
+    }
+
+    public function publishedChildObjects(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_object_id')
+            ->published()
+            ->orderBy('name');
     }
 
     public function vicariate(): BelongsTo
@@ -158,6 +177,22 @@ class PilgrimageObject extends Model
                 $query->whereNull('published_at')
                     ->orWhere('published_at', '<=', now());
             });
+    }
+
+    public function scopeTypeOrParentOfType(Builder $query, ?string $slug): Builder
+    {
+        $slug = trim((string) $slug);
+
+        if ($slug === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $query) use ($slug) {
+            $query->whereHas('objectType', fn (Builder $query) => $query->where('slug', $slug))
+                ->orWhereHas('publishedChildObjects', function (Builder $query) use ($slug) {
+                    $query->whereHas('objectType', fn (Builder $query) => $query->where('slug', $slug));
+                });
+        });
     }
 
     public function scopeSearch(Builder $query, ?string $term): Builder

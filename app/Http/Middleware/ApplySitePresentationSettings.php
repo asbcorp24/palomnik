@@ -37,7 +37,7 @@ class ApplySitePresentationSettings
         }
 
         try {
-            if (! Schema::hasTable('site_color_schemes') || ! Schema::hasTable('site_settings')) {
+            if (! Schema::hasTable('site_color_schemes') || ! Schema::hasTable('site_seo_settings')) {
                 return $response;
             }
 

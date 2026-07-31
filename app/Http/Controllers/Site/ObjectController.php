@@ -7,13 +7,16 @@ use App\Models\Deanery;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use App\Models\Vicariate;
+use App\Services\PilgrimageObjectFuzzySearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class ObjectController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, PilgrimageObjectFuzzySearch $fuzzySearch): View
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
@@ -23,11 +26,10 @@ class ObjectController extends Controller
             'sort' => ['nullable', 'in:name,newest'],
         ]);
 
-        $objects = PilgrimageObject::query()
+        $query = PilgrimageObject::query()
             ->published()
             ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'sanctities'])
             ->withAvg(['reviews as published_rating' => fn ($query) => $query->where('status', 'published')], 'rating')
-            ->search($filters['q'] ?? null)
             ->when($filters['type'] ?? null, function (Builder $query, string $slug) {
                 $query->whereHas('objectType', fn (Builder $query) => $query->where('slug', $slug));
             })
@@ -38,14 +40,30 @@ class ObjectController extends Controller
                 $query->whereHas('deanery', fn (Builder $query) => $query->where('slug', $slug));
             });
 
-        if (($filters['sort'] ?? 'name') === 'newest') {
-            $objects->orderByDesc('published_at')->orderByDesc('id');
+        $searchTerm = trim((string) ($filters['q'] ?? ''));
+
+        if ($searchTerm !== '') {
+            $rankedObjects = $fuzzySearch->rank($query->get(), $searchTerm);
+
+            if ($request->filled('sort')) {
+                $rankedObjects = ($filters['sort'] ?? 'name') === 'newest'
+                    ? $rankedObjects->sortByDesc(fn (PilgrimageObject $object) => $object->published_at?->getTimestamp() ?? 0)->values()
+                    : $rankedObjects->sortBy(fn (PilgrimageObject $object) => mb_strtolower($object->name, 'UTF-8'))->values();
+            }
+
+            $objects = $this->paginateCollection($rankedObjects, $request, 12);
         } else {
-            $objects->orderBy('name');
+            if (($filters['sort'] ?? 'name') === 'newest') {
+                $query->orderByDesc('published_at')->orderByDesc('id');
+            } else {
+                $query->orderBy('name');
+            }
+
+            $objects = $query->paginate(12)->withQueryString();
         }
 
         return view('site.objects.index', [
-            'objects' => $objects->paginate(12)->withQueryString(),
+            'objects' => $objects,
             'types' => ObjectType::query()->orderBy('sort_order')->orderBy('name')->get(),
             'vicariates' => Vicariate::query()->orderBy('name')->get(),
             'deaneries' => Deanery::query()->with('vicariate')->orderBy('name')->get(),
@@ -100,5 +118,21 @@ class ObjectController extends Controller
             'isFavorite' => $isFavorite,
             'rating' => $object->reviews->avg('rating'),
         ]);
+    }
+
+    private function paginateCollection(Collection $items, Request $request, int $perPage): LengthAwarePaginator
+    {
+        $page = LengthAwarePaginator::resolveCurrentPage();
+
+        return new LengthAwarePaginator(
+            $items->forPage($page, $perPage)->values(),
+            $items->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
     }
 }

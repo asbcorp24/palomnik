@@ -22,7 +22,7 @@
     <form class="row g-2 align-items-end" method="GET">
         <div class="col-md-5">
             <label class="form-label small">Поиск</label>
-            <input class="form-control" type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Название или адрес">
+            <input class="form-control" type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Название, адрес или дочерний объект">
         </div>
         <div class="col-md-3">
             <label class="form-label small">Тип</label>
@@ -80,6 +80,11 @@
                                 <div>
                                     <div class="fw-semibold">{{ $object->name }}</div>
                                     <div class="small text-secondary text-truncate" style="max-width:320px">{{ $object->address }}</div>
+                                    @if($object->parentObject)
+                                        <div class="small text-secondary"><i class="bi bi-diagram-2 me-1"></i>В составе: {{ $object->parentObject->name }}</div>
+                                    @elseif($object->child_objects_count > 0)
+                                        <div class="small text-secondary"><i class="bi bi-diagram-3 me-1"></i>Дочерних объектов: {{ $object->child_objects_count }}</div>
+                                    @endif
                                     <code class="small">{{ $object->slug }}</code>
                                 </div>
                             </div>

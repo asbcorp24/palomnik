@@ -1,0 +1,510 @@
+name: Import Moscow region Orthodox places
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/import-moscow-region-churches.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, fileinfo, gd, pdo_sqlite
+          coverage: none
+
+      - name: Add importer, migration and seeder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p scripts database/seeders/data docs tests/Feature
+
+          cat > scripts/fetch_moscow_region_churches.py <<'PY'
+          #!/usr/bin/env python3
+          import json
+          import math
+          import re
+          import time
+          import unicodedata
+          import urllib.parse
+          import urllib.request
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          ENDPOINTS = [
+              'https://overpass.kumi.systems/api/interpreter',
+              'https://overpass-api.de/api/interpreter',
+              'https://overpass.private.coffee/api/interpreter',
+          ]
+          REGIONS = [
+              ('RU-MOW', 'Москва'),
+              ('RU-MOS', 'Московская область'),
+          ]
+          OUTPUT = Path('database/seeders/data/moscow-region-orthodox-places.json')
+          NAME_PATTERN = re.compile(
+              r'(храм|церков|собор|часовн|монастыр|подворье|пустынь|church|cathedral|chapel|monastery)',
+              re.IGNORECASE,
+          )
+          NON_ORTHODOX = {
+              'roman_catholic', 'catholic', 'protestant', 'lutheran', 'baptist',
+              'evangelical', 'pentecostal', 'methodist', 'adventist',
+              'seventh_day_adventist', 'jehovahs_witness', 'mormon',
+              'new_apostolic', 'armenian_apostolic', 'anglican', 'presbyterian',
+              'reformed', 'quaker', 'unitarian', 'mennonite',
+          }
+          LIFECYCLE_PREFIXES = ('abandoned:', 'disused:', 'demolished:', 'razed:')
+
+          def overpass_query(iso_code: str) -> str:
+              return f'''[out:json][timeout:900][maxsize:1073741824];
+          area["ISO3166-2"="{iso_code}"]["boundary"="administrative"]->.region;
+          (
+            nwr(area.region)["amenity"~"^(place_of_worship|monastery)$"];
+            nwr(area.region)["building"~"^(church|cathedral|chapel|monastery)$"];
+          );
+          out center tags qt;'''
+
+          def fetch_region(iso_code: str) -> dict:
+              payload = urllib.parse.urlencode({'data': overpass_query(iso_code)}).encode('utf-8')
+              last_error = None
+              for endpoint in ENDPOINTS:
+                  for attempt in range(3):
+                      try:
+                          request = urllib.request.Request(
+                              endpoint,
+                              data=payload,
+                              headers={
+                                  'User-Agent': 'MoscowPilgrimSeeder/1.0 (+https://github.com/asbcorp24/palomnik)',
+                                  'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                              },
+                              method='POST',
+                          )
+                          with urllib.request.urlopen(request, timeout=960) as response:
+                              return json.loads(response.read().decode('utf-8'))
+                      except Exception as exc:
+                          last_error = exc
+                          time.sleep(5 * (attempt + 1))
+              raise RuntimeError(f'Overpass request failed for {iso_code}: {last_error}')
+
+          def text(tags: dict, *keys: str):
+              for key in keys:
+                  value = tags.get(key)
+                  if value is not None and str(value).strip():
+                      return str(value).strip()
+              return None
+
+          def normalize(value: str) -> str:
+              value = unicodedata.normalize('NFKC', value).casefold().replace('ё', 'е')
+              return re.sub(r'[^a-zа-я0-9]+', ' ', value).strip()
+
+          def coordinates(element: dict):
+              if element.get('lat') is not None and element.get('lon') is not None:
+                  return float(element['lat']), float(element['lon'])
+              center = element.get('center') or {}
+              if center.get('lat') is not None and center.get('lon') is not None:
+                  return float(center['lat']), float(center['lon'])
+              return None
+
+          def is_active(tags: dict) -> bool:
+              if any(key.startswith(LIFECYCLE_PREFIXES) for key in tags):
+                  if tags.get('amenity') not in {'place_of_worship', 'monastery'}:
+                      return False
+              if tags.get('construction') or tags.get('building') == 'construction':
+                  return False
+              if tags.get('ruins') == 'yes' or tags.get('historic') == 'ruins':
+                  return False
+              return True
+
+          def is_orthodox_candidate(tags: dict, name: str) -> bool:
+              religion = (tags.get('religion') or '').strip().casefold()
+              if religion and religion != 'christian':
+                  return False
+              denomination = (tags.get('denomination') or '').strip().casefold()
+              if denomination in NON_ORTHODOX:
+                  return False
+              building = (tags.get('building') or '').strip().casefold()
+              amenity = (tags.get('amenity') or '').strip().casefold()
+              if denomination in {'orthodox', 'russian_orthodox', 'eastern_orthodox', 'old_believers'}:
+                  return True
+              if building in {'church', 'cathedral', 'chapel', 'monastery'}:
+                  return True
+              if amenity == 'monastery':
+                  return True
+              return bool(NAME_PATTERN.search(name))
+
+          def infer_type(tags: dict, name: str) -> str:
+              haystack = normalize(' '.join(filter(None, [name, tags.get('building'), tags.get('amenity'), tags.get('place')])))
+              if 'монастыр' in haystack or 'monastery' in haystack or tags.get('amenity') == 'monastery':
+                  return 'monastery'
+              if 'часовн' in haystack or 'chapel' in haystack or tags.get('building') == 'chapel':
+                  return 'chapel'
+              return 'temple'
+
+          def address(tags: dict, region_name: str) -> str:
+              full = text(tags, 'addr:full')
+              if full:
+                  return full
+              parts = []
+              for value in [
+                  text(tags, 'addr:region') or region_name,
+                  text(tags, 'addr:city', 'addr:town', 'addr:village', 'addr:place'),
+                  text(tags, 'addr:suburb', 'addr:district'),
+                  text(tags, 'addr:street'),
+              ]:
+                  if value and value not in parts:
+                      parts.append(value)
+              house = text(tags, 'addr:housenumber')
+              if house:
+                  if parts:
+                      parts[-1] = f'{parts[-1]}, {house}'
+                  else:
+                      parts.append(house)
+              return ', '.join(parts) if parts else region_name
+
+          def schedule(tags: dict):
+              values = []
+              service = text(tags, 'service_times')
+              opening = text(tags, 'opening_hours')
+              if service:
+                  values.append(f'Богослужения: {service}')
+              if opening:
+                  values.append(f'Часы работы: {opening}')
+              return '\n'.join(values) or None
+
+          def haversine(a, b) -> float:
+              lat1, lon1 = map(math.radians, a)
+              lat2, lon2 = map(math.radians, b)
+              dlat, dlon = lat2 - lat1, lon2 - lon1
+              h = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+              return 6371000 * 2 * math.atan2(math.sqrt(h), math.sqrt(1 - h))
+
+          def richness(item: dict) -> int:
+              fields = ('address', 'phone', 'email', 'website', 'schedule_text')
+              return sum(1 for field in fields if item.get(field)) + (2 if item['osm_type'] != 'node' else 0)
+
+          all_items = []
+          raw_counts = {}
+          skipped = {'unnamed': 0, 'inactive': 0, 'non_orthodox': 0, 'no_coordinates': 0, 'duplicates': 0}
+
+          for iso_code, region_name in REGIONS:
+              payload = fetch_region(iso_code)
+              raw_counts[iso_code] = len(payload.get('elements', []))
+              for element in payload.get('elements', []):
+                  tags = element.get('tags') or {}
+                  name = text(tags, 'name:ru', 'name')
+                  if not name:
+                      skipped['unnamed'] += 1
+                      continue
+                  if not is_active(tags):
+                      skipped['inactive'] += 1
+                      continue
+                  if not is_orthodox_candidate(tags, name):
+                      skipped['non_orthodox'] += 1
+                      continue
+                  point = coordinates(element)
+                  if point is None:
+                      skipped['no_coordinates'] += 1
+                      continue
+                  osm_type = element['type']
+                  osm_id = int(element['id'])
+                  all_items.append({
+                      'source_id': f'{osm_type}/{osm_id}',
+                      'osm_type': osm_type,
+                      'osm_id': osm_id,
+                      'source_url': f'https://www.openstreetmap.org/{osm_type}/{osm_id}',
+                      'region': region_name,
+                      'type': infer_type(tags, name),
+                      'name': name,
+                      'address': address(tags, region_name),
+                      'latitude': round(point[0], 7),
+                      'longitude': round(point[1], 7),
+                      'phone': text(tags, 'contact:phone', 'phone'),
+                      'email': text(tags, 'contact:email', 'email'),
+                      'website': text(tags, 'contact:website', 'website'),
+                      'schedule_text': schedule(tags),
+                  })
+
+          # Remove duplicate node/building pairs with the same normalized name and type nearby.
+          deduplicated = []
+          for item in sorted(all_items, key=lambda value: (-richness(value), value['source_id'])):
+              duplicate = None
+              key = (item['type'], normalize(item['name']))
+              for existing in deduplicated:
+                  if (existing['type'], normalize(existing['name'])) != key:
+                      continue
+                  if haversine(
+                      (item['latitude'], item['longitude']),
+                      (existing['latitude'], existing['longitude']),
+                  ) <= 80:
+                      duplicate = existing
+                      break
+              if duplicate is None:
+                  deduplicated.append(item)
+              else:
+                  skipped['duplicates'] += 1
+
+          deduplicated.sort(key=lambda value: (value['region'], value['type'], normalize(value['name']), value['source_id']))
+          OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+          OUTPUT.write_text(json.dumps({
+              'meta': {
+                  'generated_at': datetime.now(timezone.utc).isoformat(),
+                  'source': 'OpenStreetMap contributors via Overpass API',
+                  'license': 'ODbL 1.0',
+                  'regions': [region[0] for region in REGIONS],
+                  'raw_counts': raw_counts,
+                  'imported_count': len(deduplicated),
+                  'skipped': skipped,
+              },
+              'objects': deduplicated,
+          }, ensure_ascii=False, indent=2), encoding='utf-8')
+          print(f'Wrote {len(deduplicated)} objects to {OUTPUT}')
+          PY
+          chmod +x scripts/fetch_moscow_region_churches.py
+
+          cat > database/migrations/2026_07_31_143000_add_external_source_to_pilgrimage_objects_table.php <<'PHP'
+          <?php
+
+          use Illuminate\Database\Migrations\Migration;
+          use Illuminate\Database\Schema\Blueprint;
+          use Illuminate\Support\Facades\Schema;
+
+          return new class extends Migration
+          {
+              public function up(): void
+              {
+                  Schema::table('pilgrimage_objects', function (Blueprint $table) {
+                      $table->string('source', 32)->nullable()->after('parent_object_id');
+                      $table->string('source_id', 96)->nullable()->after('source');
+                      $table->unique(['source', 'source_id'], 'pilgrimage_objects_source_unique');
+                  });
+              }
+
+              public function down(): void
+              {
+                  Schema::table('pilgrimage_objects', function (Blueprint $table) {
+                      $table->dropUnique('pilgrimage_objects_source_unique');
+                      $table->dropColumn(['source', 'source_id']);
+                  });
+              }
+          };
+          PHP
+
+          cat > database/seeders/MoscowRegionChurchSeeder.php <<'PHP'
+          <?php
+
+          namespace Database\Seeders;
+
+          use App\Models\ObjectType;
+          use App\Models\PilgrimageObject;
+          use Illuminate\Database\Seeder;
+          use Illuminate\Support\Str;
+          use JsonException;
+          use RuntimeException;
+
+          class MoscowRegionChurchSeeder extends Seeder
+          {
+              /** @throws JsonException */
+              public function run(): void
+              {
+                  $path = database_path('seeders/data/moscow-region-orthodox-places.json');
+                  if (! is_file($path)) {
+                      throw new RuntimeException('Не найден снимок храмов: '.$path);
+                  }
+
+                  $snapshot = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+                  $objects = $snapshot['objects'] ?? [];
+                  $typeIds = ObjectType::query()
+                      ->whereIn('slug', ['temple', 'monastery', 'chapel'])
+                      ->pluck('id', 'slug');
+
+                  foreach (['temple', 'monastery', 'chapel'] as $requiredType) {
+                      if (! $typeIds->has($requiredType)) {
+                          throw new RuntimeException('Перед импортом запустите CatalogSeeder: отсутствует тип '.$requiredType);
+                      }
+                  }
+
+                  foreach ($objects as $item) {
+                      $sourceId = (string) $item['source_id'];
+                      $object = PilgrimageObject::withTrashed()
+                          ->where('source', 'openstreetmap')
+                          ->where('source_id', $sourceId)
+                          ->first();
+
+                      // Удалённые администратором записи не восстанавливаем автоматически.
+                      if ($object?->trashed()) {
+                          continue;
+                      }
+
+                      $payload = [
+                          'object_type_id' => $typeIds[(string) $item['type']],
+                          'source' => 'openstreetmap',
+                          'source_id' => $sourceId,
+                          'name' => (string) $item['name'],
+                          'address' => (string) $item['address'],
+                          'latitude' => (float) $item['latitude'],
+                          'longitude' => (float) $item['longitude'],
+                          'phone' => $item['phone'] ?: null,
+                          'email' => $item['email'] ?: null,
+                          'website' => $item['website'] ?: null,
+                          'schedule_text' => $item['schedule_text'] ?: null,
+                          'is_published' => true,
+                          'published_at' => now(),
+                      ];
+
+                      if (! $object) {
+                          $payload['slug'] = $this->uniqueSlug((string) $item['name'], $sourceId);
+                          PilgrimageObject::query()->create($payload);
+                          continue;
+                      }
+
+                      // Координаты и тип синхронизируем; редакционные поля не затираем.
+                      $updates = [
+                          'object_type_id' => $payload['object_type_id'],
+                          'latitude' => $payload['latitude'],
+                          'longitude' => $payload['longitude'],
+                      ];
+                      foreach (['name', 'address', 'phone', 'email', 'website', 'schedule_text'] as $field) {
+                          if (blank($object->{$field}) && filled($payload[$field])) {
+                              $updates[$field] = $payload[$field];
+                          }
+                      }
+                      $object->update($updates);
+                  }
+              }
+
+              private function uniqueSlug(string $name, string $sourceId): string
+              {
+                  $suffix = str_replace('/', '-', $sourceId);
+                  $base = Str::slug($name);
+                  $base = Str::limit($base !== '' ? $base : 'pravoslavnyy-obekt', 180, '');
+                  $candidate = $base.'-osm-'.$suffix;
+                  $counter = 2;
+
+                  while (PilgrimageObject::withTrashed()->where('slug', $candidate)->exists()) {
+                      $candidate = $base.'-osm-'.$suffix.'-'.$counter++;
+                  }
+
+                  return $candidate;
+              }
+          }
+          PHP
+
+          cat > tests/Feature/MoscowRegionChurchSeederTest.php <<'PHP'
+          <?php
+
+          namespace Tests\Feature;
+
+          use App\Models\PilgrimageObject;
+          use Database\Seeders\CatalogSeeder;
+          use Database\Seeders\MoscowRegionChurchSeeder;
+          use Illuminate\Foundation\Testing\RefreshDatabase;
+          use Tests\TestCase;
+
+          class MoscowRegionChurchSeederTest extends TestCase
+          {
+              use RefreshDatabase;
+
+              public function test_snapshot_imports_many_unique_published_places(): void
+              {
+                  $this->seed([CatalogSeeder::class, MoscowRegionChurchSeeder::class]);
+
+                  $query = PilgrimageObject::query()->where('source', 'openstreetmap');
+                  $count = $query->count();
+
+                  $this->assertGreaterThan(100, $count);
+                  $this->assertSame($count, $query->distinct()->count('source_id'));
+                  $this->assertSame(0, $query->where('is_published', false)->count());
+                  $this->assertGreaterThan(0, $query->whereHas('objectType', fn ($q) => $q->where('slug', 'temple'))->count());
+                  $this->assertGreaterThan(0, $query->whereHas('objectType', fn ($q) => $q->where('slug', 'monastery'))->count());
+                  $this->assertGreaterThan(0, $query->whereHas('objectType', fn ($q) => $q->where('slug', 'chapel'))->count());
+              }
+          }
+          PHP
+
+          cat > docs/osm-church-import.md <<'MD'
+          # Импорт храмов Москвы и Московской области
+
+          Снимок `database/seeders/data/moscow-region-orthodox-places.json` формируется из OpenStreetMap через Overpass API.
+
+          В импорт входят именованные действующие православные храмы, соборы, часовни и монастыри в регионах `RU-MOW` и `RU-MOS`. Явно не православные конфессии, строящиеся, заброшенные и разрушенные объекты исключаются. Близкие дубли «точка + контур здания» объединяются.
+
+          Обновить снимок:
+
+          ```bash
+          python3 scripts/fetch_moscow_region_churches.py
+          php artisan db:seed --class=MoscowRegionChurchSeeder
+          ```
+
+          Seeder идентифицирует записи по паре `source=openstreetmap` и `source_id=node|way|relation/id`. Удалённые администратором записи не восстанавливаются, заполненные редакционные поля повторным импортом не перезаписываются.
+
+          Данные: © OpenStreetMap contributors, лицензия ODbL 1.0.
+          MD
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Anchor not found in {path}: {old!r}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              'app/Models/PilgrimageObject.php',
+              "        'parent_object_id',\n",
+              "        'parent_object_id',\n        'source',\n        'source_id',\n",
+          )
+          replace_once(
+              'database/seeders/DatabaseSeeder.php',
+              "            CatalogSeeder::class,\n",
+              "            CatalogSeeder::class,\n            MoscowRegionChurchSeeder::class,\n",
+          )
+          replace_once(
+              'resources/views/site/layouts/app.blade.php',
+              '<span>© {{ date(\'Y\') }} Московский паломник</span>',
+              '<span>© {{ date(\'Y\') }} Московский паломник · Данные объектов: <a class="footer-link" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a></span>',
+          )
+          PY
+
+      - name: Download and normalize OpenStreetMap data
+        run: python3 scripts/fetch_moscow_region_churches.py
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Verify migration, seeder and views
+        shell: bash
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          touch database/database.sqlite
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$(pwd)/database/database.sqlite|" .env
+          php artisan migrate:fresh --force
+          php artisan db:seed --class=CatalogSeeder --force
+          php artisan db:seed --class=MoscowRegionChurchSeeder --force
+          php artisan view:cache
+          php artisan test --filter=MoscowRegionChurchSeederTest
+          php -l database/seeders/MoscowRegionChurchSeeder.php
+          php -l database/migrations/2026_07_31_143000_add_external_source_to_pilgrimage_objects_table.php
+
+      - name: Commit imported snapshot
+        shell: bash
+        run: |
+          rm -f .github/workflows/import-moscow-region-churches.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(seed): import Moscow region Orthodox places"
+          git push origin HEAD:main

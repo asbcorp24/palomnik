@@ -40,7 +40,9 @@ class SiteColorScheme extends Model
     public function activate(): void
     {
         DB::transaction(function (): void {
-            static::query()->whereKeyNot($this->getKey())->update(['is_active' => false]);
+            static::query()
+                ->where('id', '<>', $this->getKey())
+                ->update(['is_active' => false]);
             $this->update(['is_active' => true]);
         });
 

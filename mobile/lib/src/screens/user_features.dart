@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:maplibre/maplibre.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api_client.dart';
 import '../core/session_controller.dart';
 import '../theme/app_theme.dart';
+import '../widgets/pilgrim_map_marker.dart';
 
 class ObjectDetailScreen extends StatefulWidget {
   const ObjectDetailScreen({super.key, required this.slug});
@@ -169,6 +171,14 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
                         OutlinedButton.icon(onPressed: _busy ? null : () => _visit(item), icon: const Icon(Icons.where_to_vote_outlined), label: const Text('Я посетил')),
                         OutlinedButton.icon(onPressed: _busy ? null : () => _review(item), icon: const Icon(Icons.rate_review_outlined), label: const Text('Отзыв')),
                       ]),
+                      if (lat is num && lon is num) ...[
+                        const SizedBox(height: 20),
+                        ObjectMiniMap(
+                          item: item,
+                          latitude: lat.toDouble(),
+                          longitude: lon.toDouble(),
+                        ),
+                      ],
                       if (_text(item['short_description']) != null) ...[
                         const SizedBox(height: 24),
                         Text('${item['short_description']}', style: Theme.of(context).textTheme.titleMedium),
@@ -239,6 +249,87 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
         height: 240,
         child: ColoredBox(color: AppTheme.cream, child: Center(child: Icon(Icons.church, size: 70, color: AppTheme.gold))),
       );
+}
+
+class ObjectMiniMap extends StatelessWidget {
+  const ObjectMiniMap({
+    super.key,
+    required this.item,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final Map<String, dynamic> item;
+  final double latitude;
+  final double longitude;
+
+  @override
+  Widget build(BuildContext context) {
+    final point = Geographic(lon: longitude, lat: latitude);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 220,
+            child: MapLibreMap(
+              options: MapOptions(
+                initCenter: point,
+                initZoom: 15,
+                initStyle: '${ApiClient.siteBaseUrl}/api/v1/map/style.json',
+              ),
+              children: [
+                WidgetLayer(
+                  allowInteraction: false,
+                  markers: [
+                    Marker(
+                      point: point,
+                      size: const Size(46, 46),
+                      alignment: Alignment.bottomCenter,
+                      child: PilgrimMapMarker(
+                        color: pilgrimageMarkerColor(item),
+                        icon: pilgrimageObjectIcon(item),
+                        primary: true,
+                        onTap: () {},
+                      ),
+                    ),
+                  ],
+                ),
+                const SourceAttribution(),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                const Icon(Icons.map_outlined, color: AppTheme.gold),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Расположение объекта',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Открыть маршрут',
+                  onPressed: () => launchUrl(
+                    Uri.parse(
+                      'https://yandex.ru/maps/?rtext=~$latitude,$longitude&rtt=auto',
+                    ),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  icon: const Icon(Icons.directions),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class RouteDetailScreen extends StatefulWidget {

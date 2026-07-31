@@ -362,6 +362,17 @@
                     }, beforeId);
                 }
 
+                [
+                    'pilgrim-clusters',
+                    'pilgrim-cluster-count',
+                    'pilgrim-points',
+                    'pilgrim-point-icons'
+                ].forEach((primaryLayerId) => {
+                    if (this.getLayer(primaryLayerId)) {
+                        this.moveLayer(primaryLayerId);
+                    }
+                });
+
                 return result;
             }
 

@@ -96,6 +96,7 @@ class ApiClient {
     if (options.method.toUpperCase() != 'GET') return false;
     final path = options.path;
     return path == '/objects' ||
+        path == '/points-of-interest' ||
         path.startsWith('/objects/') ||
         path == '/mobile/home' ||
         path.startsWith('/mobile/routes') ||

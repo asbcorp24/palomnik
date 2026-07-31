@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'palomnik-v3';
+const CACHE_VERSION = 'palomnik-v4';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_CACHE = `${CACHE_VERSION}-offline`;
 const STATIC_URLS = [

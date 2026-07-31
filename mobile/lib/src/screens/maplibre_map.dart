@@ -6,6 +6,7 @@ import '../core/api_client.dart';
 import '../data/cached_api.dart';
 import '../data/offline_store.dart';
 import '../theme/app_theme.dart';
+import '../widgets/pilgrim_map_marker.dart';
 import 'advanced_features.dart';
 import 'offline_map_screen.dart';
 import 'user_features.dart';
@@ -23,6 +24,7 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
   final _search = TextEditingController();
   MapController? _controller;
   List<Map<String, dynamic>> _objects = const [];
+  List<Map<String, dynamic>> _pointsOfInterest = const [];
   Feature<LineString>? _routeFeature;
   bool _loading = true;
   String? _error;
@@ -52,24 +54,46 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
     });
 
     try {
-      final payload = await CachedApi.instance.get(
-        '/objects',
-        queryParameters: {
-          'per_page': 100,
-          if (_search.text.trim().isNotEmpty) 'q': _search.text.trim(),
-        },
-        forceRefresh: forceRefresh,
-      ) as Map;
+      final query = {
+        'per_page': 100,
+        if (_search.text.trim().isNotEmpty) 'q': _search.text.trim(),
+      };
+      final payloads = await Future.wait([
+        CachedApi.instance.get(
+          '/objects',
+          queryParameters: query,
+          forceRefresh: forceRefresh,
+        ),
+        CachedApi.instance.get(
+          '/points-of-interest',
+          queryParameters: query,
+          forceRefresh: forceRefresh,
+        ),
+      ]);
 
-      final objects = (payload['data'] as List? ?? const [])
+      final objectPayload = payloads[0] as Map;
+      final pointPayload = payloads[1] as Map;
+      final objects = (objectPayload['data'] as List? ?? const [])
           .map((value) => Map<String, dynamic>.from(value as Map))
           .where((object) {
             final location = _location(object);
             return location['latitude'] is num && location['longitude'] is num;
           })
           .toList();
+      final points = (pointPayload['data'] as List? ?? const [])
+          .map((value) => Map<String, dynamic>.from(value as Map))
+          .where((point) {
+            final location = _location(point);
+            return location['latitude'] is num && location['longitude'] is num;
+          })
+          .toList();
 
-      if (mounted) setState(() => _objects = objects);
+      if (mounted) {
+        setState(() {
+          _objects = objects;
+          _pointsOfInterest = points;
+        });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = _message(error));
     } finally {
@@ -160,6 +184,86 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
                   ),
                 ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPointOfInterest(Map<String, dynamic> point) async {
+    final location = _location(point);
+    final baseObject = point['base_object'] is Map
+        ? Map<String, dynamic>.from(point['base_object'] as Map)
+        : const <String, dynamic>{};
+
+    await _controller?.animateCamera(
+      center: Geographic(
+        lon: (location['longitude'] as num).toDouble(),
+        lat: (location['latitude'] as num).toDouble(),
+      ),
+      zoom: 16,
+    );
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${point['category_label'] ?? 'Точка интереса'}',
+                style: const TextStyle(
+                  color: AppTheme.gold,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                '${point['name'] ?? ''}',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${location['address'] ?? ''}',
+                style: const TextStyle(color: Colors.black54),
+              ),
+              if (point['description'] != null) ...[
+                const SizedBox(height: 10),
+                Text('${point['description']}'),
+              ],
+              if (baseObject['name'] != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Рядом с: ${baseObject['name']}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+              if (baseObject['slug'] != null) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ObjectDetailScreen(
+                          slug: '${baseObject['slug']}',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.church),
+                  label: const Text('Открыть основной объект'),
+                ),
+              ],
             ],
           ),
         ),
@@ -277,7 +381,27 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
 
   @override
   Widget build(BuildContext context) {
-    final markers = _objects.map((object) {
+    final pointMarkers = _pointsOfInterest.map((point) {
+      final location = _location(point);
+      return Marker(
+        size: const Size(36, 36),
+        point: Geographic(
+          lon: (location['longitude'] as num).toDouble(),
+          lat: (location['latitude'] as num).toDouble(),
+        ),
+        alignment: Alignment.bottomCenter,
+        child: PilgrimMapMarker(
+          color: pilgrimageMarkerColor(
+            point,
+            fallback: const Color(0xFF7C3AED),
+          ),
+          icon: pointOfInterestIcon(point),
+          onTap: () => _showPointOfInterest(point),
+        ),
+      );
+    }).toList();
+
+    final objectMarkers = _objects.map((object) {
       final location = _location(object);
       return Marker(
         size: const Size(46, 46),
@@ -286,21 +410,11 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
           lat: (location['latitude'] as num).toDouble(),
         ),
         alignment: Alignment.bottomCenter,
-        child: GestureDetector(
+        child: PilgrimMapMarker(
+          color: pilgrimageMarkerColor(object),
+          icon: pilgrimageObjectIcon(object),
+          primary: true,
           onTap: () => _showObject(object),
-          child: Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: _markerColor(object),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: const [
-                BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
-              ],
-            ),
-            child: const Icon(Icons.church, color: Colors.white, size: 23),
-          ),
         ),
       );
     }).toList();
@@ -361,7 +475,14 @@ class _MapLibreMapTabState extends State<MapLibreMapTab> {
                 ),
             ],
             children: [
-              WidgetLayer(markers: markers, allowInteraction: true),
+              WidgetLayer(
+                markers: pointMarkers,
+                allowInteraction: true,
+              ),
+              WidgetLayer(
+                markers: objectMarkers,
+                allowInteraction: true,
+              ),
               const SourceAttribution(),
               const MapCompass(),
               const MapControlButtons(),
@@ -446,13 +567,6 @@ Map<String, dynamic> _location(Map<String, dynamic> object) {
   };
 }
 
-Color _markerColor(Map<String, dynamic> object) {
-  final type = object['type'];
-  final value = type is Map ? type['marker_color'] : object['marker_color'];
-  final normalized = '$value'.replaceFirst('#', '').trim();
-  final parsed = int.tryParse('FF$normalized', radix: 16);
-  return normalized.length == 6 && parsed != null ? Color(parsed) : AppTheme.gold;
-}
 
 String _message(Object error) {
   final apiMessage = ApiClient.instance.messageFrom(error);

@@ -15,6 +15,16 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
+        if (config('backup.enabled')) {
+            $schedule->command('backup:create --label=daily')
+                ->dailyAt((string) config('backup.schedule_time', '01:30'))
+                ->withoutOverlapping(240);
+
+            $schedule->command('backup:prune')
+                ->weeklyOn(7, '02:20')
+                ->withoutOverlapping(60);
+        }
+
         $schedule->command('objects:mark-information-outdated')
             ->dailyAt('02:30')
             ->withoutOverlapping();

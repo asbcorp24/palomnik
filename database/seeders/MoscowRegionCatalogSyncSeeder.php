@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Services\MonasteryTempleLinkService;
 use App\Services\MoscowRegionCatalogSyncService;
 use Illuminate\Database\Seeder;
 
@@ -23,6 +24,9 @@ class MoscowRegionCatalogSyncSeeder extends Seeder
             (string) $nearbyPath,
             $clean
         );
+        $hierarchy = $clean
+            ? app(MonasteryTempleLinkService::class)->link(true, true, true, 600)
+            : null;
 
         $objects = $result['objects'];
         $points = $result['points'];
@@ -50,5 +54,17 @@ class MoscowRegionCatalogSyncSeeder extends Seeder
             .', удалено приделов '.$prepared['auxiliary_removed']
             .', объединено дублей '.$prepared['nearby_duplicates_merged'].'.'
         );
+
+        if ($hierarchy !== null) {
+            $this->command?->line(
+                'Иерархия монастырей: проверено '.$hierarchy['scanned']
+                .', привязано храмов и часовен '.$hierarchy['linked']
+                .', неоднозначных '.$hierarchy['ambiguous'].'.'
+            );
+        } else {
+            $this->command?->comment(
+                'Иерархия монастырей не изменялась в режиме без очистки.'
+            );
+        }
     }
 }

@@ -1,4 +1,4 @@
-name: PHP syntax
+name: PHP and JavaScript syntax
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  php-syntax:
+  syntax:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,9 +21,17 @@ jobs:
           php-version: '8.0'
           coverage: none
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Lint PHP files
         shell: bash
         run: |
           set -euo pipefail
           find app bootstrap config database routes tests -type f -name '*.php' -print0 \
             | xargs -0 -n1 php -l
+
+      - name: Lint viewport map JavaScript
+        run: node --check public/js/map-viewport.js

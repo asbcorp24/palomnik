@@ -276,21 +276,18 @@ class PilgrimageObjectController extends Controller
         bool $informationChanged = false
     ): array {
         $markVerified = $request->boolean('mark_information_verified');
+        $statusWasSubmitted = array_key_exists('verification_status', $data);
         unset($data['mark_information_verified']);
 
         $status = $data['verification_status']
             ?? $object?->verification_status
             ?? PilgrimageObject::VERIFICATION_UNVERIFIED;
 
-        if ($markVerified || $status === PilgrimageObject::VERIFICATION_VERIFIED) {
+        if ($markVerified) {
             $data['verification_status'] = PilgrimageObject::VERIFICATION_VERIFIED;
-            $data['information_verified_at'] = $markVerified
-                ? now()
-                : ($data['information_verified_at'] ?? $object?->information_verified_at ?? now());
+            $data['information_verified_at'] = now();
             $data['verified_by'] = $request->user()->id;
-            $data['next_verification_at'] = $data['next_verification_at']
-                ?? $object?->next_verification_at
-                ?? now()->addDays(90);
+            $data['next_verification_at'] = $data['next_verification_at'] ?? now()->addDays(90);
 
             return $data;
         }
@@ -298,6 +295,20 @@ class PilgrimageObjectController extends Controller
         if ($informationChanged) {
             $data['verification_status'] = PilgrimageObject::VERIFICATION_NEEDS_REVIEW;
             $data['next_verification_at'] = now();
+
+            return $data;
+        }
+
+        if ($statusWasSubmitted && $status === PilgrimageObject::VERIFICATION_VERIFIED) {
+            $data['information_verified_at'] = $data['information_verified_at']
+                ?? $object?->information_verified_at
+                ?? now();
+            $data['verified_by'] = $request->user()->id;
+            $data['next_verification_at'] = $data['next_verification_at']
+                ?? $object?->next_verification_at
+                ?? now()->addDays(90);
+        } elseif (! $statusWasSubmitted && $object) {
+            unset($data['verification_status']);
         } else {
             $data['verification_status'] = $status;
         }

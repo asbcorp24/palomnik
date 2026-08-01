@@ -70,10 +70,14 @@ class PilgrimageObjectController extends Controller
 
     public function show(PilgrimageObject $pilgrimageObject): PilgrimageObjectResource
     {
+        $pilgrimageObject->loadMissing('objectType');
         $isScheduledForFuture = $pilgrimageObject->published_at
             && $pilgrimageObject->published_at->isFuture();
+        $typeIsVisible = $pilgrimageObject->objectType
+            && $pilgrimageObject->objectType->is_active
+            && $pilgrimageObject->objectType->is_public;
 
-        abort_if(! $pilgrimageObject->is_published || $isScheduledForFuture, 404);
+        abort_if(! $pilgrimageObject->is_published || $isScheduledForFuture || ! $typeIsVisible, 404);
 
         $pilgrimageObject->load([
             'objectType',

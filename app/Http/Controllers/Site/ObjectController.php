@@ -10,6 +10,7 @@ use App\Models\Vicariate;
 use App\Services\AnalyticsService;
 use App\Services\PilgrimageObjectFuzzySearch;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -21,14 +22,19 @@ class ObjectController extends Controller
         Request $request,
         PilgrimageObjectFuzzySearch $fuzzySearch,
         AnalyticsService $analytics
-    ): View {
+    ): View|JsonResponse {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', 'string', 'max:255'],
             'vicariate' => ['nullable', 'string', 'max:255'],
             'deanery' => ['nullable', 'string', 'max:255'],
             'sort' => ['nullable', 'in:name,newest'],
+            'picker' => ['nullable', 'in:route'],
         ]);
+
+        if (($filters['picker'] ?? null) === 'route') {
+            return $this->routePickerResults($filters);
+        }
 
         $query = PilgrimageObject::query()
             ->published()
@@ -169,6 +175,47 @@ class ObjectController extends Controller
             'isFavorite' => $isFavorite,
             'rating' => $object->reviews->avg('rating'),
         ]);
+    }
+
+    private function routePickerResults(array $filters): JsonResponse
+    {
+        $searchTerm = trim((string) ($filters['q'] ?? ''));
+
+        if (mb_strlen($searchTerm, 'UTF-8') < 2) {
+            return response()->json(['data' => []]);
+        }
+
+        $type = in_array($filters['type'] ?? null, ['temple', 'monastery'], true)
+            ? $filters['type']
+            : null;
+
+        $objects = PilgrimageObject::query()
+            ->published()
+            ->select(['id', 'name', 'address', 'object_type_id'])
+            ->with('objectType:id,name,slug')
+            ->whereHas('objectType', function (Builder $query) use ($type) {
+                $query->visible()
+                    ->whereIn('slug', ['temple', 'monastery'])
+                    ->when($type, fn (Builder $query, string $slug) => $query->where('slug', $slug));
+            })
+            ->where(function (Builder $query) use ($searchTerm) {
+                $query->where('name', 'like', '%'.$searchTerm.'%')
+                    ->orWhere('address', 'like', '%'.$searchTerm.'%');
+            })
+            ->orderByRaw('CASE WHEN name LIKE ? THEN 0 ELSE 1 END', [$searchTerm.'%'])
+            ->orderBy('name')
+            ->limit(20)
+            ->get()
+            ->map(fn (PilgrimageObject $object): array => [
+                'id' => (int) $object->id,
+                'name' => $object->name,
+                'address' => $object->address,
+                'type' => $object->objectType?->name ?: 'Паломнический объект',
+                'type_slug' => $object->objectType?->slug,
+            ])
+            ->values();
+
+        return response()->json(['data' => $objects]);
     }
 
     private function nearbyObjects(PilgrimageObject $object, float $radiusKm = 25, int $limit = 6): Collection

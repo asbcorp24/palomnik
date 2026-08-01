@@ -23,11 +23,13 @@ class RoutePlanController extends Controller
         return view('site.route-plans.index', compact('plans'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $selectedIds = array_map('intval', (array) old('object_ids', []));
+
         return view('site.route-plans.form', [
             'plan' => new UserRoutePlan(),
-            'objects' => $this->objects(),
+            'selectedObjects' => $this->selectedObjects($selectedIds),
             'transportModes' => $this->transportModes(),
         ]);
     }
@@ -66,9 +68,14 @@ class RoutePlanController extends Controller
         $this->authorizeOwner($request, $plan);
         $plan->load('objects');
 
+        $selectedIds = array_map(
+            'intval',
+            (array) old('object_ids', $plan->objects->pluck('id')->values()->all())
+        );
+
         return view('site.route-plans.form', [
             'plan' => $plan,
-            'objects' => $this->objects(),
+            'selectedObjects' => $this->selectedObjects($selectedIds),
             'transportModes' => $this->transportModes(),
         ]);
     }
@@ -184,13 +191,30 @@ class RoutePlanController extends Controller
         abort_unless($plan->user_id === $request->user()->id || $request->user()->isAdmin(), 403);
     }
 
-    private function objects()
+    private function selectedObjects(array $objectIds): Collection
     {
-        return PilgrimageObject::query()
+        $objectIds = collect($objectIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->take(20)
+            ->values();
+
+        if ($objectIds->isEmpty()) {
+            return collect();
+        }
+
+        $objects = PilgrimageObject::query()
             ->published()
-            ->with(['objectType', 'vicariate'])
-            ->orderBy('name')
-            ->get();
+            ->whereIn('id', $objectIds)
+            ->with('objectType:id,name,slug')
+            ->get(['id', 'name', 'address', 'object_type_id'])
+            ->keyBy('id');
+
+        return $objectIds
+            ->map(fn (int $id) => $objects->get($id))
+            ->filter()
+            ->values();
     }
 
     private function transportModes(): array

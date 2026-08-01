@@ -169,9 +169,18 @@ class PilgrimageObject extends Model
             ->withTimestamps();
     }
 
+    public function scopePubliclyVisible(Builder $query): Builder
+    {
+        return $query->whereIn(
+            'object_type_id',
+            ObjectType::query()->visible()->select('id')
+        );
+    }
+
     public function scopePublished(Builder $query): Builder
     {
         return $query
+            ->publiclyVisible()
             ->where('is_published', true)
             ->where(function (Builder $query) {
                 $query->whereNull('published_at')
@@ -188,9 +197,9 @@ class PilgrimageObject extends Model
         }
 
         return $query->where(function (Builder $query) use ($slug) {
-            $query->whereHas('objectType', fn (Builder $query) => $query->where('slug', $slug))
+            $query->whereHas('objectType', fn (Builder $query) => $query->visible()->where('slug', $slug))
                 ->orWhereHas('publishedChildObjects', function (Builder $query) use ($slug) {
-                    $query->whereHas('objectType', fn (Builder $query) => $query->where('slug', $slug));
+                    $query->whereHas('objectType', fn (Builder $query) => $query->visible()->where('slug', $slug));
                 });
         });
     }

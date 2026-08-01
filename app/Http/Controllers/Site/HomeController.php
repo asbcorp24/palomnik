@@ -24,6 +24,7 @@ class HomeController extends Controller
             ->get();
 
         $types = ObjectType::query()
+            ->visible()
             ->withCount([
                 'pilgrimageObjects as published_objects_count' => function (Builder $query) {
                     $query->published();
@@ -43,7 +44,7 @@ class HomeController extends Controller
 
         $stats = [
             'objects' => PilgrimageObject::query()->published()->count(),
-            'sanctities' => Sanctity::query()->count(),
+            'sanctities' => Sanctity::query()->where('slug', '<>', 'holy-spring')->count(),
             'routes' => PilgrimageRoute::query()->published()->count(),
         ];
 

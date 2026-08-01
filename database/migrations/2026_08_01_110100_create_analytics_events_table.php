@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('event', 80)->index();
             $table->string('entity_type', 80)->nullable()->index();
             $table->unsignedBigInteger('entity_id')->nullable()->index();
-            $table->string('search_query', 500)->nullable()->index();
+            $table->string('search_query', 255)->nullable()->index();
             $table->json('properties')->nullable();
             $table->string('path', 1000)->nullable();
             $table->string('referrer', 1000)->nullable();

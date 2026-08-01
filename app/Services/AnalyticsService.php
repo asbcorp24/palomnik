@@ -10,6 +10,8 @@ use Throwable;
 
 class AnalyticsService
 {
+    private static ?bool $tableAvailable = null;
+
     public function track(
         Request $request,
         string $event,
@@ -18,7 +20,7 @@ class AnalyticsService
         ?string $searchQuery = null
     ): void {
         try {
-            if (! Schema::hasTable('analytics_events') || $this->isBot($request)) {
+            if (! $this->tableAvailable() || $this->isBot($request)) {
                 return;
             }
 
@@ -29,7 +31,7 @@ class AnalyticsService
                 'entity_type' => $entity ? class_basename($entity) : null,
                 'entity_id' => $entity?->getKey(),
                 'search_query' => $searchQuery !== null
-                    ? mb_substr(trim($searchQuery), 0, 500)
+                    ? mb_substr(trim($searchQuery), 0, 255)
                     : null,
                 'properties' => $this->sanitizeProperties($properties),
                 'path' => mb_substr($request->path(), 0, 1000),
@@ -47,6 +49,15 @@ class AnalyticsService
         } catch (Throwable $exception) {
             report($exception);
         }
+    }
+
+    private function tableAvailable(): bool
+    {
+        if (self::$tableAvailable === null) {
+            self::$tableAvailable = Schema::hasTable('analytics_events');
+        }
+
+        return self::$tableAvailable;
     }
 
     private function sanitizeProperties(array $properties): array

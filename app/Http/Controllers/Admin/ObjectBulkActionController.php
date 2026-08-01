@@ -36,10 +36,16 @@ class ObjectBulkActionController extends Controller
                 'export',
                 'merge',
             ])],
-            'type_id' => ['nullable', 'integer', 'exists:object_types,id'],
-            'deanery_id' => ['nullable', 'integer', 'exists:deaneries,id'],
-            'route_id' => ['nullable', 'integer', 'exists:pilgrimage_routes,id'],
-            'master_id' => ['nullable', 'integer'],
+            'type_id' => ['nullable', 'required_if:action,set_type', 'integer', 'exists:object_types,id'],
+            'deanery_id' => ['nullable', 'required_if:action,set_deanery', 'integer', 'exists:deaneries,id'],
+            'route_id' => ['nullable', 'required_if:action,add_route', 'integer', 'exists:pilgrimage_routes,id'],
+            'master_id' => ['nullable', 'required_if:action,merge', 'integer'],
+        ], [
+            'object_ids.required' => 'Выберите хотя бы один объект.',
+            'type_id.required_if' => 'Выберите тип объекта.',
+            'deanery_id.required_if' => 'Выберите благочиние.',
+            'route_id.required_if' => 'Выберите маршрут.',
+            'master_id.required_if' => 'Выберите основной объект для объединения.',
         ]);
 
         $ids = collect($data['object_ids'])->map(fn ($id): int => (int) $id)->unique()->values();
@@ -128,7 +134,7 @@ class ObjectBulkActionController extends Controller
             }
 
             if ($data['action'] === 'set_type') {
-                $type = ObjectType::query()->where('is_active', true)->findOrFail((int) ($data['type_id'] ?? 0));
+                $type = ObjectType::query()->where('is_active', true)->findOrFail((int) $data['type_id']);
                 foreach ($objects as $object) {
                     $object->update(['object_type_id' => $type->id]);
                 }
@@ -137,7 +143,7 @@ class ObjectBulkActionController extends Controller
             }
 
             if ($data['action'] === 'set_deanery') {
-                $deanery = Deanery::query()->findOrFail((int) ($data['deanery_id'] ?? 0));
+                $deanery = Deanery::query()->findOrFail((int) $data['deanery_id']);
                 foreach ($objects as $object) {
                     $object->update([
                         'deanery_id' => $deanery->id,
@@ -149,7 +155,7 @@ class ObjectBulkActionController extends Controller
             }
 
             if ($data['action'] === 'add_route') {
-                $route = PilgrimageRoute::query()->findOrFail((int) ($data['route_id'] ?? 0));
+                $route = PilgrimageRoute::query()->findOrFail((int) $data['route_id']);
                 $sortOrder = (int) DB::table('pilgrimage_route_object')
                     ->where('pilgrimage_route_id', $route->id)
                     ->max('sort_order');

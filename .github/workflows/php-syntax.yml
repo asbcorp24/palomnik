@@ -33,5 +33,9 @@ jobs:
           find app bootstrap config database routes tests -type f -name '*.php' -print0 \
             | xargs -0 -n1 php -l
 
-      - name: Lint viewport map JavaScript
-        run: node --check public/js/map-viewport.js
+      - name: Lint map JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check public/js/map-viewport.js
+          node --check public/js/map-enhancements.js

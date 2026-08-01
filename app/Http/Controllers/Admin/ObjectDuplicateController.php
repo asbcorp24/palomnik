@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ObjectDuplicateCandidate;
 use App\Models\PilgrimageObject;
+use App\Services\AdminActivityLogger;
 use App\Services\ObjectDuplicateDetectionService;
 use App\Services\PilgrimageObjectMergeService;
 use Illuminate\Database\Eloquent\Builder;
@@ -67,10 +68,27 @@ class ObjectDuplicateController extends Controller
         ]);
     }
 
-    public function scan(ObjectDuplicateDetectionService $service): RedirectResponse
-    {
+    public function scan(
+        Request $request,
+        ObjectDuplicateDetectionService $service,
+        AdminActivityLogger $logger
+    ): RedirectResponse {
         set_time_limit(180);
         $result = $service->scan();
+
+        $logger->log(
+            'updated',
+            null,
+            null,
+            null,
+            ['operation' => 'duplicate_scan'] + $result,
+            $request->user()->id,
+            'web',
+            'duplicate-scan-'.now()->format('YmdHis'),
+            ObjectDuplicateCandidate::class,
+            null,
+            'Пересчёт возможных дублей'
+        );
 
         return redirect()
             ->route('admin.duplicates.index')
@@ -81,7 +99,8 @@ class ObjectDuplicateController extends Controller
 
     public function mark(
         Request $request,
-        ObjectDuplicateCandidate $candidate
+        ObjectDuplicateCandidate $candidate,
+        AdminActivityLogger $logger
     ): RedirectResponse {
         $data = $request->validate([
             'status' => ['required', Rule::in([
@@ -90,11 +109,26 @@ class ObjectDuplicateController extends Controller
             ])],
         ]);
 
+        $before = $candidate->getAttributes();
         $candidate->update([
             'status' => $data['status'],
             'reviewed_by' => $request->user()->id,
             'reviewed_at' => now(),
         ]);
+
+        $logger->log(
+            $data['status'] === ObjectDuplicateCandidate::STATUS_SEPARATE
+                ? 'duplicate_separate'
+                : 'duplicate_ignored',
+            $candidate,
+            $before,
+            $candidate->fresh()->getAttributes(),
+            [
+                'object_a_id' => $candidate->object_a_id,
+                'object_b_id' => $candidate->object_b_id,
+                'score' => $candidate->score,
+            ]
+        );
 
         $message = $data['status'] === ObjectDuplicateCandidate::STATUS_SEPARATE
             ? 'Объекты отмечены как самостоятельные.'
@@ -105,7 +139,8 @@ class ObjectDuplicateController extends Controller
 
     public function setParent(
         Request $request,
-        ObjectDuplicateCandidate $candidate
+        ObjectDuplicateCandidate $candidate,
+        AdminActivityLogger $logger
     ): RedirectResponse {
         $pair = [(int) $candidate->object_a_id, (int) $candidate->object_b_id];
         $data = $request->validate([
@@ -122,6 +157,7 @@ class ObjectDuplicateController extends Controller
 
         abort_if($this->wouldCreateCycle($parent, $child), 422, 'Такая связь создаст цикл в иерархии объектов.');
 
+        $oldParentId = $child->parent_object_id;
         $child->update(['parent_object_id' => $parent->id]);
         $candidate->update([
             'status' => ObjectDuplicateCandidate::STATUS_PARENTED,
@@ -129,13 +165,26 @@ class ObjectDuplicateController extends Controller
             'reviewed_at' => now(),
         ]);
 
+        $logger->log(
+            'parent_assigned',
+            $child,
+            ['parent_object_id' => $oldParentId],
+            ['parent_object_id' => $parent->id],
+            [
+                'candidate_id' => $candidate->id,
+                'parent_name' => $parent->name,
+                'child_name' => $child->name,
+            ]
+        );
+
         return back()->with('success', 'Объект «'.$child->name.'» установлен в составе «'.$parent->name.'».');
     }
 
     public function merge(
         Request $request,
         ObjectDuplicateCandidate $candidate,
-        PilgrimageObjectMergeService $service
+        PilgrimageObjectMergeService $service,
+        AdminActivityLogger $logger
     ): RedirectResponse {
         $pair = [(int) $candidate->object_a_id, (int) $candidate->object_b_id];
         $data = $request->validate([
@@ -149,9 +198,24 @@ class ObjectDuplicateController extends Controller
 
         $master = PilgrimageObject::query()->findOrFail($masterId);
         $duplicate = PilgrimageObject::query()->findOrFail($duplicateId);
+        $masterBefore = $logger->snapshot($master);
+        $duplicateBefore = $logger->snapshot($duplicate);
         $duplicateName = $duplicate->name;
 
-        $service->merge($master, $duplicate, $candidate, $request->user()->id);
+        $merged = $service->merge($master, $duplicate, $candidate, $request->user()->id);
+
+        $logger->log(
+            'merged',
+            $merged,
+            $masterBefore,
+            $logger->snapshot($merged),
+            [
+                'candidate_id' => $candidate->id,
+                'duplicate_id' => $duplicateId,
+                'duplicate_name' => $duplicateName,
+                'duplicate_snapshot' => $duplicateBefore,
+            ]
+        );
 
         return redirect()
             ->route('admin.duplicates.index')

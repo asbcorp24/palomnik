@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Services\AnalyticsService;
 use App\Services\MapTileCacheService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
@@ -71,7 +72,7 @@ class MapController extends Controller
         return $tiles->response($request, $z, $x, $y);
     }
 
-    public function route(Request $request): JsonResponse
+    public function route(Request $request, AnalyticsService $analytics): JsonResponse
     {
         $data = $request->validate([
             'locations' => ['required', 'array', 'min:2', 'max:25'],
@@ -132,6 +133,14 @@ class MapController extends Controller
         if (! is_array($route) || ! is_array($route['geometry'] ?? null)) {
             return response()->json(['message' => 'Маршрут не найден.'], 422);
         }
+
+        $analytics->track($request, 'map_route_built', null, [
+            'mode' => $data['mode'],
+            'points_count' => count($data['locations']),
+            'optimized' => $action === 'optimized_route',
+            'distance_meters' => (float) ($route['distance'] ?? 0),
+            'duration_seconds' => (float) ($route['duration'] ?? 0),
+        ]);
 
         return response()->json([
             'data' => [

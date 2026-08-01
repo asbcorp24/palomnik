@@ -70,7 +70,7 @@
                                 @if($trip->status === 'open' && ($remaining === null || $remaining > 0))
                                     @auth
                                         <button class="btn btn-pm-gold w-100" type="button" data-bs-toggle="collapse" data-bs-target="#bookingForm{{ $trip->id }}"><i class="bi bi-ticket-perforated me-2"></i>Записаться</button>
-                                        <div class="collapse mt-3" id="bookingForm{{ $trip->id }}">
+                                        <div class="collapse mt-3 booking-analytics-collapse" id="bookingForm{{ $trip->id }}" data-analytics-url="{{ route('analytics.booking-started', $trip) }}">
                                             <form class="p-3 bg-light rounded-4" method="POST" action="{{ route('bookings.store', $trip) }}">
                                                 @csrf
                                                 <div class="mb-2"><label class="form-label small">Количество участников</label><input class="form-control form-control-sm" name="participants_count" type="number" value="1" min="1" max="{{ $remaining !== null ? min(10, $remaining) : 10 }}" required></div>
@@ -99,3 +99,29 @@
     </div>
 </section>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    document.querySelectorAll('.booking-analytics-collapse').forEach(function (collapse) {
+        collapse.addEventListener('shown.bs.collapse', function () {
+            if (collapse.dataset.analyticsSent === '1' || !collapse.dataset.analyticsUrl) return;
+            collapse.dataset.analyticsSent = '1';
+            fetch(collapse.dataset.analyticsUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                keepalive: true,
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).catch(function () {
+                collapse.dataset.analyticsSent = '0';
+            });
+        }, {once:true});
+    });
+})();
+</script>
+@endpush

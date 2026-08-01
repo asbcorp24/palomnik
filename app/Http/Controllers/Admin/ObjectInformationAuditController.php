@@ -28,6 +28,7 @@ class ObjectInformationAuditController extends Controller
         $scoreSql = $this->completeness->sqlExpression();
 
         $query = $this->baseQuery()
+            ->select('pilgrimage_objects.*')
             ->selectRaw($scoreSql.' as editorial_completeness_score')
             ->when($filters['q'] ?? null, function (Builder $query, string $term): void {
                 $term = trim($term);

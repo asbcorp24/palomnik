@@ -14,6 +14,7 @@
 
         document.querySelectorAll('a[href]').forEach(anchor => {
             let url;
+
             try {
                 url = new URL(anchor.getAttribute('href'), window.location.origin);
             } catch (error) {
@@ -67,12 +68,17 @@
         ctx.restore();
     }
 
-    function drawTemple(ctx) {
-        ctx.save();
+    function setupWhiteStroke(ctx, width) {
         ctx.strokeStyle = '#ffffff';
+        ctx.fillStyle = '#ffffff';
+        ctx.lineWidth = width;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.lineWidth = 4;
+    }
+
+    function drawTemple(ctx) {
+        ctx.save();
+        setupWhiteStroke(ctx, 4);
         ctx.beginPath();
         ctx.moveTo(36, 15);
         ctx.lineTo(36, 51);
@@ -88,12 +94,7 @@
 
     function drawMonastery(ctx) {
         ctx.save();
-        ctx.strokeStyle = '#ffffff';
-        ctx.fillStyle = '#ffffff';
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
+        setupWhiteStroke(ctx, 3);
         ctx.strokeRect(21, 36, 30, 17);
         ctx.beginPath();
         ctx.moveTo(26, 36);
@@ -102,9 +103,6 @@
         ctx.moveTo(36, 36);
         ctx.quadraticCurveTo(36, 23, 42, 23);
         ctx.quadraticCurveTo(48, 23, 48, 36);
-        ctx.stroke();
-
-        ctx.beginPath();
         ctx.moveTo(31, 20);
         ctx.lineTo(31, 28);
         ctx.moveTo(28, 23);
@@ -114,7 +112,6 @@
         ctx.moveTo(38, 19);
         ctx.lineTo(46, 19);
         ctx.stroke();
-
         ctx.fillRect(27, 43, 4, 10);
         ctx.fillRect(40, 43, 5, 10);
         ctx.restore();
@@ -122,11 +119,7 @@
 
     function drawChapel(ctx) {
         ctx.save();
-        ctx.strokeStyle = '#ffffff';
-        ctx.fillStyle = '#ffffff';
-        ctx.lineWidth = 3.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        setupWhiteStroke(ctx, 3.5);
         ctx.beginPath();
         ctx.moveTo(22, 36);
         ctx.lineTo(36, 24);
@@ -155,11 +148,7 @@
 
     function drawHotel(ctx) {
         ctx.save();
-        ctx.strokeStyle = '#ffffff';
-        ctx.fillStyle = '#ffffff';
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        setupWhiteStroke(ctx, 4);
         ctx.beginPath();
         ctx.moveTo(20, 22);
         ctx.lineTo(20, 50);
@@ -176,10 +165,7 @@
 
     function drawCafe(ctx) {
         ctx.save();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        setupWhiteStroke(ctx, 4);
         ctx.beginPath();
         ctx.moveTo(23, 28);
         ctx.lineTo(23, 42);
@@ -207,6 +193,7 @@
         ctx.fillStyle = '#ffffff';
         ctx.translate(36, 35);
         ctx.beginPath();
+
         for (let index = 0; index < 10; index++) {
             const angle = -Math.PI / 2 + index * Math.PI / 5;
             const radius = index % 2 === 0 ? 17 : 7;
@@ -214,6 +201,7 @@
             const y = Math.sin(angle) * radius;
             if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
+
         ctx.closePath();
         ctx.fill();
         ctx.restore();
@@ -224,6 +212,7 @@
         canvas.width = 72;
         canvas.height = 86;
         const ctx = canvas.getContext('2d');
+
         drawPin(ctx, color);
 
         if (kind === 'monastery') drawMonastery(ctx);
@@ -245,14 +234,21 @@
         });
     }
 
-    function objectSymbolLayer(layer) {
-        return {
-            id: layer.id,
+    function replaceLayerWithSymbol(map, layerId, definition) {
+        if (!map.getLayer(layerId) || !map.getSource(definition.source)) return;
+
+        map.removeLayer(layerId);
+        map.addLayer(definition);
+    }
+
+    function installSymbolLayers(map) {
+        ensureMarkerImages(map);
+
+        replaceLayerWithSymbol(map, 'pilgrim-points', {
+            id: 'pilgrim-points',
             type: 'symbol',
-            source: layer.source,
-            filter: layer.filter,
-            minzoom: layer.minzoom,
-            maxzoom: layer.maxzoom,
+            source: 'pilgrim-objects',
+            filter: ['!', ['has', 'point_count']],
             layout: {
                 'icon-image': [
                     'match', ['get', 'type_slug'],
@@ -266,17 +262,12 @@
                 'icon-ignore-placement': false,
                 'icon-padding': 3,
             },
-        };
-    }
+        });
 
-    function poiSymbolLayer(layer) {
-        return {
-            id: layer.id,
+        replaceLayerWithSymbol(map, 'points-of-interest', {
+            id: 'points-of-interest',
             type: 'symbol',
-            source: layer.source,
-            filter: layer.filter,
-            minzoom: layer.minzoom,
-            maxzoom: layer.maxzoom,
+            source: 'points-of-interest',
             layout: {
                 'icon-image': [
                     'match', ['get', 'category'],
@@ -291,23 +282,8 @@
                 'icon-ignore-placement': false,
                 'icon-padding': 2,
             },
-        };
+        });
     }
-
-    const mapPrototype = window.maplibregl.Map.prototype;
-    const originalAddLayer = mapPrototype.addLayer;
-    const originalAddControl = mapPrototype.addControl;
-
-    mapPrototype.addLayer = function (layer, beforeId) {
-        if (layer && (layer.id === 'pilgrim-points' || layer.id === 'points-of-interest')) {
-            ensureMarkerImages(this);
-            layer = layer.id === 'pilgrim-points'
-                ? objectSymbolLayer(layer)
-                : poiSymbolLayer(layer);
-        }
-
-        return originalAddLayer.call(this, layer, beforeId);
-    };
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -339,6 +315,7 @@
                 credentials: 'same-origin',
             });
             const payload = await response.json();
+
             if (!response.ok || !payload.data) {
                 throw new Error(payload.message || 'Объект не найден.');
             }
@@ -389,10 +366,16 @@
         }
     }
 
+    const mapPrototype = window.maplibregl.Map.prototype;
+    const originalAddControl = mapPrototype.addControl;
+
     mapPrototype.addControl = function () {
         if (!this.__pilgrimEnhancementsBound) {
             this.__pilgrimEnhancementsBound = true;
-            this.once('load', () => focusRequestedObject(this));
+            this.once('load', () => {
+                window.setTimeout(() => installSymbolLayers(this), 0);
+                focusRequestedObject(this);
+            });
         }
 
         return originalAddControl.apply(this, arguments);

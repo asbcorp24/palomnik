@@ -20,7 +20,10 @@ class RouteController extends Controller
 
         $routes = PilgrimageRoute::query()
             ->published()
-            ->withCount(['objects', 'trips'])
+            ->withCount([
+                'objects' => fn ($query) => $query->published(),
+                'trips',
+            ])
             ->when($filters['q'] ?? null, function (Builder $query, string $term) {
                 $term = trim($term);
                 $query->where(function (Builder $query) use ($term) {
@@ -49,6 +52,7 @@ class RouteController extends Controller
         abort_if(! $pilgrimageRoute->is_published || $isScheduledForFuture, 404);
 
         $pilgrimageRoute->load([
+            'objects' => fn ($query) => $query->published(),
             'objects.objectType',
             'objects.coverMedia',
             'pilgrimagePhotos' => fn ($query) => $query

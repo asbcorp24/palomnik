@@ -19,6 +19,7 @@
         <h1 class="page-title">Аналитика поведения</h1>
         <div class="page-subtitle">Поиски, просмотры, маршруты, избранное и воронка бронирования.</div>
     </div>
+    <a class="btn btn-outline-green" href="{{ route('admin.activity.index') }}"><i class="bi bi-journal-text me-1"></i>Журнал администраторов</a>
 </div>
 
 <div class="card-soft p-3 mb-4">
@@ -45,6 +46,7 @@
         ['object_views','bi-building','Просмотров храмов'],
         ['route_views','bi-signpost-split','Просмотров маршрутов'],
         ['day_routes','bi-stars','Маршрутов дня'],
+        ['map_routes','bi-map','Построений пути'],
         ['favorites','bi-heart','Добавлений в избранное'],
     ] as $card)
         <div class="col-6 col-lg-3 col-xxl-2">
@@ -83,10 +85,26 @@
             <h2 class="h5 mb-1">Воронка бронирования</h2>
             <div class="small text-secondary mb-4">От открытия формы до созданной заявки</div>
             @php($started = max(1, (int)$summary['booking_started']))
+            @php($submitted = max(1, (int)$summary['booking_submitted']))
             <div class="d-grid gap-3">
-                <div class="funnel-step"><div class="d-flex justify-content-between"><strong>Начали заполнять</strong><span>{{ $summary['booking_started'] }}</span></div><div class="analytics-bar mt-2"><span style="width:100%"></span></div></div>
-                <div class="funnel-step"><div class="d-flex justify-content-between"><strong>Создали заявку</strong><span>{{ $summary['booking_created'] }}</span></div><div class="analytics-bar mt-2"><span style="width:{{ min(100, round(($summary['booking_created'] / $started) * 100)) }}%"></span></div><div class="small text-secondary mt-2">Конверсия: {{ $summary['booking_started'] ? number_format(($summary['booking_created'] / $summary['booking_started']) * 100, 1, ',', ' ') : 0 }}%</div></div>
-                <div class="funnel-step"><div class="d-flex justify-content-between"><strong>Отменили</strong><span>{{ $summary['booking_cancelled'] }}</span></div><div class="analytics-bar mt-2"><span style="width:{{ min(100, round(($summary['booking_cancelled'] / max(1,$summary['booking_created'])) * 100)) }}%"></span></div></div>
+                <div class="funnel-step">
+                    <div class="d-flex justify-content-between"><strong>Открыли форму</strong><span>{{ $summary['booking_started'] }}</span></div>
+                    <div class="analytics-bar mt-2"><span style="width:100%"></span></div>
+                </div>
+                <div class="funnel-step">
+                    <div class="d-flex justify-content-between"><strong>Отправили форму</strong><span>{{ $summary['booking_submitted'] }}</span></div>
+                    <div class="analytics-bar mt-2"><span style="width:{{ min(100, round(($summary['booking_submitted'] / $started) * 100)) }}%"></span></div>
+                    <div class="small text-secondary mt-2">До отправки дошли: {{ $summary['booking_started'] ? number_format(($summary['booking_submitted'] / $summary['booking_started']) * 100, 1, ',', ' ') : 0 }}%</div>
+                </div>
+                <div class="funnel-step">
+                    <div class="d-flex justify-content-between"><strong>Создали заявку</strong><span>{{ $summary['booking_created'] }}</span></div>
+                    <div class="analytics-bar mt-2"><span style="width:{{ min(100, round(($summary['booking_created'] / $started) * 100)) }}%"></span></div>
+                    <div class="small text-secondary mt-2">Итоговая конверсия: {{ $summary['booking_started'] ? number_format(($summary['booking_created'] / $summary['booking_started']) * 100, 1, ',', ' ') : 0 }}% · успешных отправок: {{ $summary['booking_submitted'] ? number_format(($summary['booking_created'] / $summary['booking_submitted']) * 100, 1, ',', ' ') : 0 }}%</div>
+                </div>
+                <div class="funnel-step">
+                    <div class="d-flex justify-content-between"><strong>Отменили</strong><span>{{ $summary['booking_cancelled'] }}</span></div>
+                    <div class="analytics-bar mt-2"><span style="width:{{ min(100, round(($summary['booking_cancelled'] / max(1,$summary['booking_created'])) * 100)) }}%"></span></div>
+                </div>
             </div>
         </div>
     </div>

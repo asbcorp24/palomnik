@@ -103,7 +103,7 @@ class DirectoryController extends Controller
         $item = $config['model']::query()->findOrFail($id);
 
         if ($resource === 'object-types' && $item->pilgrimageObjects()->withTrashed()->exists()) {
-            return back()->with('error', 'Тип используется в объектах, включая архивные, и не может быть удалён.');
+            return back()->with('error', 'Тип используется в объектах, включая архивные, и не может быть удалён. Отключите его или сделайте внутренним.');
         }
 
         if ($resource === 'vicariates' && ($item->deaneries()->exists() || $item->pilgrimageObjects()->withTrashed()->exists())) {
@@ -144,6 +144,8 @@ class DirectoryController extends Controller
                 'marker_color' => ['nullable', 'string', 'max:16'],
                 'icon' => ['nullable', 'string', 'max:255'],
                 'sort_order' => ['nullable', 'integer', 'min:0', 'max:100000'],
+                'is_active' => ['nullable', 'boolean'],
+                'is_public' => ['nullable', 'boolean'],
             ];
         } elseif ($resource === 'deaneries') {
             $rules += [
@@ -164,6 +166,8 @@ class DirectoryController extends Controller
 
         if ($resource === 'object-types') {
             $data['sort_order'] = (int) ($data['sort_order'] ?? 0);
+            $data['is_active'] = $request->boolean('is_active');
+            $data['is_public'] = $request->boolean('is_public');
         }
 
         return $data;

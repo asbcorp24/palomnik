@@ -25,7 +25,8 @@ class MonasteryTempleLinkService
         bool $apply = false,
         bool $osmOnly = true,
         bool $includeChapels = true,
-        int $radiusMeters = self::DEFAULT_RADIUS_METERS
+        int $radiusMeters = self::DEFAULT_RADIUS_METERS,
+        bool $aggressive = false
     ): array {
         $radiusMeters = max(
             self::MIN_RADIUS_METERS,
@@ -38,6 +39,7 @@ class MonasteryTempleLinkService
             'osm_only' => $osmOnly,
             'include_chapels' => $includeChapels,
             'radius_meters' => $radiusMeters,
+            'aggressive' => $aggressive,
             'monasteries' => $monasteries->count(),
             'scanned' => 0,
             'would_link' => 0,
@@ -63,12 +65,18 @@ class MonasteryTempleLinkService
         $query->orderBy('id')->chunkById(250, function ($children) use (
             $monasteries,
             $radiusMeters,
+            $aggressive,
             $apply,
             &$stats
         ): void {
             foreach ($children as $child) {
                 $stats['scanned']++;
-                $resolution = $this->resolveParent($child, $monasteries, $radiusMeters);
+                $resolution = $this->resolveParent(
+                    $child,
+                    $monasteries,
+                    $radiusMeters,
+                    $aggressive
+                );
 
                 if ($resolution['status'] === 'none') {
                     $stats['no_candidate']++;
@@ -129,6 +137,7 @@ class MonasteryTempleLinkService
                     'radius_meters' => $stats['radius_meters'],
                     'osm_only' => $stats['osm_only'],
                     'include_chapels' => $stats['include_chapels'],
+                    'aggressive' => $stats['aggressive'],
                     'samples' => array_slice($stats['samples'], 0, 50),
                 ],
                 null,
@@ -176,7 +185,8 @@ class MonasteryTempleLinkService
     private function resolveParent(
         PilgrimageObject $child,
         Collection $monasteries,
-        int $radiusMeters
+        int $radiusMeters,
+        bool $aggressive
     ): array {
         $ranked = [];
 
@@ -219,11 +229,20 @@ class MonasteryTempleLinkService
         $second = $ranked[1] ?? null;
         $uniqueVeryClose = $best['distance'] <= 35
             && ($second === null || $second['distance'] >= 100);
+        $uniqueNearby = $aggressive
+            && $best['distance'] <= 180
+            && ($second === null
+                || $second['distance'] >= max(300, $best['distance'] + 140));
         $qualified = ($best['strong'] && $best['score'] >= 80)
-            || $uniqueVeryClose;
+            || $uniqueVeryClose
+            || $uniqueNearby;
 
         if (! $qualified) {
             return ['status' => 'none'];
+        }
+
+        if ($uniqueNearby && ! $best['strong']) {
+            $best['signals'][] = 'unique_nearest_monastery';
         }
 
         $scoreGap = $second === null ? PHP_INT_MAX : $best['score'] - $second['score'];
@@ -267,14 +286,18 @@ class MonasteryTempleLinkService
         $score = $this->distanceScore($distance);
         $childAddress = $this->normalizeAddress($child->address);
         $parentAddress = $this->normalizeAddress($monastery->address);
+        $childWebsite = $this->normalizeWebsite($child->website);
+        $parentWebsite = $this->normalizeWebsite($monastery->website);
+        $childPhone = $this->normalizePhone($child->phone);
+        $parentPhone = $this->normalizePhone($monastery->phone);
         $sameAddress = $childAddress !== ''
             && $parentAddress !== ''
             && ! $this->isGenericAddress($childAddress)
             && $childAddress === $parentAddress;
-        $sameWebsite = $this->normalizeWebsite($child->website) !== null
-            && $this->normalizeWebsite($child->website) === $this->normalizeWebsite($monastery->website);
-        $samePhone = $this->normalizePhone($child->phone) !== null
-            && $this->normalizePhone($child->phone) === $this->normalizePhone($monastery->phone);
+        $sameWebsite = $childWebsite !== null
+            && $childWebsite === $parentWebsite;
+        $samePhone = $childPhone !== null
+            && $childPhone === $parentPhone;
         $nameRelated = $this->namesIndicateMonasteryRelation($child->name, $monastery->name);
 
         if ($sameAddress) {

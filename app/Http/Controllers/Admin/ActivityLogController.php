@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use App\Models\PilgrimageObject;
 use App\Models\SiteColorScheme;
 use App\Models\SiteSetting;
+use App\Models\User;
 use App\Services\AdminActivityLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -59,8 +60,8 @@ class ActivityLogController extends Controller
                 ->distinct()
                 ->orderBy('entity_type')
                 ->pluck('entity_type'),
-            'users' => \App\Models\User::query()
-                ->whereHas('roles', fn (Builder $query) => $query->whereIn('slug', ['admin', 'super-admin']))
+            'users' => User::query()
+                ->whereIn('role', [User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN])
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']),
         ]);

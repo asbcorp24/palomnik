@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\PointOfInterest;
 use App\Services\MapViewportService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -50,7 +49,7 @@ class MapViewportController extends Controller
             'max_lat' => ['required', 'numeric', 'between:-90,90'],
             'min_lng' => ['required', 'numeric', 'between:-180,180'],
             'max_lng' => ['required', 'numeric', 'between:-180,180'],
-            'zoom' => ['required', 'numeric', 'between:3,20'],
+            'zoom' => ['required', 'numeric', 'between:0,20'],
             'q' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', 'string', 'max:255'],
             'vicariate' => ['nullable', 'string', 'max:255'],
@@ -74,14 +73,6 @@ class MapViewportController extends Controller
         if ((float) $filters['min_lng'] >= (float) $filters['max_lng']) {
             throw ValidationException::withMessages([
                 'max_lng' => 'Восточная граница должна быть больше западной.',
-            ]);
-        }
-
-        $latitudeSpan = (float) $filters['max_lat'] - (float) $filters['min_lat'];
-        $longitudeSpan = (float) $filters['max_lng'] - (float) $filters['min_lng'];
-        if ($latitudeSpan > 45 || $longitudeSpan > 90) {
-            throw ValidationException::withMessages([
-                'bounds' => 'Запрошена слишком большая область карты.',
             ]);
         }
 

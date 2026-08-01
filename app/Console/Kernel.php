@@ -18,6 +18,10 @@ class Kernel extends ConsoleKernel
         $schedule->command('objects:mark-information-outdated')
             ->dailyAt('02:30')
             ->withoutOverlapping();
+
+        $schedule->command('analytics:prune --days=400')
+            ->dailyAt('03:10')
+            ->withoutOverlapping();
     }
 
     /**

@@ -38,16 +38,17 @@ class MoscowRegionChurchSeeder extends Seeder
             );
         }
 
-        $allowedTypes = ['temple', 'monastery', 'chapel', 'holy-spring'];
+        $allowedTypes = ['temple', 'monastery', 'chapel'];
 
         $typeIds = ObjectType::query()
+            ->visible()
             ->whereIn('slug', $allowedTypes)
             ->pluck('id', 'slug');
 
         foreach ($allowedTypes as $slug) {
             if (! $typeIds->has($slug)) {
                 throw new RuntimeException(
-                    'Не найден тип объекта '.$slug
+                    'Не найден активный публичный тип объекта '.$slug
                     .'. Сначала выполните CatalogSeeder.'
                 );
             }

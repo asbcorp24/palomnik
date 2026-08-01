@@ -12,6 +12,7 @@ class LinkMonasteryTemples extends Command
         {--apply : Сохранить найденные связи в базе}
         {--all : Обрабатывать также объекты, созданные вручную, а не только OSM}
         {--temples-only : Не привязывать часовни}
+        {--aggressive : Связывать единственный ближайший монастырь в пределах 180 метров}
         {--radius=600 : Максимальное расстояние поиска монастыря в метрах}';
 
     protected $description = 'Найти храмы на территории монастырей и заполнить parent_object_id';
@@ -21,6 +22,7 @@ class LinkMonasteryTemples extends Command
         $apply = (bool) $this->option('apply');
         $osmOnly = ! (bool) $this->option('all');
         $includeChapels = ! (bool) $this->option('temples-only');
+        $aggressive = (bool) $this->option('aggressive');
         $radius = max(100, min(1500, (int) $this->option('radius')));
 
         $this->info($apply
@@ -29,9 +31,16 @@ class LinkMonasteryTemples extends Command
         $this->line('Объекты: '.($osmOnly ? 'только импортированные OSM' : 'все опубликованные'));
         $this->line('Часовни: '.($includeChapels ? 'учитываются' : 'не учитываются'));
         $this->line('Радиус поиска: '.$radius.' м');
+        $this->line('Усиленный поиск: '.($aggressive ? 'да' : 'нет'));
 
         try {
-            $result = $service->link($apply, $osmOnly, $includeChapels, $radius);
+            $result = $service->link(
+                $apply,
+                $osmOnly,
+                $includeChapels,
+                $radius,
+                $aggressive
+            );
         } catch (Throwable $exception) {
             report($exception);
             $this->error($exception->getMessage());

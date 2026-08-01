@@ -168,29 +168,41 @@
 </div>
 @endsection
 
+@php
+    $pilgrimMapConfig = [
+        'styleUrl' => config('palomnik.maps.style_url') ?: route('api.v1.map.style'),
+        'objectsUrl' => route('api.v1.map.objects'),
+        'objectDetailUrl' => url('/api/v1/map/objects/__ID__'),
+        'pointsOfInterestUrl' => route('api.v1.map.points-of-interest'),
+        'pointOfInterestDetailUrl' => url('/api/v1/map/points-of-interest/__ID__'),
+        'routeUrl' => route('api.v1.map.route'),
+        'satelliteUrl' => config('palomnik.maps.satellite_tiles'),
+        'historicUrl' => config('palomnik.maps.historic_tiles'),
+        'attribution' => config('palomnik.maps.attribution'),
+        'filters' => [
+            'q' => $filters['q'] ?? null,
+            'type' => $filters['type'] ?? null,
+            'vicariate' => $filters['vicariate'] ?? null,
+            'deanery' => $filters['deanery'] ?? null,
+            'sanctity' => $filters['sanctity'] ?? null,
+        ],
+        'selectedRoute' => $selectedRoute,
+        'focusedPointOfInterestId' => $focusedPointOfInterestId,
+    ];
+@endphp
+
 @push('scripts')
 <script src="{{ asset('assets/vendor/maplibre/maplibre-gl.js') }}"></script>
 <script>
-window.pilgrimMapConfig = @json([
-    'styleUrl' => config('palomnik.maps.style_url') ?: route('api.v1.map.style'),
-    'objectsUrl' => route('api.v1.map.objects'),
-    'objectDetailUrl' => url('/api/v1/map/objects/__ID__'),
-    'pointsOfInterestUrl' => route('api.v1.map.points-of-interest'),
-    'pointOfInterestDetailUrl' => url('/api/v1/map/points-of-interest/__ID__'),
-    'routeUrl' => route('api.v1.map.route'),
-    'satelliteUrl' => config('palomnik.maps.satellite_tiles'),
-    'historicUrl' => config('palomnik.maps.historic_tiles'),
-    'attribution' => config('palomnik.maps.attribution'),
-    'filters' => [
-        'q' => $filters['q'] ?? null,
-        'type' => $filters['type'] ?? null,
-        'vicariate' => $filters['vicariate'] ?? null,
-        'deanery' => $filters['deanery'] ?? null,
-        'sanctity' => $filters['sanctity'] ?? null,
-    ],
-    'selectedRoute' => $selectedRoute,
-    'focusedPointOfInterestId' => $focusedPointOfInterestId,
-], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+window.pilgrimMapConfig = {!! json_encode(
+    $pilgrimMapConfig,
+    JSON_UNESCAPED_UNICODE
+        | JSON_UNESCAPED_SLASHES
+        | JSON_HEX_TAG
+        | JSON_HEX_APOS
+        | JSON_HEX_AMP
+        | JSON_HEX_QUOT
+) !!};
 </script>
 <script src="{{ asset('js/map-viewport.js') }}"></script>
 @endpush

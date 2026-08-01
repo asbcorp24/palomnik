@@ -109,6 +109,7 @@ class ObjectInformationAuditController extends Controller
     private function baseQuery(): Builder
     {
         return PilgrimageObject::query()
+            ->publiclyVisible()
             ->select('pilgrimage_objects.*')
             ->with(['objectType', 'verifier', 'coverMedia'])
             ->withCount([
@@ -120,7 +121,7 @@ class ObjectInformationAuditController extends Controller
 
     private function countForIssue(string $issue): int
     {
-        $query = PilgrimageObject::query();
+        $query = PilgrimageObject::query()->publiclyVisible();
         $this->applyIssueFilter($query, $issue);
 
         return $query->count();

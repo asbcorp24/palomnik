@@ -25,6 +25,7 @@
     let routeStopMarkers = [];
     let routeRequestId = 0;
     let activePopup = null;
+    let mapReady = false;
 
     function filterDeaneries() {
         if (!vicariate || !deanery) return;
@@ -127,7 +128,7 @@
     }
 
     async function loadViewport() {
-        if (!map.loaded()) return;
+        if (!mapReady) return;
 
         const requestId = ++viewportRequestId;
         loadingStatus?.classList.remove('d-none');
@@ -434,6 +435,7 @@
         addRasterLayers();
         addObjectLayers();
         addPoiLayers();
+        mapReady = true;
 
         if (config.selectedRoute?.points?.length >= 2) {
             buildPublishedRoute(config.selectedRoute);
@@ -517,7 +519,7 @@
     }));
 
     routeMode?.addEventListener('change', () => {
-        if (config.selectedRoute?.points?.length >= 2 && map.loaded()) {
+        if (config.selectedRoute?.points?.length >= 2 && mapReady) {
             buildPublishedRoute(config.selectedRoute);
         }
     });

@@ -103,7 +103,6 @@ class PilgrimageObjectMergeService
             'verification_status',
             'vicariate_id',
             'deanery_id',
-            'parent_object_id',
         ] as $field) {
             if (blank($master->{$field}) && filled($duplicate->{$field})) {
                 $master->{$field} = $duplicate->{$field};

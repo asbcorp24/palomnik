@@ -44,7 +44,7 @@
             @if($resource === 'sanctities')
                 <div class="col-lg-6">
                     <label class="form-label" for="type">Тип святыни</label>
-                    <input class="form-control" id="type" name="type" value="{{ old('type', $item->type) }}" maxlength="64" placeholder="икона, мощи, источник...">
+                    <input class="form-control" id="type" name="type" value="{{ old('type', $item->type) }}" maxlength="64" placeholder="икона, мощи...">
                 </div>
                 <div class="col-lg-6">
                     <label class="form-label" for="image">Фотография святыни</label>
@@ -74,6 +74,21 @@
                 <div class="col-md-4">
                     <label class="form-label" for="sort_order">Порядок</label>
                     <input class="form-control" id="sort_order" type="number" min="0" name="sort_order" value="{{ old('sort_order', $item->sort_order ?? 0) }}">
+                </div>
+
+                <div class="col-md-6">
+                    <div class="form-check form-switch border rounded-4 p-3 ps-5 h-100">
+                        <input class="form-check-input" id="is_active" type="checkbox" name="is_active" value="1" @checked((bool) old('is_active', $item->exists ? $item->is_active : true))>
+                        <label class="form-check-label fw-semibold" for="is_active">Тип активен</label>
+                        <div class="form-text">Неактивный тип нельзя использовать для новых публичных объектов. Старые записи сохраняются.</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch border rounded-4 p-3 ps-5 h-100">
+                        <input class="form-check-input" id="is_public" type="checkbox" name="is_public" value="1" @checked((bool) old('is_public', $item->exists ? $item->is_public : true))>
+                        <label class="form-check-label fw-semibold" for="is_public">Показывать на сайте и в API</label>
+                        <div class="form-text">Отключите для внутренних и архивных типов. Связанные объекты останутся доступны администраторам.</div>
+                    </div>
                 </div>
             @else
                 <div class="col-12">

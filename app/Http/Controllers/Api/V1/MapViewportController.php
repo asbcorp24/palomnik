@@ -77,7 +77,8 @@ class MapViewportController extends Controller
         }
 
         if ($withCategories) {
-            $filters['categories'] = array_values(array_unique($filters['categories'] ?? []));
+            $categories = $filters['categories'] ?? ['__none__'];
+            $filters['categories'] = array_values(array_unique($categories));
             sort($filters['categories']);
         }
 

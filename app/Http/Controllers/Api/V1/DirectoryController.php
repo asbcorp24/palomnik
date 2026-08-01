@@ -16,6 +16,7 @@ class DirectoryController extends Controller
     {
         return response()->json([
             'data' => ObjectType::query()
+                ->visible()
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug', 'marker_color', 'icon']),
@@ -60,6 +61,7 @@ class DirectoryController extends Controller
         ]);
 
         $sanctities = Sanctity::query()
+            ->where('slug', '<>', 'holy-spring')
             ->when($validated['q'] ?? null, function ($query, string $term) {
                 $query->where('name', 'like', '%'.trim($term).'%');
             })

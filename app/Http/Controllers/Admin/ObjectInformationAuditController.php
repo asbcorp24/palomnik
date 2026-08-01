@@ -114,7 +114,7 @@ class ObjectInformationAuditController extends Controller
             ->withCount([
                 'updateRequests as pending_update_requests_count' => fn (Builder $query) => $query->where('status', 'pending'),
                 'media as image_media_count' => fn (Builder $query) => $query->where('type', 'image'),
-                'sanctities',
+                'sanctities' => fn (Builder $query) => $query->where('slug', '<>', 'holy-spring'),
             ]);
     }
 

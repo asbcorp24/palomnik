@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\PilgrimageObject;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +28,6 @@ class NormalizeInterfaceTerminology
 
         $html = $this->replaceTerms($html);
         $html = $this->removeHolySpringControls($html);
-        $html = $this->injectObjectHierarchy($request, $html);
         $html = $this->injectMapEnhancements($html);
 
         $response->setContent($html);
@@ -106,76 +104,6 @@ class NormalizeInterfaceTerminology
         ];
 
         return preg_replace($patterns, '', $html) ?: $html;
-    }
-
-    private function injectObjectHierarchy(Request $request, string $html): string
-    {
-        if (! $request->routeIs('objects.show') || str_contains($html, 'id="objectHierarchy"')) {
-            return $html;
-        }
-
-        $object = $request->route('object');
-        if (! $object instanceof PilgrimageObject) {
-            $slug = trim((string) $object);
-            if ($slug === '') {
-                return $html;
-            }
-
-            $object = PilgrimageObject::query()
-                ->published()
-                ->where('slug', $slug)
-                ->first();
-        }
-
-        if (! $object) {
-            return $html;
-        }
-
-        $object->loadMissing('objectType');
-        $hierarchyParent = null;
-
-        if ($object->parent_object_id) {
-            $hierarchyParent = PilgrimageObject::query()
-                ->published()
-                ->whereKey($object->parent_object_id)
-                ->whereHas('objectType', fn ($query) => $query
-                    ->visible()
-                    ->where('slug', 'monastery'))
-                ->with(['objectType', 'coverMedia'])
-                ->first();
-        }
-
-        $hierarchyChildren = collect();
-        if ($object->objectType?->slug === 'monastery') {
-            $hierarchyChildren = PilgrimageObject::query()
-                ->published()
-                ->where('parent_object_id', $object->id)
-                ->whereHas('objectType', fn ($query) => $query
-                    ->visible()
-                    ->whereIn('slug', ['temple', 'chapel']))
-                ->with(['objectType', 'coverMedia'])
-                ->orderBy('name')
-                ->get();
-        }
-
-        if (! $hierarchyParent && $hierarchyChildren->isEmpty()) {
-            return $html;
-        }
-
-        $fragment = view('site.objects._hierarchy', [
-            'hierarchyParent' => $hierarchyParent,
-            'hierarchyChildren' => $hierarchyChildren,
-        ])->render();
-
-        $needle = '<section class="section-space pt-5">';
-        $position = strpos($html, $needle);
-        if ($position === false) {
-            return $html;
-        }
-
-        return substr($html, 0, $position)
-            .$fragment."\n"
-            .substr($html, $position);
     }
 
     private function injectMapEnhancements(string $html): string

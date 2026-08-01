@@ -83,6 +83,14 @@ class PilgrimageObjectResource extends JsonResource
                 'parking' => $this->parking_info,
                 'accessibility' => $this->accessibility_info,
             ],
+            'information_verification' => [
+                'status' => $this->verification_status,
+                'status_label' => \App\Models\PilgrimageObject::verificationStatusLabels()[$this->verification_status] ?? $this->verification_status,
+                'verified_at' => optional($this->information_verified_at)->toIso8601String(),
+                'next_verification_at' => optional($this->next_verification_at)->toIso8601String(),
+                'is_current' => $this->isInformationCurrent(),
+                'source_url' => $this->information_source_url,
+            ],
             'cover' => $this->whenLoaded('coverMedia', function () {
                 return $this->coverMedia ? [
                     'url' => $this->coverMedia->url,
@@ -90,17 +98,19 @@ class PilgrimageObjectResource extends JsonResource
                 ] : null;
             }),
             'sanctities' => $this->whenLoaded('sanctities', function () {
-                return $this->sanctities->map(function ($sanctity) {
-                    return [
-                        'id' => $sanctity->id,
-                        'name' => $sanctity->name,
-                        'slug' => $sanctity->slug,
-                        'type' => $sanctity->type,
-                        'description' => $sanctity->description,
-                        'image_url' => $sanctity->image_url,
-                        'note' => $sanctity->pivot->note,
-                    ];
-                })->values();
+                return $this->sanctities
+                    ->where('slug', '<>', 'holy-spring')
+                    ->map(function ($sanctity) {
+                        return [
+                            'id' => $sanctity->id,
+                            'name' => $sanctity->name,
+                            'slug' => $sanctity->slug,
+                            'type' => $sanctity->type,
+                            'description' => $sanctity->description,
+                            'image_url' => $sanctity->image_url,
+                            'note' => $sanctity->pivot->note,
+                        ];
+                    })->values();
             }),
             'media' => $this->whenLoaded('media', function () {
                 return $this->media->map(function ($media) {

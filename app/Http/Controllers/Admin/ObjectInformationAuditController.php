@@ -28,7 +28,6 @@ class ObjectInformationAuditController extends Controller
         $scoreSql = $this->completeness->sqlExpression();
 
         $query = $this->baseQuery()
-            ->select('pilgrimage_objects.*')
             ->selectRaw($scoreSql.' as editorial_completeness_score')
             ->when($filters['q'] ?? null, function (Builder $query, string $term): void {
                 $term = trim($term);
@@ -110,6 +109,7 @@ class ObjectInformationAuditController extends Controller
     private function baseQuery(): Builder
     {
         return PilgrimageObject::query()
+            ->select('pilgrimage_objects.*')
             ->with(['objectType', 'verifier', 'coverMedia'])
             ->withCount([
                 'updateRequests as pending_update_requests_count' => fn (Builder $query) => $query->where('status', 'pending'),

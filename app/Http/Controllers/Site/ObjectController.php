@@ -72,7 +72,7 @@ class ObjectController extends Controller
 
         return view('site.objects.index', [
             'objects' => $objects,
-            'types' => ObjectType::query()->orderBy('sort_order')->orderBy('name')->get(),
+            'types' => ObjectType::query()->visible()->orderBy('sort_order')->orderBy('name')->get(),
             'vicariates' => Vicariate::query()->orderBy('name')->get(),
             'deaneries' => Deanery::query()->with('vicariate')->orderBy('name')->get(),
             'filters' => $filters,
@@ -81,8 +81,13 @@ class ObjectController extends Controller
 
     public function show(PilgrimageObject $object): View
     {
+        $object->loadMissing('objectType');
         $isScheduledForFuture = $object->published_at && $object->published_at->isFuture();
-        abort_if(! $object->is_published || $isScheduledForFuture, 404);
+        $typeIsVisible = $object->objectType
+            && $object->objectType->is_active
+            && $object->objectType->is_public;
+
+        abort_if(! $object->is_published || $isScheduledForFuture || ! $typeIsVisible, 404);
 
         $object->load([
             'objectType',

@@ -35,7 +35,10 @@ class ObjectEditorialCompletenessService
             'coordinates' => $this->criterion(
                 'Координаты',
                 self::WEIGHTS['coordinates'],
-                $object->latitude !== null && $object->longitude !== null
+                $object->latitude !== null
+                    && $object->longitude !== null
+                    && (float) $object->latitude !== 0.0
+                    && (float) $object->longitude !== 0.0
             ),
             'description' => $this->criterion(
                 'Описание',
@@ -76,7 +79,7 @@ class ObjectEditorialCompletenessService
         return "(
             CASE WHEN TRIM(COALESCE({$table}.name, '')) <> '' THEN 10 ELSE 0 END
             + CASE WHEN TRIM(COALESCE({$table}.address, '')) <> '' THEN 10 ELSE 0 END
-            + CASE WHEN {$table}.latitude IS NOT NULL AND {$table}.longitude IS NOT NULL THEN 10 ELSE 0 END
+            + CASE WHEN {$table}.latitude IS NOT NULL AND {$table}.longitude IS NOT NULL AND {$table}.latitude <> 0 AND {$table}.longitude <> 0 THEN 10 ELSE 0 END
             + CASE WHEN TRIM(COALESCE({$table}.short_description, '')) <> '' OR TRIM(COALESCE({$table}.description, '')) <> '' THEN 15 ELSE 0 END
             + CASE WHEN TRIM(COALESCE({$table}.history, '')) <> '' THEN 10 ELSE 0 END
             + CASE WHEN TRIM(COALESCE({$table}.schedule_text, '')) <> '' THEN 15 ELSE 0 END
@@ -87,8 +90,12 @@ class ObjectEditorialCompletenessService
                   AND completeness_media.type = 'image'
             ) THEN 10 ELSE 0 END
             + CASE WHEN EXISTS (
-                SELECT 1 FROM object_sanctity completeness_sanctity
-                WHERE completeness_sanctity.pilgrimage_object_id = {$table}.id
+                SELECT 1
+                FROM object_sanctity completeness_pivot
+                INNER JOIN sanctities completeness_sanctity
+                    ON completeness_sanctity.id = completeness_pivot.sanctity_id
+                WHERE completeness_pivot.pilgrimage_object_id = {$table}.id
+                  AND completeness_sanctity.slug <> 'holy-spring'
             ) THEN 5 ELSE 0 END
             + CASE WHEN TRIM(COALESCE({$table}.parking_info, '')) <> '' THEN 2.5 ELSE 0 END
             + CASE WHEN TRIM(COALESCE({$table}.accessibility_info, '')) <> '' THEN 2.5 ELSE 0 END
@@ -124,9 +131,9 @@ class ObjectEditorialCompletenessService
         }
 
         if ($object->relationLoaded('sanctities')) {
-            return $object->sanctities->isNotEmpty();
+            return $object->sanctities->where('slug', '<>', 'holy-spring')->isNotEmpty();
         }
 
-        return $object->sanctities()->exists();
+        return $object->sanctities()->where('slug', '<>', 'holy-spring')->exists();
     }
 }

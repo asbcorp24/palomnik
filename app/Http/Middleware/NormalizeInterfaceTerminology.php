@@ -112,10 +112,12 @@ class NormalizeInterfaceTerminology
         $enhancementsUrl = htmlspecialchars(asset('js/map-enhancements.js'), ENT_QUOTES, 'UTF-8');
         $religiousIconsUrl = htmlspecialchars(asset('js/map-religious-icons.js'), ENT_QUOTES, 'UTF-8');
         $focusedPointsUrl = htmlspecialchars(asset('js/map-focused-points.js'), ENT_QUOTES, 'UTF-8');
+        $viewportReadyUrl = htmlspecialchars(asset('js/map-viewport-ready.js'), ENT_QUOTES, 'UTF-8');
         $cssTag = '<link rel="stylesheet" href="'.$cssUrl.'">';
         $scriptTags = '<script src="'.$enhancementsUrl.'"></script>'."\n"
             .'<script src="'.$religiousIconsUrl.'"></script>'."\n"
-            .'<script src="'.$focusedPointsUrl.'"></script>';
+            .'<script src="'.$focusedPointsUrl.'"></script>'."\n"
+            .'<script src="'.$viewportReadyUrl.'"></script>';
 
         if (! str_contains($html, $cssUrl)) {
             $html = str_contains($html, '</head>')
@@ -123,7 +125,7 @@ class NormalizeInterfaceTerminology
                 : $cssTag.$html;
         }
 
-        if (str_contains($html, $religiousIconsUrl)) {
+        if (str_contains($html, $viewportReadyUrl)) {
             return $html;
         }
 

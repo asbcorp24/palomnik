@@ -27,7 +27,7 @@ class PilgrimageObjectController extends Controller
         ]);
 
         $objects = PilgrimageObject::query()
-            ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'parentObject.objectType'])
+            ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'parentObject.objectType', 'verifier'])
             ->withCount('childObjects')
             ->search($filters['q'] ?? null)
             ->when($filters['type'] ?? null, function (Builder $query, int $type) {
@@ -61,6 +61,7 @@ class PilgrimageObjectController extends Controller
         $files = $request->file('media_files', []);
         unset($data['sanctity_ids'], $data['media_files']);
 
+        $data = $this->prepareVerificationData($request, $data);
         $data['slug'] = $this->uniqueSlug($data['slug'] ?? null, $data['name']);
         $data['is_published'] = $request->boolean('is_published');
         $data['published_at'] = $data['is_published']
@@ -92,6 +93,7 @@ class PilgrimageObjectController extends Controller
             'sanctities',
             'media',
             'pointsOfInterest',
+            'verifier',
         ]);
 
         return view('admin.objects.show', compact('object'));
@@ -105,6 +107,7 @@ class PilgrimageObjectController extends Controller
             'sanctities',
             'media',
             'pointsOfInterest',
+            'verifier',
         ]);
 
         return $this->formView($object);
@@ -117,6 +120,8 @@ class PilgrimageObjectController extends Controller
         $files = $request->file('media_files', []);
         unset($data['sanctity_ids'], $data['media_files']);
 
+        $informationChanged = $this->informationChanged($object, $data);
+        $data = $this->prepareVerificationData($request, $data, $object, $informationChanged);
         $data['slug'] = $this->uniqueSlug($data['slug'] ?? null, $data['name'], $object->id);
         $data['is_published'] = $request->boolean('is_published');
         $data['published_at'] = $data['is_published']
@@ -150,9 +155,21 @@ class PilgrimageObjectController extends Controller
             ? array_merge([$object->id], $this->descendantIds($object))
             : [];
 
+        $types = ObjectType::query()
+            ->where(function (Builder $query) use ($object): void {
+                $query->where('is_active', true);
+
+                if ($object->exists && $object->object_type_id) {
+                    $query->orWhereKey($object->object_type_id);
+                }
+            })
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
         return view('admin.objects.form', [
             'object' => $object,
-            'types' => ObjectType::query()->orderBy('sort_order')->orderBy('name')->get(),
+            'types' => $types,
             'parentObjects' => PilgrimageObject::query()
                 ->with('objectType')
                 ->when($excludedParentIds !== [], fn (Builder $query) => $query->whereNotIn('id', $excludedParentIds))
@@ -160,10 +177,11 @@ class PilgrimageObjectController extends Controller
                 ->get(),
             'vicariates' => Vicariate::query()->orderBy('name')->get(),
             'deaneries' => Deanery::query()->with('vicariate')->orderBy('name')->get(),
-            'sanctities' => Sanctity::query()->orderBy('name')->get(),
+            'sanctities' => Sanctity::query()->where('slug', '<>', 'holy-spring')->orderBy('name')->get(),
             'selectedSanctities' => $object->exists
                 ? $object->sanctities->pluck('id')->all()
                 : [],
+            'verificationStatuses' => PilgrimageObject::verificationStatusLabels(),
         ]);
     }
 
@@ -209,7 +227,17 @@ class PilgrimageObjectController extends Controller
         ];
 
         return $request->validate([
-            'object_type_id' => ['required', 'integer', 'exists:object_types,id'],
+            'object_type_id' => [
+                'required',
+                'integer',
+                'exists:object_types,id',
+                function (string $attribute, mixed $value, $fail) use ($object): void {
+                    $type = ObjectType::query()->find((int) $value);
+                    if ($type && ! $type->is_active && (int) $object?->object_type_id !== (int) $type->id) {
+                        $fail('Выбранный тип объекта отключён.');
+                    }
+                },
+            ],
             'parent_object_id' => $parentRules,
             'vicariate_id' => ['nullable', 'required_with:deanery_id', 'integer', 'exists:vicariates,id'],
             'deanery_id' => ['nullable', 'integer', $deaneryRule],
@@ -227,6 +255,11 @@ class PilgrimageObjectController extends Controller
             'schedule_text' => ['nullable', 'string'],
             'parking_info' => ['nullable', 'string'],
             'accessibility_info' => ['nullable', 'string'],
+            'information_verified_at' => ['nullable', 'date'],
+            'information_source_url' => ['nullable', 'url', 'max:1000'],
+            'next_verification_at' => ['nullable', 'date'],
+            'verification_status' => ['nullable', Rule::in(array_keys(PilgrimageObject::verificationStatusLabels()))],
+            'mark_information_verified' => ['nullable', 'boolean'],
             'is_published' => ['nullable', 'boolean'],
             'published_at' => ['nullable', 'date'],
             'sanctity_ids' => ['nullable', 'array'],
@@ -234,6 +267,71 @@ class PilgrimageObjectController extends Controller
             'media_files' => ['nullable', 'array', 'max:20'],
             'media_files.*' => ['file', 'max:51200', 'mimes:jpg,jpeg,png,webp,gif,mp3,wav,m4a,mp4,mov,avi,pdf,doc,docx'],
         ]);
+    }
+
+    private function prepareVerificationData(
+        Request $request,
+        array $data,
+        ?PilgrimageObject $object = null,
+        bool $informationChanged = false
+    ): array {
+        $markVerified = $request->boolean('mark_information_verified');
+        unset($data['mark_information_verified']);
+
+        $status = $data['verification_status']
+            ?? $object?->verification_status
+            ?? PilgrimageObject::VERIFICATION_UNVERIFIED;
+
+        if ($markVerified || $status === PilgrimageObject::VERIFICATION_VERIFIED) {
+            $data['verification_status'] = PilgrimageObject::VERIFICATION_VERIFIED;
+            $data['information_verified_at'] = $markVerified
+                ? now()
+                : ($data['information_verified_at'] ?? $object?->information_verified_at ?? now());
+            $data['verified_by'] = $request->user()->id;
+            $data['next_verification_at'] = $data['next_verification_at']
+                ?? $object?->next_verification_at
+                ?? now()->addDays(90);
+
+            return $data;
+        }
+
+        if ($informationChanged) {
+            $data['verification_status'] = PilgrimageObject::VERIFICATION_NEEDS_REVIEW;
+            $data['next_verification_at'] = now();
+        } else {
+            $data['verification_status'] = $status;
+        }
+
+        return $data;
+    }
+
+    private function informationChanged(PilgrimageObject $object, array $data): bool
+    {
+        foreach ([
+            'name',
+            'short_description',
+            'description',
+            'history',
+            'address',
+            'latitude',
+            'longitude',
+            'phone',
+            'email',
+            'website',
+            'schedule_text',
+            'parking_info',
+            'accessibility_info',
+        ] as $field) {
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
+
+            if ((string) ($object->{$field} ?? '') !== (string) ($data[$field] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return array<int> */

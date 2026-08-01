@@ -4,13 +4,14 @@ namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Controller;
 use App\Models\PilgrimageRoute;
+use App\Services\AnalyticsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class RouteController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, AnalyticsService $analytics): View
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
@@ -38,6 +39,15 @@ class RouteController extends Controller
             ->paginate(12)
             ->withQueryString();
 
+        $searchTerm = trim((string) ($filters['q'] ?? ''));
+        if ($searchTerm !== '') {
+            $analytics->track($request, 'route_search', null, [
+                'results_count' => $routes->total(),
+                'category' => $filters['category'] ?? null,
+                'difficulty' => $filters['difficulty'] ?? null,
+            ], $searchTerm);
+        }
+
         return view('site.routes.index', [
             'routes' => $routes,
             'filters' => $filters,
@@ -46,8 +56,11 @@ class RouteController extends Controller
         ]);
     }
 
-    public function show(PilgrimageRoute $pilgrimageRoute): View
-    {
+    public function show(
+        Request $request,
+        PilgrimageRoute $pilgrimageRoute,
+        AnalyticsService $analytics
+    ): View {
         $isScheduledForFuture = $pilgrimageRoute->published_at && $pilgrimageRoute->published_at->isFuture();
         abort_if(! $pilgrimageRoute->is_published || $isScheduledForFuture, 404);
 
@@ -66,6 +79,13 @@ class RouteController extends Controller
                     ->where('starts_at', '>=', now())
                     ->orderBy('starts_at');
             },
+        ]);
+
+        $analytics->track($request, 'route_view', $pilgrimageRoute, [
+            'category' => $pilgrimageRoute->category,
+            'difficulty' => $pilgrimageRoute->difficulty,
+            'objects_count' => $pilgrimageRoute->objects->count(),
+            'open_trips_count' => $pilgrimageRoute->trips->where('status', 'open')->count(),
         ]);
 
         return view('site.routes.show', [

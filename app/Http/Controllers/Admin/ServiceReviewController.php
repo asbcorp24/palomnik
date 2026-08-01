@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ObjectMediaSubmission;
 use App\Models\ObjectUpdateRequest;
+use App\Models\PilgrimageObject;
 use App\Notifications\PlatformNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -54,14 +55,22 @@ class ServiceReviewController extends Controller
         abort_unless($updateRequest->status === 'pending', 422, 'Эта заявка уже рассмотрена.');
 
         DB::transaction(function () use ($request, $updateRequest, $data) {
+            $object = $updateRequest->pilgrimageObject;
+
             if ($data['status'] === 'approved') {
                 $payload = $updateRequest->payload;
                 $sanctityIds = $payload['sanctity_ids'] ?? null;
                 unset($payload['sanctity_ids']);
 
-                $updateRequest->pilgrimageObject->update($payload);
+                $object->update($payload + [
+                    'information_verified_at' => now(),
+                    'verified_by' => $request->user()->id,
+                    'next_verification_at' => now()->addDays(90),
+                    'verification_status' => PilgrimageObject::VERIFICATION_VERIFIED,
+                ]);
+
                 if (is_array($sanctityIds)) {
-                    $updateRequest->pilgrimageObject->sanctities()->sync($sanctityIds);
+                    $object->sanctities()->sync($sanctityIds);
                 }
             }
 
@@ -71,6 +80,26 @@ class ServiceReviewController extends Controller
                 'reviewed_at' => now(),
                 'review_note' => $data['review_note'] ?? null,
             ]);
+
+            if ($data['status'] === 'rejected') {
+                $hasPending = $object->updateRequests()
+                    ->where('status', 'pending')
+                    ->exists();
+
+                if (! $hasPending) {
+                    $stillCurrent = $object->information_verified_at
+                        && (! $object->next_verification_at || $object->next_verification_at->isFuture());
+
+                    $object->update([
+                        'verification_status' => $stillCurrent
+                            ? PilgrimageObject::VERIFICATION_VERIFIED
+                            : PilgrimageObject::VERIFICATION_NEEDS_REVIEW,
+                        'next_verification_at' => $stillCurrent
+                            ? $object->next_verification_at
+                            : now(),
+                    ]);
+                }
+            }
         });
 
         $updateRequest->user->notify(new PlatformNotification(

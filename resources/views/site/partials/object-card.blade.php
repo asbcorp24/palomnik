@@ -1,3 +1,12 @@
+@php
+    $monasteryTemples = optional($object->objectType)->slug === 'monastery'
+        && $object->relationLoaded('publishedChildObjects')
+            ? $object->publishedChildObjects
+                ->filter(fn ($child) => optional($child->objectType)->slug === 'temple')
+                ->values()
+            : collect();
+@endphp
+
 <article class="card-pm">
     <a class="text-decoration-none" href="{{ route('objects.show', $object) }}">
         @if($object->coverMedia && $object->coverMedia->url)
@@ -23,11 +32,39 @@
         </div>
         <h3 class="object-title mb-2"><a class="text-decoration-none" href="{{ route('objects.show', $object) }}">{{ $object->name }}</a></h3>
         <div class="object-meta mb-2"><i class="bi bi-geo-alt me-1"></i>{{ $object->address }}</div>
+
         @if($object->parentObject)
-            <div class="small text-secondary mb-3"><i class="bi bi-diagram-2 me-1"></i>В составе: {{ $object->parentObject->name }}</div>
-        @elseif(($object->published_child_objects_count ?? 0) > 0)
-            <div class="small text-secondary mb-3"><i class="bi bi-diagram-3 me-1"></i>На территории: {{ $object->published_child_objects_count }} связанных объектов</div>
+            <div class="small text-secondary mb-3">
+                <i class="bi bi-diagram-2 me-1"></i>
+                {{ optional($object->parentObject->objectType)->slug === 'monastery' ? 'Монастырь:' : 'В составе:' }}
+                <a
+                    class="fw-semibold text-decoration-none"
+                    href="{{ route('objects.show', $object->parentObject) }}"
+                    style="color:var(--pm-green)"
+                >{{ $object->parentObject->name }}</a>
+            </div>
         @endif
+
+        @if($monasteryTemples->isNotEmpty())
+            <div class="small text-secondary mb-3">
+                <div class="fw-semibold mb-2">
+                    <i class="bi bi-diagram-3 me-1"></i>Храмы монастыря
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach($monasteryTemples as $temple)
+                        <a
+                            class="badge rounded-pill text-bg-light text-decoration-none text-wrap text-start"
+                            href="{{ route('objects.show', $temple) }}"
+                        >{{ $temple->name }}</a>
+                    @endforeach
+                </div>
+            </div>
+        @elseif(!$object->parentObject && ($object->published_child_objects_count ?? 0) > 0)
+            <div class="small text-secondary mb-3">
+                <i class="bi bi-diagram-3 me-1"></i>На территории: {{ $object->published_child_objects_count }} связанных объектов
+            </div>
+        @endif
+
         @if($object->short_description)
             <p class="text-secondary small mb-3">{{ \Illuminate\Support\Str::limit($object->short_description, 145) }}</p>
         @endif

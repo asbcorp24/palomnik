@@ -33,6 +33,9 @@ return new class extends Migration
         DB::table('object_types')
             ->where('slug', 'holy-spring')
             ->update([
+                'name' => 'Архивный тип',
+                'icon' => 'archive',
+                'sort_order' => 1000,
                 'is_active' => false,
                 'is_public' => false,
             ]);
@@ -44,20 +47,20 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('object_types', function (Blueprint $table): void {
-            $columns = [];
+        $columns = [];
 
-            if (Schema::hasColumn('object_types', 'is_public')) {
-                $columns[] = 'is_public';
-            }
+        if (Schema::hasColumn('object_types', 'is_public')) {
+            $columns[] = 'is_public';
+        }
 
-            if (Schema::hasColumn('object_types', 'is_active')) {
-                $columns[] = 'is_active';
-            }
+        if (Schema::hasColumn('object_types', 'is_active')) {
+            $columns[] = 'is_active';
+        }
 
-            if ($columns !== []) {
+        if ($columns !== []) {
+            Schema::table('object_types', function (Blueprint $table) use ($columns): void {
                 $table->dropColumn($columns);
-            }
-        });
+            });
+        }
     }
 };

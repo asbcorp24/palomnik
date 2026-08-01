@@ -28,6 +28,7 @@ class NormalizeInterfaceTerminology
 
         $html = $this->replaceTerms($html);
         $html = $this->removeHolySpringControls($html);
+        $html = $this->injectMapEnhancements($html);
 
         $response->setContent($html);
 
@@ -103,5 +104,38 @@ class NormalizeInterfaceTerminology
         ];
 
         return preg_replace($patterns, '', $html) ?: $html;
+    }
+
+    private function injectMapEnhancements(string $html): string
+    {
+        $cssUrl = htmlspecialchars(asset('css/map-enhancements.css'), ENT_QUOTES, 'UTF-8');
+        $scriptUrl = htmlspecialchars(asset('js/map-enhancements.js'), ENT_QUOTES, 'UTF-8');
+        $cssTag = '<link rel="stylesheet" href="'.$cssUrl.'">';
+        $scriptTag = '<script src="'.$scriptUrl.'"></script>';
+
+        if (! str_contains($html, $cssUrl)) {
+            $html = str_contains($html, '</head>')
+                ? str_replace('</head>', $cssTag."\n</head>", $html)
+                : $cssTag.$html;
+        }
+
+        if (str_contains($html, $scriptUrl)) {
+            return $html;
+        }
+
+        $viewportUrl = htmlspecialchars(asset('js/map-viewport.js'), ENT_QUOTES, 'UTF-8');
+        $viewportTag = '<script src="'.$viewportUrl.'"></script>';
+
+        if (str_contains($html, $viewportTag)) {
+            return str_replace(
+                $viewportTag,
+                $scriptTag."\n".$viewportTag,
+                $html
+            );
+        }
+
+        return str_contains($html, '</body>')
+            ? str_replace('</body>', $scriptTag."\n</body>", $html)
+            : $html.$scriptTag;
     }
 }

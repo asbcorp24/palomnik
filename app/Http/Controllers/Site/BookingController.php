@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Site;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Trip;
+use App\Services\AnalyticsService;
 use App\Services\BookingCrmService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ class BookingController extends Controller
     public function store(
         Request $request,
         Trip $trip,
-        BookingCrmService $service
+        BookingCrmService $service,
+        AnalyticsService $analytics
     ): RedirectResponse {
         $data = $request->validate([
             'participants_count' => ['required', 'integer', 'min:1', 'max:10'],
@@ -67,6 +69,13 @@ class BookingController extends Controller
             'notes' => $data['notes'] ?? null,
         ], $request->user(), $request->user());
 
+        $analytics->track($request, 'booking_created', $booking, [
+            'trip_id' => $trip->id,
+            'route_id' => $trip->pilgrimage_route_id,
+            'participants_count' => $participants,
+            'total_amount' => $unitPrice * $participants,
+        ]);
+
         return redirect()
             ->route('profile.bookings')
             ->with('success', 'Заявка создана. Код бронирования: '.$booking->ticket_code.'.');
@@ -75,7 +84,8 @@ class BookingController extends Controller
     public function cancel(
         Request $request,
         Booking $booking,
-        BookingCrmService $service
+        BookingCrmService $service,
+        AnalyticsService $analytics
     ): RedirectResponse {
         abort_unless($booking->user_id === $request->user()->id, 403);
 
@@ -94,6 +104,10 @@ class BookingController extends Controller
             'crm_stage' => 'closed',
             'cancellation_reason' => 'Отменено пользователем через личный кабинет.',
         ], $request->user());
+
+        $analytics->track($request, 'booking_cancelled', $booking, [
+            'trip_id' => $booking->trip_id,
+        ]);
 
         return back()->with('success', 'Бронирование отменено.');
     }

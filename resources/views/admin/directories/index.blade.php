@@ -55,6 +55,7 @@
                     @endif
                     @if($resource === 'object-types')
                         <th>Маркер</th>
+                        <th>Статус</th>
                         <th>Порядок</th>
                     @endif
                     <th class="text-end">Действия</th>
@@ -81,6 +82,20 @@
                         @if($resource === 'object-types')
                             <td>
                                 <span class="d-inline-block rounded-circle border" style="width:22px;height:22px;background:{{ $item->marker_color ?: '#ddd' }}"></span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @if($item->is_active)
+                                        <span class="badge text-bg-success">Активен</span>
+                                    @else
+                                        <span class="badge text-bg-secondary">Отключён</span>
+                                    @endif
+                                    @if($item->is_public)
+                                        <span class="badge text-bg-primary">Публичный</span>
+                                    @else
+                                        <span class="badge text-bg-dark">Внутренний</span>
+                                    @endif
+                                </div>
                             </td>
                             <td>{{ $item->sort_order }}</td>
                         @endif

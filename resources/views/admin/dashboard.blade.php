@@ -42,6 +42,30 @@
 
 <div class="d-flex justify-content-between align-items-end gap-3 mb-3 mt-5">
     <div>
+        <h2 class="h4 mb-1">Контроль качества и аналитика</h2>
+        <div class="small text-secondary">Инструменты для работы с большим каталогом и контроля действий администраторов.</div>
+    </div>
+</div>
+
+<div class="row g-3 mb-5">
+    @foreach([
+        ['title'=>'Актуальность данных','text'=>'Заполненность карточек, расписания, контакты и источники.','icon'=>'bi-clipboard2-pulse','route'=>route('admin.information-audit.index')],
+        ['title'=>'Возможные дубли','text'=>'Сравнение названий, координат, телефонов и сайтов.','icon'=>'bi-intersect','route'=>route('admin.duplicates.index')],
+        ['title'=>'Аналитика поведения','text'=>'Поиски без результатов, просмотры, маршруты и бронирования.','icon'=>'bi-graph-up-arrow','route'=>route('admin.analytics.index')],
+        ['title'=>'Журнал действий','text'=>'Изменения, массовые операции, импорт и восстановление редакций.','icon'=>'bi-journal-text','route'=>route('admin.activity.index')],
+    ] as $tool)
+        <div class="col-md-6 col-xl-3">
+            <a class="card-soft p-4 d-block text-decoration-none h-100" href="{{ $tool['route'] }}">
+                <div class="stat-icon mb-3"><i class="bi {{ $tool['icon'] }}"></i></div>
+                <h3 class="h5 text-dark mb-2">{{ $tool['title'] }}</h3>
+                <p class="small text-secondary mb-0">{{ $tool['text'] }}</p>
+            </a>
+        </div>
+    @endforeach
+</div>
+
+<div class="d-flex justify-content-between align-items-end gap-3 mb-3 mt-5">
+    <div>
         <h2 class="h4 mb-1">Функциональные модули</h2>
         <div class="small text-secondary">Все основные разделы доступны из панели управления.</div>
     </div>

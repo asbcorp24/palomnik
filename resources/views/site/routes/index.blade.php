@@ -14,6 +14,19 @@
 
 <section class="section-space pt-5">
     <div class="container">
+        <div class="card-pm p-4 p-lg-5 mb-5 overflow-hidden position-relative">
+            <div class="row align-items-center g-4 position-relative" style="z-index:1">
+                <div class="col-lg-8">
+                    <div class="section-kicker mb-2">Персональный подбор</div>
+                    <h2 class="h2 mb-3">Составьте маршрут дня</h2>
+                    <p class="text-secondary mb-0">Укажите местоположение, свободное время, способ передвижения и интересующую тему. Система подберёт храмы и монастыри, проверит расписания и рассчитает путь.</p>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <a class="btn btn-pm-gold btn-lg px-4" href="{{ route('day-route.index') }}"><i class="bi bi-stars me-2"></i>Составить маршрут</a>
+                </div>
+            </div>
+        </div>
+
         <form class="filter-card mb-5" method="GET" action="{{ route('routes.index') }}">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-5">

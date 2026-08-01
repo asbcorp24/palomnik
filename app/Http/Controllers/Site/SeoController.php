@@ -23,6 +23,7 @@ class SeoController extends Controller
             ['loc' => $base.'/map', 'priority' => '0.9', 'changefreq' => 'daily'],
             ['loc' => $base.'/objects', 'priority' => '0.9', 'changefreq' => 'daily'],
             ['loc' => $base.'/routes', 'priority' => '0.9', 'changefreq' => 'daily'],
+            ['loc' => $base.'/route-of-the-day', 'priority' => '0.9', 'changefreq' => 'weekly'],
             ['loc' => $base.'/calendar', 'priority' => '0.8', 'changefreq' => 'daily'],
             ['loc' => $base.'/community', 'priority' => '0.7', 'changefreq' => 'daily'],
         ]);

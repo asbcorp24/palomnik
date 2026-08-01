@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
+use App\Services\AdminActivityLogger;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use JsonException;
@@ -168,10 +169,35 @@ class MoscowRegionChurchSeeder extends Seeder
                 });
         }
 
+        $batchId = 'church-import-'.now()->format('YmdHis');
+        app(AdminActivityLogger::class)->log(
+            'import',
+            null,
+            null,
+            null,
+            [
+                'importer' => self::class,
+                'file' => $path,
+                'file_sha256' => hash_file('sha256', $path),
+                'source_objects' => count($objects),
+                'created' => $created,
+                'updated' => $updated,
+                'removed' => $removed,
+                'skipped' => $skipped,
+                'ollama_reviewed' => isset($snapshot['meta']['ollama_review']),
+            ],
+            null,
+            'import',
+            $batchId,
+            PilgrimageObject::class,
+            null,
+            'Импорт храмов и монастырей Москвы и Подмосковья'
+        );
+
         $this->command?->info(
             "Импорт объектов завершён: создано {$created}, "
             ."обновлено {$updated}, удалено после проверки {$removed}, "
-            ."пропущено {$skipped}."
+            ."пропущено {$skipped}. Пакет: {$batchId}."
         );
     }
 

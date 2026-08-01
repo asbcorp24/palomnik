@@ -67,6 +67,7 @@
 
             <div class="sidebar-label">Карта и объекты</div>
             <a class="sidebar-link {{ request()->routeIs('admin.objects.*') || request()->routeIs('admin.media.*') ? 'active' : '' }}" href="{{ route('admin.objects.index') }}"><i class="bi bi-geo-alt"></i><span>Храмы и объекты</span></a>
+            <a class="sidebar-link {{ request()->routeIs('admin.information-audit.*') ? 'active' : '' }}" href="{{ route('admin.information-audit.index') }}"><i class="bi bi-clipboard2-pulse"></i><span>Актуальность данных</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.points-of-interest.*') ? 'active' : '' }}" href="{{ route('admin.points-of-interest.index') }}"><i class="bi bi-pin-map-fill"></i><span>Точки интереса</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.representatives.*') ? 'active' : '' }}" href="{{ route('admin.representatives.index') }}"><i class="bi bi-person-badge"></i><span>Представители храмов</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.service-review.*') ? 'active' : '' }}" href="{{ route('admin.service-review.index') }}"><i class="bi bi-building-check"></i><span>Изменения от храмов</span></a>
@@ -80,7 +81,7 @@
             <a class="sidebar-link" href="{{ route('service.tickets.scanner') }}" target="_blank" rel="noopener"><i class="bi bi-qr-code-scan"></i><span>Сканер QR-билетов</span></a>
 
             <div class="sidebar-label">Геймификация</div>
-            <a class="sidebar-link {{ request()->is('admin/modules/achievements*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'achievements') }}"><i class="bi bi-trophy"></i><span>Достижения и квесты</span></a>
+            <a class="sidebar-link {{ request()->is('admin/modules/achievements*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'achievements') }}"><i class="bi bi-trophy"></i><span>Достижения и паломнические маршруты</span></a>
             <a class="sidebar-link {{ request()->is('admin/moderation/visits*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'visits') }}"><i class="bi bi-geo-fill"></i><span>Посещения</span></a>
 
             <div class="sidebar-label">Сообщество</div>

@@ -30,103 +30,7 @@ class MapController extends Controller
             'focus_poi' => ['nullable', 'integer', 'exists:points_of_interest,id'],
         ]);
 
-        $query = PilgrimageObject::query()
-            ->published()
-            ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'sanctities'])
-            ->search($filters['q'] ?? null)
-            ->when($filters['type'] ?? null, fn (Builder $query, string $slug) => $query->whereHas('objectType', fn (Builder $query) => $query->visible()->where('slug', $slug)))
-            ->when($filters['vicariate'] ?? null, fn (Builder $query, string $slug) => $query->whereHas('vicariate', fn (Builder $query) => $query->where('slug', $slug)))
-            ->when($filters['deanery'] ?? null, fn (Builder $query, string $slug) => $query->whereHas('deanery', fn (Builder $query) => $query->where('slug', $slug)))
-            ->when($filters['sanctity'] ?? null, fn (Builder $query, string $slug) => $query->whereHas('sanctities', fn (Builder $query) => $query->where('slug', $slug)))
-            ->orderBy('name');
-
-        $objects = $query->get()->map(function (PilgrimageObject $object) {
-            return [
-                'id' => $object->id,
-                'name' => $object->name,
-                'type' => optional($object->objectType)->name,
-                'type_slug' => optional($object->objectType)->slug,
-                'marker_color' => optional($object->objectType)->marker_color ?: '#b08a3e',
-                'vicariate' => optional($object->vicariate)->name,
-                'deanery' => optional($object->deanery)->name,
-                'sanctities' => $object->sanctities->where('slug', '<>', 'holy-spring')->pluck('name')->values(),
-                'address' => $object->address,
-                'latitude' => (float) $object->latitude,
-                'longitude' => (float) $object->longitude,
-                'cover' => optional($object->coverMedia)->url,
-                'url' => route('objects.show', $object),
-            ];
-        })->values();
-
-        $searchTerm = trim((string) ($filters['q'] ?? ''));
-        if ($searchTerm !== '') {
-            $analytics->track($request, 'catalog_search', null, [
-                'source' => 'map',
-                'results_count' => $objects->count(),
-                'type' => $filters['type'] ?? null,
-                'vicariate' => $filters['vicariate'] ?? null,
-                'deanery' => $filters['deanery'] ?? null,
-                'sanctity' => $filters['sanctity'] ?? null,
-            ], $searchTerm);
-
-            if ($objects->isEmpty()) {
-                $analytics->track($request, 'search_no_results', null, [
-                    'source' => 'map',
-                    'type' => $filters['type'] ?? null,
-                    'vicariate' => $filters['vicariate'] ?? null,
-                    'deanery' => $filters['deanery'] ?? null,
-                    'sanctity' => $filters['sanctity'] ?? null,
-                ], $searchTerm);
-            }
-        }
-
-        $activeFilters = collect($filters)
-            ->except(['q', 'focus_poi'])
-            ->filter(fn ($value): bool => filled($value));
-        if ($activeFilters->isNotEmpty()) {
-            $analytics->track(
-                $request,
-                'catalog_filter',
-                null,
-                ['source' => 'map'] + $activeFilters->all(),
-                'map: '.$activeFilters->map(fn ($value, $key): string => $key.'='.$value)->implode('; ')
-            );
-        }
-
-        $pointsOfInterest = PointOfInterest::query()
-            ->published()
-            ->with('pilgrimageObject')
-            ->whereIn('pilgrimage_object_id', $objects->pluck('id'))
-            ->ordered()
-            ->get()
-            ->map(function (PointOfInterest $point) {
-                return [
-                    'id' => $point->id,
-                    'category' => $point->category,
-                    'category_label' => $point->category_label,
-                    'icon' => $point->category_icon,
-                    'marker_color' => $point->marker_color,
-                    'name' => $point->name,
-                    'description' => $point->description,
-                    'address' => $point->address,
-                    'latitude' => (float) $point->latitude,
-                    'longitude' => (float) $point->longitude,
-                    'phone' => $point->phone,
-                    'website' => $point->website,
-                    'schedule' => $point->schedule_text,
-                    'base_object_id' => $point->pilgrimage_object_id,
-                    'base_object_name' => optional($point->pilgrimageObject)->name,
-                    'base_object_url' => $point->pilgrimageObject
-                        ? route('objects.show', $point->pilgrimageObject)
-                        : null,
-                ];
-            })
-            ->values();
-
-        $focusedPointOfInterest = $pointsOfInterest->firstWhere(
-            'id',
-            (int) ($filters['focus_poi'] ?? 0)
-        );
+        $this->trackFilters($request, $analytics, $filters);
 
         $routes = PilgrimageRoute::query()
             ->published()
@@ -165,7 +69,6 @@ class MapController extends Controller
         }
 
         return view('site.map', [
-            'objects' => $objects,
             'filters' => $filters,
             'types' => ObjectType::query()->visible()->orderBy('sort_order')->orderBy('name')->get(),
             'vicariates' => Vicariate::query()->orderBy('name')->get(),
@@ -173,10 +76,77 @@ class MapController extends Controller
             'sanctities' => Sanctity::query()->where('slug', '<>', 'holy-spring')->orderBy('name')->limit(300)->get(),
             'routes' => $routes,
             'selectedRoute' => $selectedRoute,
-            'pointsOfInterest' => $pointsOfInterest,
-            'focusedPointOfInterest' => $focusedPointOfInterest,
+            'focusedPointOfInterestId' => isset($filters['focus_poi']) ? (int) $filters['focus_poi'] : null,
             'poiCategories' => PointOfInterest::CATEGORIES,
         ]);
+    }
+
+    private function trackFilters(Request $request, AnalyticsService $analytics, array $filters): void
+    {
+        $searchTerm = trim((string) ($filters['q'] ?? ''));
+        $activeFilters = collect($filters)
+            ->only(['type', 'vicariate', 'deanery', 'sanctity'])
+            ->filter(fn ($value): bool => filled($value));
+
+        if ($searchTerm === '' && $activeFilters->isEmpty()) {
+            return;
+        }
+
+        $resultCount = $this->filteredObjectQuery($filters)->count();
+
+        if ($searchTerm !== '') {
+            $analytics->track($request, 'catalog_search', null, [
+                'source' => 'map',
+                'results_count' => $resultCount,
+                'type' => $filters['type'] ?? null,
+                'vicariate' => $filters['vicariate'] ?? null,
+                'deanery' => $filters['deanery'] ?? null,
+                'sanctity' => $filters['sanctity'] ?? null,
+            ], $searchTerm);
+
+            if ($resultCount === 0) {
+                $analytics->track($request, 'search_no_results', null, [
+                    'source' => 'map',
+                    'type' => $filters['type'] ?? null,
+                    'vicariate' => $filters['vicariate'] ?? null,
+                    'deanery' => $filters['deanery'] ?? null,
+                    'sanctity' => $filters['sanctity'] ?? null,
+                ], $searchTerm);
+            }
+        }
+
+        if ($activeFilters->isNotEmpty()) {
+            $analytics->track(
+                $request,
+                'catalog_filter',
+                null,
+                ['source' => 'map', 'results_count' => $resultCount] + $activeFilters->all(),
+                'map: '.$activeFilters->map(fn ($value, $key): string => $key.'='.$value)->implode('; ')
+            );
+        }
+    }
+
+    private function filteredObjectQuery(array $filters): Builder
+    {
+        return PilgrimageObject::query()
+            ->published()
+            ->search($filters['q'] ?? null)
+            ->when($filters['type'] ?? null, fn (Builder $query, string $slug) => $query->whereHas(
+                'objectType',
+                fn (Builder $query) => $query->visible()->where('slug', $slug)
+            ))
+            ->when($filters['vicariate'] ?? null, fn (Builder $query, string $slug) => $query->whereHas(
+                'vicariate',
+                fn (Builder $query) => $query->where('slug', $slug)
+            ))
+            ->when($filters['deanery'] ?? null, fn (Builder $query, string $slug) => $query->whereHas(
+                'deanery',
+                fn (Builder $query) => $query->where('slug', $slug)
+            ))
+            ->when($filters['sanctity'] ?? null, fn (Builder $query, string $slug) => $query->whereHas(
+                'sanctities',
+                fn (Builder $query) => $query->where('slug', $slug)
+            ));
     }
 
     private function routePoints(Collection $objects): Collection

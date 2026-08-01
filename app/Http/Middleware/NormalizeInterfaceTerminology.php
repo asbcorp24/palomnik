@@ -109,9 +109,11 @@ class NormalizeInterfaceTerminology
     private function injectMapEnhancements(string $html): string
     {
         $cssUrl = htmlspecialchars(asset('css/map-enhancements.css'), ENT_QUOTES, 'UTF-8');
-        $scriptUrl = htmlspecialchars(asset('js/map-enhancements.js'), ENT_QUOTES, 'UTF-8');
+        $enhancementsUrl = htmlspecialchars(asset('js/map-enhancements.js'), ENT_QUOTES, 'UTF-8');
+        $focusedPointsUrl = htmlspecialchars(asset('js/map-focused-points.js'), ENT_QUOTES, 'UTF-8');
         $cssTag = '<link rel="stylesheet" href="'.$cssUrl.'">';
-        $scriptTag = '<script src="'.$scriptUrl.'"></script>';
+        $scriptTags = '<script src="'.$enhancementsUrl.'"></script>'."\n"
+            .'<script src="'.$focusedPointsUrl.'"></script>';
 
         if (! str_contains($html, $cssUrl)) {
             $html = str_contains($html, '</head>')
@@ -119,7 +121,7 @@ class NormalizeInterfaceTerminology
                 : $cssTag.$html;
         }
 
-        if (str_contains($html, $scriptUrl)) {
+        if (str_contains($html, $focusedPointsUrl)) {
             return $html;
         }
 
@@ -129,13 +131,13 @@ class NormalizeInterfaceTerminology
         if (str_contains($html, $viewportTag)) {
             return str_replace(
                 $viewportTag,
-                $scriptTag."\n".$viewportTag,
+                $scriptTags."\n".$viewportTag,
                 $html
             );
         }
 
         return str_contains($html, '</body>')
-            ? str_replace('</body>', $scriptTag."\n</body>", $html)
-            : $html.$scriptTag;
+            ? str_replace('</body>', $scriptTags."\n</body>", $html)
+            : $html.$scriptTags;
     }
 }

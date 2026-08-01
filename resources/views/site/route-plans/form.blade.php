@@ -228,17 +228,18 @@
 
         if (activeRequest) {
             activeRequest.abort();
-            activeRequest = null;
         }
 
         if (term.length < 2) {
+            activeRequest = null;
             currentResults = [];
             catalog.innerHTML = '<div class="empty-state py-4">Начните вводить название храма, монастыря или адрес.</div>';
             statusBox.textContent = 'Введите минимум 2 символа. Загружается не более 20 результатов.';
             return;
         }
 
-        activeRequest = new AbortController();
+        const requestController = new AbortController();
+        activeRequest = requestController;
         statusBox.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Поиск...';
 
         const url = new URL(searchUrl, window.location.origin);
@@ -252,12 +253,14 @@
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                signal: activeRequest.signal
+                signal: requestController.signal
             });
 
             if (!response.ok) throw new Error('Search request failed');
 
             const payload = await response.json();
+            if (activeRequest !== requestController) return;
+
             const objects = Array.isArray(payload.data) ? payload.data : [];
             objects.forEach(object => objectStore.set(Number(object.id), object));
             renderResults(objects);
@@ -265,12 +268,14 @@
                 ? `Найдено: ${objects.length}. Выберите нужные объекты.`
                 : 'По вашему запросу ничего не найдено.';
         } catch (error) {
-            if (error.name === 'AbortError') return;
+            if (error.name === 'AbortError' || activeRequest !== requestController) return;
             currentResults = [];
             catalog.innerHTML = '<div class="alert alert-light border mb-0">Не удалось выполнить поиск. Повторите попытку.</div>';
             statusBox.textContent = 'Ошибка загрузки результатов.';
         } finally {
-            activeRequest = null;
+            if (activeRequest === requestController) {
+                activeRequest = null;
+            }
         }
     }
 

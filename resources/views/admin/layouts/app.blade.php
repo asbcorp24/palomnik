@@ -62,11 +62,13 @@
         <nav class="sidebar-nav">
             <div class="sidebar-label">Главное</div>
             <a class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}"><i class="bi bi-grid-1x2"></i><span>Обзор</span></a>
+            <a class="sidebar-link {{ request()->routeIs('admin.analytics.*') ? 'active' : '' }}" href="{{ route('admin.analytics.index') }}"><i class="bi bi-graph-up-arrow"></i><span>Аналитика поведения</span></a>
             <a class="sidebar-link" href="{{ route('admin.help') }}"><i class="bi bi-question-circle"></i><span>Справка</span></a>
             <a class="sidebar-link" href="{{ route('home') }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i><span>Открыть сайт</span></a>
 
             <div class="sidebar-label">Карта и объекты</div>
-            <a class="sidebar-link {{ request()->routeIs('admin.objects.*') || request()->routeIs('admin.media.*') ? 'active' : '' }}" href="{{ route('admin.objects.index') }}"><i class="bi bi-geo-alt"></i><span>Храмы и объекты</span></a>
+            <a class="sidebar-link {{ request()->routeIs('admin.objects.*') || request()->routeIs('admin.media.*') ? 'active' : '' }}" href="{{ route('admin.objects.index') }}"><i class="bi bi-geo-alt"></i><span>Храмы и монастыри</span></a>
+            <a class="sidebar-link {{ request()->routeIs('admin.duplicates.*') ? 'active' : '' }}" href="{{ route('admin.duplicates.index') }}"><i class="bi bi-intersect"></i><span>Возможные дубли</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.information-audit.*') ? 'active' : '' }}" href="{{ route('admin.information-audit.index') }}"><i class="bi bi-clipboard2-pulse"></i><span>Актуальность данных</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.points-of-interest.*') ? 'active' : '' }}" href="{{ route('admin.points-of-interest.index') }}"><i class="bi bi-pin-map-fill"></i><span>Точки интереса</span></a>
             <a class="sidebar-link {{ request()->routeIs('admin.representatives.*') ? 'active' : '' }}" href="{{ route('admin.representatives.index') }}"><i class="bi bi-person-badge"></i><span>Представители храмов</span></a>

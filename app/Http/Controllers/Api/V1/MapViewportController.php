@@ -47,8 +47,8 @@ class MapViewportController extends Controller
         $rules = [
             'min_lat' => ['required', 'numeric', 'between:-90,90'],
             'max_lat' => ['required', 'numeric', 'between:-90,90'],
-            'min_lng' => ['required', 'numeric', 'between:-180,180'],
-            'max_lng' => ['required', 'numeric', 'between:-180,180'],
+            'min_lng' => ['required', 'numeric', 'between:-720,720'],
+            'max_lng' => ['required', 'numeric', 'between:-720,720'],
             'zoom' => ['required', 'numeric', 'between:0,20'],
             'q' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', 'string', 'max:255'],

@@ -19,6 +19,12 @@ class BookingController extends Controller
         BookingCrmService $service,
         AnalyticsService $analytics
     ): RedirectResponse {
+        $analytics->track($request, 'booking_form_started', $trip, [
+            'trip_id' => $trip->id,
+            'route_id' => $trip->pilgrimage_route_id,
+            'participants_count' => (int) $request->input('participants_count', 0),
+        ]);
+
         $data = $request->validate([
             'participants_count' => ['required', 'integer', 'min:1', 'max:10'],
             'contact_name' => ['required', 'string', 'max:255'],

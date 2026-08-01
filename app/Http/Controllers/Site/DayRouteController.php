@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Site;
 use App\Http\Controllers\Controller;
 use App\Models\PilgrimageObject;
 use App\Models\UserRoutePlan;
+use App\Services\AnalyticsService;
 use App\Services\DayRoutePlannerService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,8 +33,10 @@ class DayRouteController extends Controller
         ]);
     }
 
-    public function generate(Request $request): View|RedirectResponse
-    {
+    public function generate(
+        Request $request,
+        AnalyticsService $analytics
+    ): View|RedirectResponse {
         $data = $this->validated($request);
         $data['allow_unknown_schedule'] = $request->boolean('allow_unknown_schedule');
 
@@ -44,6 +47,16 @@ class DayRouteController extends Controller
                 ->withInput()
                 ->with('error', 'Не удалось составить маршрут минимум из двух объектов. Увеличьте время или расстояние, разрешите неопределённое расписание либо выберите другую тему.');
         }
+
+        $analytics->track($request, 'day_route_generated', null, [
+            'transport_mode' => $data['transport_mode'],
+            'theme' => $data['theme'],
+            'requested_count' => (int) $data['object_count'],
+            'objects_count' => (int) $result['summary']['objects_count'],
+            'distance_km' => (float) $result['summary']['distance_km'],
+            'total_minutes' => (int) $result['summary']['total_minutes'],
+            'exact_routing' => (bool) $result['summary']['exact_routing'],
+        ]);
 
         $request->session()->put('day_route_save_payload', [
             'title' => $result['title'],

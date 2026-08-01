@@ -12,9 +12,11 @@ use Illuminate\View\View;
 
 class ObjectInformationAuditController extends Controller
 {
-    public function __construct(
-        private readonly ObjectEditorialCompletenessService $completeness
-    ) {
+    private ObjectEditorialCompletenessService $completeness;
+
+    public function __construct(ObjectEditorialCompletenessService $completeness)
+    {
+        $this->completeness = $completeness;
     }
 
     public function index(Request $request): View

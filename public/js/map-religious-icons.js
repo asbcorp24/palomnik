@@ -112,7 +112,20 @@
         }
     }
 
+    function forceMarkerVisibility(map) {
+        if (!map.getLayer('pilgrim-points')) {
+            return;
+        }
+
+        map.setLayoutProperty('pilgrim-points', 'visibility', 'visible');
+        map.setLayoutProperty('pilgrim-points', 'icon-allow-overlap', true);
+        map.setLayoutProperty('pilgrim-points', 'icon-ignore-placement', true);
+        map.setLayoutProperty('pilgrim-points', 'icon-padding', 0);
+    }
+
     async function applyReligiousIcons(map) {
+        forceMarkerVisibility(map);
+
         try {
             await ensureImages(map);
 
@@ -136,7 +149,9 @@
                 14, 1.02,
                 18, 1.20,
             ]);
+            forceMarkerVisibility(map);
         } catch (error) {
+            forceMarkerVisibility(map);
             console.error('[map-religious-icons]', error);
         }
     }

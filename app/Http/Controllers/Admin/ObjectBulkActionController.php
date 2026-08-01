@@ -7,6 +7,7 @@ use App\Models\Deanery;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use App\Models\PilgrimageRoute;
+use App\Services\AdminActivityLogger;
 use App\Services\PilgrimageObjectMergeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,8 @@ class ObjectBulkActionController extends Controller
 {
     public function __invoke(
         Request $request,
-        PilgrimageObjectMergeService $mergeService
+        PilgrimageObjectMergeService $mergeService,
+        AdminActivityLogger $logger
     ): RedirectResponse|StreamedResponse {
         $data = $request->validate([
             'object_ids' => ['required', 'array', 'min:1', 'max:1000'],
@@ -44,7 +46,32 @@ class ObjectBulkActionController extends Controller
         $objects = PilgrimageObject::query()->whereKey($ids->all())->get();
         abort_unless($objects->count() === $ids->count(), 422, 'Часть выбранных объектов не найдена.');
 
+        $batchId = 'bulk-'.now()->format('YmdHis').'-'.bin2hex(random_bytes(3));
+        $context = [
+            'operation' => $data['action'],
+            'object_ids' => $ids->all(),
+            'objects_count' => $objects->count(),
+            'type_id' => isset($data['type_id']) ? (int) $data['type_id'] : null,
+            'deanery_id' => isset($data['deanery_id']) ? (int) $data['deanery_id'] : null,
+            'route_id' => isset($data['route_id']) ? (int) $data['route_id'] : null,
+            'master_id' => isset($data['master_id']) ? (int) $data['master_id'] : null,
+        ];
+
         if ($data['action'] === 'export') {
+            $logger->log(
+                'bulk_export',
+                null,
+                null,
+                null,
+                $context,
+                $request->user()->id,
+                'web',
+                $batchId,
+                PilgrimageObject::class,
+                null,
+                'Экспорт выбранных объектов'
+            );
+
             return $this->export($objects);
         }
 
@@ -54,13 +81,30 @@ class ObjectBulkActionController extends Controller
             abort_unless($ids->contains($masterId), 422, 'Выберите основной объект для объединения.');
             $master = $objects->firstWhere('id', $masterId);
             $duplicate = $objects->first(fn (PilgrimageObject $object): bool => (int) $object->id !== $masterId);
+            $masterBefore = $logger->snapshot($master);
+            $duplicateBefore = $logger->snapshot($duplicate);
             $duplicateName = $duplicate->name;
-            $mergeService->merge($master, $duplicate, null, $request->user()->id);
+            $merged = $mergeService->merge($master, $duplicate, null, $request->user()->id);
+
+            $logger->log(
+                'merged',
+                $merged,
+                $masterBefore,
+                $logger->snapshot($merged),
+                $context + [
+                    'duplicate_id' => $duplicate->id,
+                    'duplicate_name' => $duplicateName,
+                    'duplicate_snapshot' => $duplicateBefore,
+                ],
+                $request->user()->id,
+                'web',
+                $batchId
+            );
 
             return back()->with('success', 'Объект «'.$duplicateName.'» объединён с «'.$master->name.'».');
         }
 
-        $message = DB::transaction(function () use ($data, $ids, $objects): string {
+        $message = DB::transaction(function () use ($data, $objects): string {
             if ($data['action'] === 'publish') {
                 foreach ($objects as $object) {
                     $object->update([
@@ -73,27 +117,33 @@ class ObjectBulkActionController extends Controller
             }
 
             if ($data['action'] === 'unpublish') {
-                PilgrimageObject::query()->whereKey($ids->all())->update([
-                    'is_published' => false,
-                    'published_at' => null,
-                ]);
+                foreach ($objects as $object) {
+                    $object->update([
+                        'is_published' => false,
+                        'published_at' => null,
+                    ]);
+                }
 
                 return 'Снято с публикации объектов: '.$objects->count().'.';
             }
 
             if ($data['action'] === 'set_type') {
                 $type = ObjectType::query()->where('is_active', true)->findOrFail((int) ($data['type_id'] ?? 0));
-                PilgrimageObject::query()->whereKey($ids->all())->update(['object_type_id' => $type->id]);
+                foreach ($objects as $object) {
+                    $object->update(['object_type_id' => $type->id]);
+                }
 
                 return 'Тип «'.$type->name.'» назначен объектам: '.$objects->count().'.';
             }
 
             if ($data['action'] === 'set_deanery') {
                 $deanery = Deanery::query()->findOrFail((int) ($data['deanery_id'] ?? 0));
-                PilgrimageObject::query()->whereKey($ids->all())->update([
-                    'deanery_id' => $deanery->id,
-                    'vicariate_id' => $deanery->vicariate_id,
-                ]);
+                foreach ($objects as $object) {
+                    $object->update([
+                        'deanery_id' => $deanery->id,
+                        'vicariate_id' => $deanery->vicariate_id,
+                    ]);
+                }
 
                 return 'Благочиние «'.$deanery->name.'» назначено объектам: '.$objects->count().'.';
             }
@@ -125,10 +175,12 @@ class ObjectBulkActionController extends Controller
             }
 
             if ($data['action'] === 'mark_review') {
-                PilgrimageObject::query()->whereKey($ids->all())->update([
-                    'verification_status' => PilgrimageObject::VERIFICATION_NEEDS_REVIEW,
-                    'next_verification_at' => now(),
-                ]);
+                foreach ($objects as $object) {
+                    $object->update([
+                        'verification_status' => PilgrimageObject::VERIFICATION_NEEDS_REVIEW,
+                        'next_verification_at' => now(),
+                    ]);
+                }
 
                 return 'На проверку отправлено объектов: '.$objects->count().'.';
             }
@@ -144,7 +196,34 @@ class ObjectBulkActionController extends Controller
             return 'Операция выполнена.';
         });
 
+        $logger->log(
+            $this->auditAction($data['action']),
+            null,
+            null,
+            null,
+            $context,
+            $request->user()->id,
+            'web',
+            $batchId,
+            PilgrimageObject::class,
+            null,
+            'Массовая операция с объектами'
+        );
+
         return back()->with('success', $message);
+    }
+
+    private function auditAction(string $action): string
+    {
+        return [
+            'publish' => 'bulk_publish',
+            'unpublish' => 'bulk_unpublish',
+            'set_type' => 'bulk_set_type',
+            'set_deanery' => 'bulk_set_deanery',
+            'add_route' => 'bulk_add_route',
+            'mark_review' => 'bulk_mark_review',
+            'archive' => 'bulk_archive',
+        ][$action] ?? 'updated';
     }
 
     private function export($objects): StreamedResponse

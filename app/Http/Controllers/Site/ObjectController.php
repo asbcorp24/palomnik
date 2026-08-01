@@ -7,6 +7,7 @@ use App\Models\Deanery;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use App\Models\Vicariate;
+use App\Services\AnalyticsService;
 use App\Services\PilgrimageObjectFuzzySearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -16,8 +17,11 @@ use Illuminate\View\View;
 
 class ObjectController extends Controller
 {
-    public function index(Request $request, PilgrimageObjectFuzzySearch $fuzzySearch): View
-    {
+    public function index(
+        Request $request,
+        PilgrimageObjectFuzzySearch $fuzzySearch,
+        AnalyticsService $analytics
+    ): View {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', 'string', 'max:255'],
@@ -70,6 +74,36 @@ class ObjectController extends Controller
             $objects = $query->paginate(12)->withQueryString();
         }
 
+        if ($searchTerm !== '') {
+            $analytics->track($request, 'catalog_search', null, [
+                'results_count' => $objects->total(),
+                'type' => $filters['type'] ?? null,
+                'vicariate' => $filters['vicariate'] ?? null,
+                'deanery' => $filters['deanery'] ?? null,
+            ], $searchTerm);
+
+            if ($objects->total() === 0) {
+                $analytics->track($request, 'search_no_results', null, [
+                    'type' => $filters['type'] ?? null,
+                    'vicariate' => $filters['vicariate'] ?? null,
+                    'deanery' => $filters['deanery'] ?? null,
+                ], $searchTerm);
+            }
+        }
+
+        $activeFilters = collect($filters)
+            ->except(['q'])
+            ->filter(fn ($value): bool => filled($value));
+        if ($activeFilters->isNotEmpty()) {
+            $analytics->track(
+                $request,
+                'catalog_filter',
+                null,
+                $activeFilters->all(),
+                $activeFilters->map(fn ($value, $key): string => $key.'='.$value)->implode('; ')
+            );
+        }
+
         return view('site.objects.index', [
             'objects' => $objects,
             'types' => ObjectType::query()->visible()->orderBy('sort_order')->orderBy('name')->get(),
@@ -79,8 +113,11 @@ class ObjectController extends Controller
         ]);
     }
 
-    public function show(PilgrimageObject $object): View
-    {
+    public function show(
+        Request $request,
+        PilgrimageObject $object,
+        AnalyticsService $analytics
+    ): View {
         $object->loadMissing('objectType');
         $isScheduledForFuture = $object->published_at && $object->published_at->isFuture();
         $typeIsVisible = $object->objectType
@@ -101,6 +138,12 @@ class ObjectController extends Controller
             'reviews' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
             'userMedia' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
             'pointsOfInterest' => fn ($query) => $query->published()->ordered(),
+        ]);
+
+        $analytics->track($request, 'object_view', $object, [
+            'type' => $object->objectType?->slug,
+            'vicariate_id' => $object->vicariate_id,
+            'deanery_id' => $object->deanery_id,
         ]);
 
         $nearbyObjects = $this->nearbyObjects($object);

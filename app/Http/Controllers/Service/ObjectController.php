@@ -33,8 +33,8 @@ class ObjectController extends Controller
 
         return view('service.objects.edit', [
             'object' => $object,
-            'sanctities' => Sanctity::query()->orderBy('name')->get(),
-            'selectedSanctities' => $object->sanctities->pluck('id')->all(),
+            'sanctities' => Sanctity::query()->where('slug', '<>', 'holy-spring')->orderBy('name')->get(),
+            'selectedSanctities' => $object->sanctities->where('slug', '<>', 'holy-spring')->pluck('id')->all(),
             'requests' => $object->updateRequests()->where('user_id', $request->user()->id)->latest()->limit(10)->get(),
             'mediaSubmissions' => $object->mediaSubmissions()->where('user_id', $request->user()->id)->latest()->limit(20)->get(),
         ]);
@@ -61,10 +61,15 @@ class ObjectController extends Controller
             'sanctity_ids.*' => ['integer', 'exists:sanctities,id'],
         ]);
 
-        $requestModel = $object->updateRequests()->create([
+        $object->updateRequests()->create([
             'user_id' => $request->user()->id,
             'payload' => $data,
             'status' => 'pending',
+        ]);
+
+        $object->update([
+            'verification_status' => PilgrimageObject::VERIFICATION_PENDING_UPDATE,
+            'next_verification_at' => now(),
         ]);
 
         $admins = User::query()->whereIn('role', [User::ROLE_ADMIN, User::ROLE_SUPER_ADMIN])->where('is_active', true)->get();

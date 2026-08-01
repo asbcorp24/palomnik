@@ -16,6 +16,8 @@ class CatalogSeeder extends Seeder
                 'marker_color' => '#B08A3E',
                 'icon' => 'church',
                 'sort_order' => 10,
+                'is_active' => true,
+                'is_public' => true,
             ],
             [
                 'name' => 'Монастырь',
@@ -23,6 +25,8 @@ class CatalogSeeder extends Seeder
                 'marker_color' => '#26443B',
                 'icon' => 'monastery',
                 'sort_order' => 20,
+                'is_active' => true,
+                'is_public' => true,
             ],
             [
                 'name' => 'Часовня',
@@ -30,13 +34,17 @@ class CatalogSeeder extends Seeder
                 'marker_color' => '#7A5B43',
                 'icon' => 'chapel',
                 'sort_order' => 30,
+                'is_active' => true,
+                'is_public' => true,
             ],
             [
-                'name' => 'Святой источник',
+                'name' => 'Архивный тип',
                 'slug' => 'holy-spring',
                 'marker_color' => '#356E8D',
-                'icon' => 'water',
-                'sort_order' => 40,
+                'icon' => 'archive',
+                'sort_order' => 1000,
+                'is_active' => false,
+                'is_public' => false,
             ],
         ];
 

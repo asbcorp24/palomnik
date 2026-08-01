@@ -26,12 +26,13 @@ class ObjectDuplicateDetectionService
                 'object_type_id',
             ]);
 
+        $objectIndex = $objects->keyBy('id');
         $pairs = $this->candidatePairs($objects);
         $candidates = [];
 
         foreach ($pairs as [$firstId, $secondId]) {
-            $first = $objects->firstWhere('id', $firstId);
-            $second = $objects->firstWhere('id', $secondId);
+            $first = $objectIndex->get($firstId);
+            $second = $objectIndex->get($secondId);
 
             if (! $first || ! $second) {
                 continue;
@@ -48,11 +49,17 @@ class ObjectDuplicateDetectionService
                 ->where('status', ObjectDuplicateCandidate::STATUS_PENDING)
                 ->delete();
 
+            $reviewed = ObjectDuplicateCandidate::query()
+                ->where('status', '<>', ObjectDuplicateCandidate::STATUS_PENDING)
+                ->get()
+                ->keyBy(fn (ObjectDuplicateCandidate $candidate): string => $candidate->object_a_id.':'.$candidate->object_b_id);
+
+            $insertRows = [];
+            $now = now();
+
             foreach ($candidates as $candidate) {
-                $existing = ObjectDuplicateCandidate::query()
-                    ->where('object_a_id', $candidate['object_a_id'])
-                    ->where('object_b_id', $candidate['object_b_id'])
-                    ->first();
+                $key = $candidate['object_a_id'].':'.$candidate['object_b_id'];
+                $existing = $reviewed->get($key);
 
                 if ($existing) {
                     $existing->update([
@@ -64,9 +71,21 @@ class ObjectDuplicateDetectionService
                     continue;
                 }
 
-                ObjectDuplicateCandidate::query()->create($candidate + [
+                $insertRows[] = [
+                    'object_a_id' => $candidate['object_a_id'],
+                    'object_b_id' => $candidate['object_b_id'],
+                    'score' => $candidate['score'],
+                    'name_similarity' => $candidate['name_similarity'],
+                    'distance_meters' => $candidate['distance_meters'],
+                    'reasons' => json_encode($candidate['reasons'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                     'status' => ObjectDuplicateCandidate::STATUS_PENDING,
-                ]);
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+
+            foreach (array_chunk($insertRows, 500) as $chunk) {
+                DB::table('object_duplicate_candidates')->insert($chunk);
             }
         });
 
@@ -158,10 +177,12 @@ class ObjectDuplicateDetectionService
         $nameA = $this->normalizeName($first->name);
         $nameB = $this->normalizeName($second->name);
         $similarity = $this->nameSimilarity($nameA, $nameB);
-        $phoneSame = $this->normalizePhone($first->phone) !== null
-            && $this->normalizePhone($first->phone) === $this->normalizePhone($second->phone);
-        $websiteSame = $this->normalizeWebsite($first->website) !== null
-            && $this->normalizeWebsite($first->website) === $this->normalizeWebsite($second->website);
+        $firstPhone = $this->normalizePhone($first->phone);
+        $secondPhone = $this->normalizePhone($second->phone);
+        $firstWebsite = $this->normalizeWebsite($first->website);
+        $secondWebsite = $this->normalizeWebsite($second->website);
+        $phoneSame = $firstPhone !== null && $firstPhone === $secondPhone;
+        $websiteSame = $firstWebsite !== null && $firstWebsite === $secondWebsite;
         $distanceMeters = $this->distanceMeters($first, $second);
 
         $reasons = [];

@@ -39,6 +39,35 @@ return new class extends Migration
                 'is_active' => false,
                 'is_public' => false,
             ]);
+
+        $legacyTypeIds = DB::table('object_types')
+            ->where('slug', 'holy-spring')
+            ->pluck('id');
+
+        if (
+            $legacyTypeIds->isNotEmpty()
+            && Schema::hasTable('pilgrimage_objects')
+            && Schema::hasColumn('pilgrimage_objects', 'deleted_at')
+        ) {
+            $updates = ['deleted_at' => now()];
+
+            if (Schema::hasColumn('pilgrimage_objects', 'is_published')) {
+                $updates['is_published'] = false;
+            }
+
+            if (Schema::hasColumn('pilgrimage_objects', 'published_at')) {
+                $updates['published_at'] = null;
+            }
+
+            if (Schema::hasColumn('pilgrimage_objects', 'updated_at')) {
+                $updates['updated_at'] = now();
+            }
+
+            DB::table('pilgrimage_objects')
+                ->whereIn('object_type_id', $legacyTypeIds)
+                ->whereNull('deleted_at')
+                ->update($updates);
+        }
     }
 
     public function down(): void

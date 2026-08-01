@@ -7,21 +7,34 @@
 @section('profile_content')
 <form class="profile-card" method="POST" action="{{ $plan->exists ? route('route-plans.update', $plan) : route('route-plans.store') }}">
     @csrf
-    @if($plan->exists)@method('PUT')@endif
+    @if($plan->exists)
+        @method('PUT')
+    @endif
 
     <div class="row g-4">
         <div class="col-lg-5">
             <div class="mb-3">
                 <label class="form-label" for="name">Название маршрута</label>
-                <input class="form-control @error('name') is-invalid @enderror" id="name" name="name" value="{{ old('name', $plan->name) }}" placeholder="Например, Храмы Замоскворечья" required>
-                @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                <input
+                    class="form-control @error('name') is-invalid @enderror"
+                    id="name"
+                    name="name"
+                    value="{{ old('name', $plan->name) }}"
+                    placeholder="Например, Храмы Замоскворечья"
+                    required
+                >
+                @error('name')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
             </div>
 
             <div class="mb-3">
                 <label class="form-label" for="transport_mode">Способ передвижения</label>
                 <select class="form-select" id="transport_mode" name="transport_mode">
                     @foreach($transportModes as $value => $label)
-                        <option value="{{ $value }}" @selected(old('transport_mode', $plan->transport_mode ?: 'walk') === $value)>{{ $label }}</option>
+                        <option value="{{ $value }}" @selected(old('transport_mode', $plan->transport_mode ?: 'walk') === $value)>
+                            {{ $label }}
+                        </option>
                     @endforeach
                 </select>
             </div>
@@ -72,33 +85,60 @@
                     <h2 class="h5 mb-0">Последовательность точек</h2>
                     <span class="badge rounded-pill object-type-badge" id="selectedCount">0</span>
                 </div>
+
                 <div id="selectedObjects" class="d-grid gap-2"></div>
                 <div id="selected-object-inputs"></div>
-                @error('object_ids')<div class="text-danger small mt-3">{{ $message }}</div>@enderror
-                @error('object_ids.*')<div class="text-danger small mt-3">{{ $message }}</div>@enderror
-                <div class="small text-secondary mt-3">Минимум 2, максимум 20 точек. Расчёт времени предварительный; точный путь откроется в Яндекс Картах.</div>
+
+                @error('object_ids')
+                    <div class="text-danger small mt-3">{{ $message }}</div>
+                @enderror
+                @error('object_ids.*')
+                    <div class="text-danger small mt-3">{{ $message }}</div>
+                @enderror
+
+                <div class="small text-secondary mt-3">
+                    Минимум 2, максимум 20 точек. Расчёт времени предварительный; точный путь откроется в Яндекс Картах.
+                </div>
             </div>
         </div>
     </div>
 
     <div class="d-flex flex-wrap gap-2 mt-4 pt-4 border-top">
-        <button class="btn btn-pm-gold px-5" type="submit">{{ $plan->exists ? 'Сохранить изменения' : 'Создать маршрут' }}</button>
+        <button class="btn btn-pm-gold px-5" type="submit">
+            {{ $plan->exists ? 'Сохранить изменения' : 'Создать маршрут' }}
+        </button>
         <a class="btn btn-light" href="{{ route('route-plans.index') }}">Отмена</a>
     </div>
 </form>
 @endsection
 
+@php
+    $routePickerInitialObjects = [];
+
+    foreach ($selectedObjects as $selectedObject) {
+        $routePickerInitialObjects[] = [
+            'id' => (int) $selectedObject->id,
+            'name' => (string) $selectedObject->name,
+            'address' => (string) ($selectedObject->address ?? ''),
+            'type' => optional($selectedObject->objectType)->name ?: 'Паломнический объект',
+            'type_slug' => optional($selectedObject->objectType)->slug,
+        ];
+    }
+
+    $routePickerSelectedIds = old(
+        'object_ids',
+        $plan->exists ? $plan->objects->pluck('id')->values()->all() : []
+    );
+@endphp
+
 @push('scripts')
 <script>
 (function () {
+    'use strict';
+
     const searchUrl = @json(route('objects.index'));
-    const initialObjects = @json($selectedObjects->map(fn ($object) => [
-        'id' => (int) $object->id,
-        'name' => $object->name,
-        'address' => $object->address,
-        'type' => optional($object->objectType)->name ?: 'Паломнический объект',
-        'type_slug' => optional($object->objectType)->slug,
-    ])->values());
+    const initialObjects = @json($routePickerInitialObjects);
+    const initialSelectedIds = @json($routePickerSelectedIds);
 
     const searchInput = document.getElementById('objectSearch');
     const typeFilter = document.getElementById('objectTypeFilter');
@@ -108,90 +148,50 @@
     const inputsBox = document.getElementById('selected-object-inputs');
     const count = document.getElementById('selectedCount');
 
-    const objectStore = new Map(initialObjects.map(object => [Number(object.id), object]));
-    let selected = @json(old('object_ids', $plan->exists ? $plan->objects->pluck('id')->values() : []));
+    if (!searchInput || !typeFilter || !statusBox || !catalog || !selectedBox || !inputsBox || !count) {
+        return;
+    }
+
+    const objectStore = new Map();
+    initialObjects.forEach(function (object) {
+        objectStore.set(Number(object.id), object);
+    });
+
+    let selected = Array.isArray(initialSelectedIds)
+        ? initialSelectedIds.map(Number).filter(function (id) { return objectStore.has(id); })
+        : [];
     let currentResults = [];
     let debounceTimer = null;
     let activeRequest = null;
 
-    selected = selected.map(Number).filter(id => objectStore.has(id));
-
     function escapeHtml(value) {
         const div = document.createElement('div');
-        div.textContent = value || '';
+        div.textContent = value == null ? '' : String(value);
         return div.innerHTML;
     }
 
-    function renderSelected() {
-        selectedBox.innerHTML = '';
-        inputsBox.innerHTML = '';
-        count.textContent = selected.length;
-
-        if (!selected.length) {
-            selectedBox.innerHTML = '<div class="empty-state py-4">Добавьте минимум два объекта.</div>';
-            renderResults(currentResults);
-            return;
-        }
-
-        selected.forEach(function (id, index) {
-            const object = objectStore.get(id);
-            if (!object) return;
-
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'object_ids[]';
-            input.value = id;
-            inputsBox.appendChild(input);
-
-            const row = document.createElement('div');
-            row.className = 'route-plan-step';
-            row.innerHTML = `
-                <span class="step-number flex-shrink-0">${index + 1}</span>
-                <div class="flex-grow-1 min-w-0">
-                    <strong class="d-block">${escapeHtml(object.name)}</strong>
-                    <small class="text-secondary">${escapeHtml(object.type)}${object.address ? ' · ' + escapeHtml(object.address) : ''}</small>
-                </div>
-                <div class="btn-group btn-group-sm">
-                    <button class="btn btn-light move-up" type="button" ${index === 0 ? 'disabled' : ''} title="Переместить выше"><i class="bi bi-arrow-up"></i></button>
-                    <button class="btn btn-light move-down" type="button" ${index === selected.length - 1 ? 'disabled' : ''} title="Переместить ниже"><i class="bi bi-arrow-down"></i></button>
-                    <button class="btn btn-light text-danger remove" type="button" title="Удалить"><i class="bi bi-x-lg"></i></button>
-                </div>`;
-
-            row.querySelector('.move-up').addEventListener('click', () => move(index, -1));
-            row.querySelector('.move-down').addEventListener('click', () => move(index, 1));
-            row.querySelector('.remove').addEventListener('click', () => {
-                selected.splice(index, 1);
-                renderSelected();
-            });
-            selectedBox.appendChild(row);
-        });
-
-        renderResults(currentResults);
-    }
-
     function renderResults(objects) {
-        currentResults = objects;
+        currentResults = Array.isArray(objects) ? objects : [];
 
-        if (!objects.length) {
+        if (!currentResults.length) {
             if (searchInput.value.trim().length >= 2) {
                 catalog.innerHTML = '<div class="empty-state py-4">Ничего не найдено. Попробуйте другое название или адрес.</div>';
             }
             return;
         }
 
-        catalog.innerHTML = objects.map(function (object) {
+        catalog.innerHTML = currentResults.map(function (object) {
             const id = Number(object.id);
-            const checked = selected.includes(id) ? 'checked' : '';
-            const address = object.address ? ` · ${escapeHtml(object.address)}` : '';
+            const checked = selected.includes(id) ? ' checked' : '';
+            const address = object.address ? ' · ' + escapeHtml(object.address) : '';
 
-            return `
-                <label class="map-object-row d-flex gap-3 align-items-start object-choice">
-                    <input class="form-check-input mt-1 route-object-checkbox" type="checkbox" value="${id}" ${checked}>
-                    <span class="min-w-0">
-                        <strong class="d-block">${escapeHtml(object.name)}</strong>
-                        <small class="text-secondary">${escapeHtml(object.type)}${address}</small>
-                    </span>
-                </label>`;
+            return '<label class="map-object-row d-flex gap-3 align-items-start object-choice">' +
+                '<input class="form-check-input mt-1 route-object-checkbox" type="checkbox" value="' + id + '"' + checked + '>' +
+                '<span class="min-w-0">' +
+                    '<strong class="d-block">' + escapeHtml(object.name) + '</strong>' +
+                    '<small class="text-secondary">' + escapeHtml(object.type || 'Паломнический объект') + address + '</small>' +
+                '</span>' +
+            '</label>';
         }).join('');
 
         catalog.querySelectorAll('.route-object-checkbox').forEach(function (checkbox) {
@@ -208,7 +208,7 @@
                 }
 
                 if (!checkbox.checked) {
-                    selected = selected.filter(item => item !== id);
+                    selected = selected.filter(function (item) { return item !== id; });
                 }
 
                 renderSelected();
@@ -216,10 +216,71 @@
         });
     }
 
+    function renderSelected() {
+        selectedBox.innerHTML = '';
+        inputsBox.innerHTML = '';
+        count.textContent = String(selected.length);
+
+        if (!selected.length) {
+            selectedBox.innerHTML = '<div class="empty-state py-4">Добавьте минимум два объекта.</div>';
+            renderResults(currentResults);
+            return;
+        }
+
+        selected.forEach(function (id, index) {
+            const object = objectStore.get(id);
+            if (!object) {
+                return;
+            }
+
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'object_ids[]';
+            input.value = String(id);
+            inputsBox.appendChild(input);
+
+            const row = document.createElement('div');
+            row.className = 'route-plan-step';
+            row.innerHTML =
+                '<span class="step-number flex-shrink-0">' + (index + 1) + '</span>' +
+                '<div class="flex-grow-1 min-w-0">' +
+                    '<strong class="d-block">' + escapeHtml(object.name) + '</strong>' +
+                    '<small class="text-secondary">' + escapeHtml(object.type || 'Паломнический объект') +
+                        (object.address ? ' · ' + escapeHtml(object.address) : '') +
+                    '</small>' +
+                '</div>' +
+                '<div class="btn-group btn-group-sm">' +
+                    '<button class="btn btn-light move-up" type="button"' + (index === 0 ? ' disabled' : '') + ' title="Переместить выше"><i class="bi bi-arrow-up"></i></button>' +
+                    '<button class="btn btn-light move-down" type="button"' + (index === selected.length - 1 ? ' disabled' : '') + ' title="Переместить ниже"><i class="bi bi-arrow-down"></i></button>' +
+                    '<button class="btn btn-light text-danger remove" type="button" title="Удалить"><i class="bi bi-x-lg"></i></button>' +
+                '</div>';
+
+            row.querySelector('.move-up').addEventListener('click', function () {
+                move(index, -1);
+            });
+            row.querySelector('.move-down').addEventListener('click', function () {
+                move(index, 1);
+            });
+            row.querySelector('.remove').addEventListener('click', function () {
+                selected.splice(index, 1);
+                renderSelected();
+            });
+
+            selectedBox.appendChild(row);
+        });
+
+        renderResults(currentResults);
+    }
+
     function move(index, delta) {
         const target = index + delta;
-        if (target < 0 || target >= selected.length) return;
-        [selected[index], selected[target]] = [selected[target], selected[index]];
+        if (target < 0 || target >= selected.length) {
+            return;
+        }
+
+        const currentId = selected[index];
+        selected[index] = selected[target];
+        selected[target] = currentId;
         renderSelected();
     }
 
@@ -245,7 +306,9 @@
         const url = new URL(searchUrl, window.location.origin);
         url.searchParams.set('picker', 'route');
         url.searchParams.set('q', term);
-        if (typeFilter.value) url.searchParams.set('type', typeFilter.value);
+        if (typeFilter.value) {
+            url.searchParams.set('type', typeFilter.value);
+        }
 
         try {
             const response = await fetch(url.toString(), {
@@ -256,19 +319,29 @@
                 signal: requestController.signal
             });
 
-            if (!response.ok) throw new Error('Search request failed');
+            if (!response.ok) {
+                throw new Error('Search request failed');
+            }
 
             const payload = await response.json();
-            if (activeRequest !== requestController) return;
+            if (activeRequest !== requestController) {
+                return;
+            }
 
             const objects = Array.isArray(payload.data) ? payload.data : [];
-            objects.forEach(object => objectStore.set(Number(object.id), object));
+            objects.forEach(function (object) {
+                objectStore.set(Number(object.id), object);
+            });
+
             renderResults(objects);
             statusBox.textContent = objects.length
-                ? `Найдено: ${objects.length}. Выберите нужные объекты.`
+                ? 'Найдено: ' + objects.length + '. Выберите нужные объекты.'
                 : 'По вашему запросу ничего не найдено.';
         } catch (error) {
-            if (error.name === 'AbortError' || activeRequest !== requestController) return;
+            if (error.name === 'AbortError' || activeRequest !== requestController) {
+                return;
+            }
+
             currentResults = [];
             catalog.innerHTML = '<div class="alert alert-light border mb-0">Не удалось выполнить поиск. Повторите попытку.</div>';
             statusBox.textContent = 'Ошибка загрузки результатов.';

@@ -5,7 +5,6 @@ use App\Http\Controllers\Api\V1\MapViewportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/map/object-by-slug/{slug}', MapObjectBySlugController::class)
-    ->where('slug', '[A-Za-z0-9._-]+')
     ->middleware('throttle:240,1')
     ->name('map.object-by-slug');
 

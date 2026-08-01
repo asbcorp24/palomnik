@@ -63,7 +63,7 @@ class PilgrimageObjectMergeService
                 });
 
             if ($candidate) {
-                $otherCandidates->whereKeyNot($candidate->id);
+                $otherCandidates->where('id', '<>', $candidate->id);
             }
 
             $otherCandidates->delete();

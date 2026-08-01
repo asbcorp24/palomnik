@@ -82,6 +82,7 @@
 @endif
 
 <main>@yield('content')</main>
+@includeWhen(request()->routeIs('objects.show'), 'site.objects._information_verification')
 
 <footer class="site-footer py-5"><div class="container"><div class="row g-4">
 <div class="col-lg-4"><div class="d-flex align-items-center gap-3 mb-3"><span class="brand-mark"><i class="bi bi-cross"></i></span><div><div class="pm-serif fs-5 text-white">Московский паломник</div><div class="small opacity-75">Единая цифровая платформа паломничества</div></div></div><p class="small mb-0">Храмы, монастыри, святыни, события и паломнические маршруты по Москве и Московской области.</p></div>

@@ -11,6 +11,7 @@ use Throwable;
 class AdminActivityLogger
 {
     private static int $disabledDepth = 0;
+    private static ?bool $tableAvailable = null;
 
     public function log(
         string $action,
@@ -30,7 +31,7 @@ class AdminActivityLogger
         }
 
         try {
-            if (! Schema::hasTable('admin_activity_logs')) {
+            if (! $this->tableAvailable()) {
                 return null;
             }
 
@@ -89,6 +90,15 @@ class AdminActivityLogger
         return $user !== null
             && method_exists($user, 'isAdmin')
             && $user->isAdmin();
+    }
+
+    private function tableAvailable(): bool
+    {
+        if (self::$tableAvailable === null) {
+            self::$tableAvailable = Schema::hasTable('admin_activity_logs');
+        }
+
+        return self::$tableAvailable;
     }
 
     private function entityLabel(?Model $entity): string

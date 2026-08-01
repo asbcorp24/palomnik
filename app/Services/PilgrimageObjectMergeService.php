@@ -11,13 +11,17 @@ use RuntimeException;
 
 class PilgrimageObjectMergeService
 {
-    public function merge(PilgrimageObject $master, PilgrimageObject $duplicate): PilgrimageObject
-    {
+    public function merge(
+        PilgrimageObject $master,
+        PilgrimageObject $duplicate,
+        ?ObjectDuplicateCandidate $candidate = null,
+        ?int $reviewedBy = null
+    ): PilgrimageObject {
         if ($master->id === $duplicate->id) {
             throw new RuntimeException('Нельзя объединить объект с самим собой.');
         }
 
-        return DB::transaction(function () use ($master, $duplicate): PilgrimageObject {
+        return DB::transaction(function () use ($master, $duplicate, $candidate, $reviewedBy): PilgrimageObject {
             $master = PilgrimageObject::withTrashed()->lockForUpdate()->findOrFail($master->id);
             $duplicate = PilgrimageObject::withTrashed()->lockForUpdate()->findOrFail($duplicate->id);
 
@@ -52,13 +56,25 @@ class PilgrimageObjectMergeService
             $this->moveDirectRows('object_representatives', $master->id, $duplicate->id, ['user_id']);
             $this->moveDirectRows('reviews', $master->id, $duplicate->id, ['user_id']);
 
-            ObjectDuplicateCandidate::query()
+            $otherCandidates = ObjectDuplicateCandidate::query()
                 ->where(function ($query) use ($duplicate): void {
                     $query->where('object_a_id', $duplicate->id)
                         ->orWhere('object_b_id', $duplicate->id);
-                })
-                ->where('status', ObjectDuplicateCandidate::STATUS_PENDING)
-                ->delete();
+                });
+
+            if ($candidate) {
+                $otherCandidates->whereKeyNot($candidate->id);
+            }
+
+            $otherCandidates->delete();
+
+            if ($candidate) {
+                $candidate->update([
+                    'status' => ObjectDuplicateCandidate::STATUS_MERGED,
+                    'reviewed_by' => $reviewedBy,
+                    'reviewed_at' => now(),
+                ]);
+            }
 
             $duplicate->delete();
 

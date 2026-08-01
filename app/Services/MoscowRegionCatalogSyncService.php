@@ -6,7 +6,6 @@ use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use App\Models\PointOfInterest;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use JsonException;
 use RuntimeException;
 
@@ -16,6 +15,7 @@ class MoscowRegionCatalogSyncService
     private const ALLOWED_POI_CATEGORIES = ['parking', 'cafe', 'hotel'];
     private const GENERATED_POI_MARKER = 'Данные OpenStreetMap';
     private const MINIMUM_FULL_SNAPSHOT_OBJECTS = 100;
+    private const MINIMUM_FULL_SNAPSHOT_POINTS = 50;
 
     private PilgrimageObjectMergeService $mergeService;
     private AdminActivityLogger $activityLogger;
@@ -28,16 +28,13 @@ class MoscowRegionCatalogSyncService
         $this->activityLogger = $activityLogger;
     }
 
-    /**
-     * @throws JsonException
-     */
+    /** @throws JsonException */
     public function sync(string $objectsPath, string $nearbyPath, bool $clean = true): array
     {
         $objectsPath = $this->resolvePath($objectsPath);
         $nearbyPath = $this->resolvePath($nearbyPath);
         $objectsSnapshot = $this->readSnapshot($objectsPath, 'objects');
         $nearbySnapshot = $this->readSnapshot($nearbyPath, 'points');
-
         $prepared = $this->prepareObjects($objectsSnapshot['objects']);
 
         if ($clean && count($prepared['objects']) < self::MINIMUM_FULL_SNAPSHOT_OBJECTS) {
@@ -48,12 +45,19 @@ class MoscowRegionCatalogSyncService
             );
         }
 
+        if ($clean && count($nearbySnapshot['points']) < self::MINIMUM_FULL_SNAPSHOT_POINTS) {
+            throw new RuntimeException(
+                'Очистка отменена: JSON ближайших точек содержит только '
+                .count($nearbySnapshot['points']).' записей. Для полной синхронизации требуется не менее '
+                .self::MINIMUM_FULL_SNAPSHOT_POINTS.'. Используйте --no-clean для частичного импорта.'
+            );
+        }
+
         $objectResult = $this->syncObjects(
             $prepared['objects'],
             $prepared['slug_map'],
             $clean
         );
-
         $pointResult = $this->syncNearbyPoints(
             $nearbySnapshot['points'],
             $prepared['slug_map'],
@@ -119,12 +123,10 @@ class MoscowRegionCatalogSyncService
     private function isAbsolutePath(string $path): bool
     {
         return str_starts_with($path, DIRECTORY_SEPARATOR)
-            || preg_match('/^[A-Za-z]:[\\\\\/]/', $path) === 1;
+            || preg_match('~^[A-Za-z]:[\\\\/]~', $path) === 1;
     }
 
-    /**
-     * @throws JsonException
-     */
+    /** @throws JsonException */
     private function readSnapshot(string $path, string $arrayKey): array
     {
         $snapshot = json_decode(
@@ -179,33 +181,36 @@ class MoscowRegionCatalogSyncService
             return $this->objectRichness($second) <=> $this->objectRichness($first);
         });
 
-        $result = [];
+        $objects = [];
         $slugMap = [];
         $spatialBuckets = [];
 
         foreach ($bySlug as $slug => $item) {
-            $duplicateSlug = $this->findPreparedDuplicate($item, $result, $spatialBuckets);
+            $masterSlug = $this->findPreparedDuplicate($item, $objects, $spatialBuckets);
 
-            if ($duplicateSlug !== null) {
-                $result[$duplicateSlug] = $this->mergeIncomingObject($result[$duplicateSlug], $item);
-                $slugMap[$slug] = $duplicateSlug;
+            if ($masterSlug !== null) {
+                $objects[$masterSlug] = $this->mergeIncomingObject($objects[$masterSlug], $item);
+                $slugMap[$slug] = $masterSlug;
                 $stats['nearby_duplicates_merged']++;
                 continue;
             }
 
-            $result[$slug] = $item;
-            $cell = $this->spatialCell((float) $item['latitude'], (float) $item['longitude']);
-            $spatialBuckets[$cell][] = $slug;
+            $objects[$slug] = $item;
+            $slugMap[$slug] = $slug;
+            $spatialBuckets[$this->spatialCell(
+                (float) $item['latitude'],
+                (float) $item['longitude']
+            )][] = $slug;
         }
 
-        foreach (array_keys($bySlug) as $slug) {
-            $slugMap[$slug] = $this->resolveMappedSlug($slug, $slugMap);
+        foreach ($slugMap as $slug => $mappedSlug) {
+            $slugMap[$slug] = $this->resolveMappedSlug($mappedSlug, $slugMap);
         }
 
         return [
-            'objects' => $result,
+            'objects' => $objects,
             'slug_map' => $slugMap,
-            'stats' => $stats + ['ready' => count($result)],
+            'stats' => $stats + ['ready' => count($objects)],
         ];
     }
 
@@ -280,6 +285,10 @@ class MoscowRegionCatalogSyncService
 
     private function objectsAreDuplicates(array $first, array $second): bool
     {
+        if (($first['type'] ?? null) !== ($second['type'] ?? null)) {
+            return false;
+        }
+
         $distance = $this->distanceMeters(
             (float) $first['latitude'],
             (float) $first['longitude'],
@@ -295,10 +304,12 @@ class MoscowRegionCatalogSyncService
         $nameB = $this->canonicalObjectName($second['name']);
         $similarity = $this->nameSimilarity($nameA, $nameB);
         $sameCanonicalName = $nameA !== '' && $nameA === $nameB;
-        $samePhone = $this->normalizePhone($first['phone']) !== null
-            && $this->normalizePhone($first['phone']) === $this->normalizePhone($second['phone']);
-        $sameWebsite = $this->normalizeWebsite($first['website']) !== null
-            && $this->normalizeWebsite($first['website']) === $this->normalizeWebsite($second['website']);
+        $firstPhone = $this->normalizePhone($first['phone']);
+        $secondPhone = $this->normalizePhone($second['phone']);
+        $firstWebsite = $this->normalizeWebsite($first['website']);
+        $secondWebsite = $this->normalizeWebsite($second['website']);
+        $samePhone = $firstPhone !== null && $firstPhone === $secondPhone;
+        $sameWebsite = $firstWebsite !== null && $firstWebsite === $secondWebsite;
 
         if ($sameCanonicalName && $distance <= 80) {
             return true;
@@ -308,7 +319,7 @@ class MoscowRegionCatalogSyncService
             return true;
         }
 
-        if ($distance <= 15 && $similarity >= 75) {
+        if ($distance <= 15 && $similarity >= 80) {
             return true;
         }
 
@@ -334,8 +345,8 @@ class MoscowRegionCatalogSyncService
             }
         }
 
-        if (($master['address'] ?? '') === 'Адрес уточняется'
-            && ($duplicate['address'] ?? '') !== 'Адрес уточняется') {
+        if ($this->isGenericAddress($master['address'] ?? null)
+            && ! $this->isGenericAddress($duplicate['address'] ?? null)) {
             $master['address'] = $duplicate['address'];
         }
 
@@ -366,6 +377,7 @@ class MoscowRegionCatalogSyncService
             'auxiliary_merged' => 0,
             'auxiliary_archived' => 0,
             'stale_archived' => 0,
+            'generated_points_archived' => 0,
         ];
 
         DB::transaction(function () use ($items, $typeIds, &$stats): void {
@@ -421,32 +433,35 @@ class MoscowRegionCatalogSyncService
             $stats['duplicates_merged']++;
         }
 
-        if ($clean) {
-            $keepSlugs = array_keys($items);
-
-            PilgrimageObject::query()
-                ->where('slug', 'like', 'osm-%')
-                ->whereNotIn('slug', $keepSlugs)
-                ->orderBy('id')
-                ->chunkById(200, function ($objects) use (&$stats): void {
-                    foreach ($objects as $object) {
-                        if ($this->isAuxiliaryObjectName($object->name)) {
-                            $parent = $this->findLikelyParentTemple($object);
-                            if ($parent) {
-                                $this->mergeService->merge($parent, $object);
-                                $stats['auxiliary_merged']++;
-                            } else {
-                                $object->delete();
-                                $stats['auxiliary_archived']++;
-                            }
-                            continue;
-                        }
-
-                        $object->delete();
-                        $stats['stale_archived']++;
-                    }
-                });
+        if (! $clean) {
+            return $stats;
         }
+
+        $keepSlugs = array_keys($items);
+        PilgrimageObject::query()
+            ->where('slug', 'like', 'osm-%')
+            ->whereNotIn('slug', $keepSlugs)
+            ->orderBy('id')
+            ->chunkById(200, function ($objects) use (&$stats): void {
+                foreach ($objects as $object) {
+                    if ($this->isAuxiliaryObjectName($object->name)) {
+                        $parent = $this->findLikelyParentTemple($object);
+                        if ($parent) {
+                            $this->mergeService->merge($parent, $object);
+                            $stats['auxiliary_merged']++;
+                        } else {
+                            $stats['generated_points_archived'] += $this->archiveGeneratedPointsForObject($object->id);
+                            $object->delete();
+                            $stats['auxiliary_archived']++;
+                        }
+                        continue;
+                    }
+
+                    $stats['generated_points_archived'] += $this->archiveGeneratedPointsForObject($object->id);
+                    $object->delete();
+                    $stats['stale_archived']++;
+                }
+            });
 
         return $stats;
     }
@@ -472,40 +487,35 @@ class MoscowRegionCatalogSyncService
 
     private function changedObjectFields(PilgrimageObject $object, array $incoming): array
     {
-        $alwaysUpdate = [
-            'object_type_id',
-            'name',
-            'address',
-            'latitude',
-            'longitude',
-        ];
-        $fillOrUpdateWhenIncomingPresent = [
-            'phone',
-            'email',
-            'website',
-            'schedule_text',
-            'information_source_url',
-        ];
-        $editorialOnlyWhenBlank = [
-            'short_description',
-            'description',
-            'history',
-        ];
         $updates = [];
 
-        foreach ($alwaysUpdate as $field) {
+        foreach (['object_type_id', 'name', 'latitude', 'longitude'] as $field) {
             if ((string) $object->{$field} !== (string) $incoming[$field]) {
                 $updates[$field] = $incoming[$field];
             }
         }
 
-        foreach ($fillOrUpdateWhenIncomingPresent as $field) {
+        if (filled($incoming['address'])
+            && (string) $object->address !== (string) $incoming['address']
+            && (blank($object->address)
+                || $this->isGenericAddress($object->address)
+                || ! $this->isGenericAddress($incoming['address']))) {
+            $updates['address'] = $incoming['address'];
+        }
+
+        foreach ([
+            'phone',
+            'email',
+            'website',
+            'schedule_text',
+            'information_source_url',
+        ] as $field) {
             if (filled($incoming[$field]) && (string) $object->{$field} !== (string) $incoming[$field]) {
                 $updates[$field] = $incoming[$field];
             }
         }
 
-        foreach ($editorialOnlyWhenBlank as $field) {
+        foreach (['short_description', 'description', 'history'] as $field) {
             if (blank($object->{$field}) && filled($incoming[$field])) {
                 $updates[$field] = $incoming[$field];
             }
@@ -522,17 +532,14 @@ class MoscowRegionCatalogSyncService
 
         $latitude = (float) $auxiliary->latitude;
         $longitude = (float) $auxiliary->longitude;
-        $latDelta = 0.0015;
-        $lngDelta = 0.0025;
         $auxiliaryAddress = $this->normalizeAddress($auxiliary->address);
         $auxiliaryPhone = $this->normalizePhone($auxiliary->phone);
         $auxiliaryWebsite = $this->normalizeWebsite($auxiliary->website);
-
         $candidates = PilgrimageObject::query()
             ->where('id', '<>', $auxiliary->id)
             ->where('slug', 'like', 'osm-%')
-            ->whereBetween('latitude', [$latitude - $latDelta, $latitude + $latDelta])
-            ->whereBetween('longitude', [$longitude - $lngDelta, $longitude + $lngDelta])
+            ->whereBetween('latitude', [$latitude - 0.0015, $latitude + 0.0015])
+            ->whereBetween('longitude', [$longitude - 0.0025, $longitude + 0.0025])
             ->whereHas('objectType', fn ($query) => $query->whereIn('slug', ['temple', 'monastery']))
             ->get();
 
@@ -574,6 +581,15 @@ class MoscowRegionCatalogSyncService
         return $best;
     }
 
+    private function archiveGeneratedPointsForObject(int $objectId): int
+    {
+        return PointOfInterest::query()
+            ->where('pilgrimage_object_id', $objectId)
+            ->whereIn('category', self::ALLOWED_POI_CATEGORIES)
+            ->where('description', 'like', '%'.self::GENERATED_POI_MARKER.'%')
+            ->delete();
+    }
+
     private function syncNearbyPoints(array $items, array $slugMap, bool $clean): array
     {
         $stats = [
@@ -584,6 +600,7 @@ class MoscowRegionCatalogSyncService
             'invalid' => 0,
             'missing_object' => 0,
             'input_duplicates' => 0,
+            'duplicate_archived' => 0,
             'stale_archived' => 0,
         ];
         $objectCache = [];
@@ -626,12 +643,14 @@ class MoscowRegionCatalogSyncService
             }
 
             $key = $this->pointKey($object->id, $category, $latitude, $longitude);
+            $description = $this->markGeneratedDescription(
+                $this->nullableString($item['description'] ?? null)
+            );
             $incoming = [
                 'pilgrimage_object_id' => $object->id,
                 'category' => $category,
                 'name' => $name,
-                'description' => $this->nullableString($item['description'] ?? null)
-                    ?: 'Данные OpenStreetMap.',
+                'description' => $description,
                 'address' => $this->nullableString($item['address'] ?? null),
                 'latitude' => round($latitude, 7),
                 'longitude' => round($longitude, 7),
@@ -686,29 +705,38 @@ class MoscowRegionCatalogSyncService
             }
         });
 
-        if ($clean) {
-            PointOfInterest::query()
-                ->whereIn('category', self::ALLOWED_POI_CATEGORIES)
-                ->where('description', 'like', '%'.self::GENERATED_POI_MARKER.'%')
-                ->whereHas('pilgrimageObject', fn ($query) => $query->where('slug', 'like', 'osm-%'))
-                ->with('pilgrimageObject:id,slug')
-                ->orderBy('id')
-                ->chunkById(500, function ($points) use ($prepared, &$stats): void {
-                    foreach ($points as $point) {
-                        $key = $this->pointKey(
-                            (int) $point->pilgrimage_object_id,
-                            (string) $point->category,
-                            (float) $point->latitude,
-                            (float) $point->longitude
-                        );
-
-                        if (! isset($prepared[$key])) {
-                            $point->delete();
-                            $stats['stale_archived']++;
-                        }
-                    }
-                });
+        if (! $clean) {
+            return $stats;
         }
+
+        $seenKeys = [];
+        PointOfInterest::query()
+            ->whereIn('category', self::ALLOWED_POI_CATEGORIES)
+            ->where('description', 'like', '%'.self::GENERATED_POI_MARKER.'%')
+            ->whereHas('pilgrimageObject', fn ($query) => $query->where('slug', 'like', 'osm-%'))
+            ->orderBy('id')
+            ->chunkById(500, function ($points) use ($prepared, &$seenKeys, &$stats): void {
+                foreach ($points as $point) {
+                    $key = $this->pointKey(
+                        (int) $point->pilgrimage_object_id,
+                        (string) $point->category,
+                        (float) $point->latitude,
+                        (float) $point->longitude
+                    );
+
+                    if (isset($seenKeys[$key])) {
+                        $point->delete();
+                        $stats['duplicate_archived']++;
+                        continue;
+                    }
+
+                    $seenKeys[$key] = true;
+                    if (! isset($prepared[$key])) {
+                        $point->delete();
+                        $stats['stale_archived']++;
+                    }
+                }
+            });
 
         return $stats;
     }
@@ -726,6 +754,19 @@ class MoscowRegionCatalogSyncService
         return $master;
     }
 
+    private function markGeneratedDescription(?string $description): string
+    {
+        if ($description === null) {
+            return self::GENERATED_POI_MARKER.'.';
+        }
+
+        if (! str_contains($description, self::GENERATED_POI_MARKER)) {
+            return rtrim($description).'. '.self::GENERATED_POI_MARKER.'.';
+        }
+
+        return $description;
+    }
+
     private function pointKey(int $objectId, string $category, float $latitude, float $longitude): string
     {
         return $objectId.'|'.$category.'|'.number_format($latitude, 7, '.', '')
@@ -734,7 +775,7 @@ class MoscowRegionCatalogSyncService
 
     private function isAuxiliaryObjectName(?string $name): bool
     {
-        return preg_match('/\b(?:придел|предел)\w*/ui', (string) $name) === 1;
+        return preg_match('/(?:придел|предел)/ui', (string) $name) === 1;
     }
 
     private function objectRichness(array $item): int
@@ -756,7 +797,7 @@ class MoscowRegionCatalogSyncService
             }
         }
 
-        if (($item['address'] ?? '') !== 'Адрес уточняется') {
+        if (! $this->isGenericAddress($item['address'] ?? null)) {
             $score += 2;
         }
         if (($item['osm_type'] ?? null) !== 'node') {
@@ -764,6 +805,19 @@ class MoscowRegionCatalogSyncService
         }
 
         return $score;
+    }
+
+    private function isGenericAddress(?string $address): bool
+    {
+        $address = $this->normalizeAddress($address);
+
+        return $address === ''
+            || in_array($address, [
+                'адрес уточняется',
+                'москва',
+                'московская область',
+                'москва и московская область',
+            ], true);
     }
 
     private function canonicalObjectName(?string $value): string

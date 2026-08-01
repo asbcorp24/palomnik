@@ -70,8 +70,8 @@ class SyncMoscowRegionCatalog extends Command
                     $result['points']['created'],
                     $result['points']['updated'],
                     $result['points']['unchanged'],
-                    $result['points']['input_duplicates'],
-                    $result['points']['stale_archived'],
+                    $result['points']['input_duplicates'] + $result['points']['duplicate_archived'],
+                    $result['points']['stale_archived'] + $result['objects']['generated_points_archived'],
                     $result['points']['invalid'] + $result['points']['missing_object'] + $result['points']['trashed_kept'],
                 ],
             ]
@@ -82,6 +82,12 @@ class SyncMoscowRegionCatalog extends Command
             .'; после очистки и дедупликации: '.$result['prepared']['ready']
             .'; приделов исключено: '.$result['prepared']['auxiliary_removed']
             .'; дублей объединено: '.$result['prepared']['nearby_duplicates_merged'].'.'
+        );
+        $this->line(
+            'Дополнительно архивировано повторяющихся точек: '
+            .$result['points']['duplicate_archived']
+            .'; точек вместе со старыми объектами: '
+            .$result['objects']['generated_points_archived'].'.'
         );
 
         return self::SUCCESS;

@@ -10,6 +10,7 @@ use App\Models\PilgrimageRoute;
 use App\Models\PointOfInterest;
 use App\Models\Sanctity;
 use App\Models\Vicariate;
+use App\Services\AnalyticsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -17,7 +18,7 @@ use Illuminate\View\View;
 
 class MapController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, AnalyticsService $analytics): View
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
@@ -56,6 +57,41 @@ class MapController extends Controller
                 'url' => route('objects.show', $object),
             ];
         })->values();
+
+        $searchTerm = trim((string) ($filters['q'] ?? ''));
+        if ($searchTerm !== '') {
+            $analytics->track($request, 'catalog_search', null, [
+                'source' => 'map',
+                'results_count' => $objects->count(),
+                'type' => $filters['type'] ?? null,
+                'vicariate' => $filters['vicariate'] ?? null,
+                'deanery' => $filters['deanery'] ?? null,
+                'sanctity' => $filters['sanctity'] ?? null,
+            ], $searchTerm);
+
+            if ($objects->isEmpty()) {
+                $analytics->track($request, 'search_no_results', null, [
+                    'source' => 'map',
+                    'type' => $filters['type'] ?? null,
+                    'vicariate' => $filters['vicariate'] ?? null,
+                    'deanery' => $filters['deanery'] ?? null,
+                    'sanctity' => $filters['sanctity'] ?? null,
+                ], $searchTerm);
+            }
+        }
+
+        $activeFilters = collect($filters)
+            ->except(['q', 'focus_poi'])
+            ->filter(fn ($value): bool => filled($value));
+        if ($activeFilters->isNotEmpty()) {
+            $analytics->track(
+                $request,
+                'catalog_filter',
+                null,
+                ['source' => 'map'] + $activeFilters->all(),
+                'map: '.$activeFilters->map(fn ($value, $key): string => $key.'='.$value)->implode('; ')
+            );
+        }
 
         $pointsOfInterest = PointOfInterest::query()
             ->published()

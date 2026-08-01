@@ -47,6 +47,7 @@ class PilgrimageObjectMergeService
             $this->movePivotRows('user_route_plan_object', 'pilgrimage_object_id', $master->id, $duplicate->id, ['user_route_plan_id']);
 
             $this->moveDirectRows('object_media', $master->id, $duplicate->id);
+            $this->normalizeMedia($master->id);
             $this->moveDirectRows('object_update_requests', $master->id, $duplicate->id);
             $this->moveDirectRows('object_media_submissions', $master->id, $duplicate->id);
             $this->moveDirectRows('calendar_events', $master->id, $duplicate->id);
@@ -205,6 +206,32 @@ class PilgrimageObjectMergeService
                     throw $exception;
                 }
             }
+        }
+    }
+
+    private function normalizeMedia(int $objectId): void
+    {
+        if (! Schema::hasTable('object_media')) {
+            return;
+        }
+
+        $media = DB::table('object_media')
+            ->where('pilgrimage_object_id', $objectId)
+            ->orderByDesc('is_cover')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'type']);
+
+        $coverId = optional($media->firstWhere('type', 'image'))->id;
+        DB::table('object_media')
+            ->where('pilgrimage_object_id', $objectId)
+            ->update(['is_cover' => false]);
+
+        foreach ($media->values() as $index => $item) {
+            DB::table('object_media')->where('id', $item->id)->update([
+                'sort_order' => $index + 1,
+                'is_cover' => $coverId !== null && (int) $item->id === (int) $coverId,
+            ]);
         }
     }
 }

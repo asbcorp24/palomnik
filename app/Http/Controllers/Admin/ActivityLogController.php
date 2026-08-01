@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use RuntimeException;
+use Throwable;
 
 class ActivityLogController extends Controller
 {
@@ -94,70 +95,73 @@ class ActivityLogController extends Controller
             ? $activityLog->old_values
             : $activityLog->new_values;
 
-        abort_unless(is_array($snapshot) && $this->canRestore($activityLog), 422, 'Для этой записи восстановление недоступно.');
+        if (! is_array($snapshot) || ! $this->canRestore($activityLog)) {
+            return back()->with('error', 'Для этой записи восстановление недоступно.');
+        }
 
         $before = null;
         $after = null;
         $entity = null;
 
-        DB::transaction(function () use (
-            $activityLog,
-            $snapshot,
-            $logger,
-            &$before,
-            &$after,
-            &$entity
-        ): void {
-            if ($activityLog->entity_type === PilgrimageObject::class) {
-                $entity = PilgrimageObject::withTrashed()->findOrFail($activityLog->entity_id);
-                $before = $logger->snapshot($entity);
+        try {
+            DB::transaction(function () use (
+                $activityLog,
+                $snapshot,
+                $logger,
+                &$before,
+                &$after,
+                &$entity
+            ): void {
+                if ($activityLog->entity_type === PilgrimageObject::class) {
+                    $entity = PilgrimageObject::withTrashed()->findOrFail($activityLog->entity_id);
+                    $before = $logger->snapshot($entity);
 
-                $logger->runWithoutLogging(function () use ($entity, $snapshot): void {
-                    $this->restorePilgrimageObject($entity, $snapshot);
-                });
+                    $logger->runWithoutLogging(function () use ($entity, $snapshot): void {
+                        $this->restorePilgrimageObject($entity, $snapshot);
+                    });
 
-                $entity = PilgrimageObject::withTrashed()->findOrFail($activityLog->entity_id);
-                $after = $logger->snapshot($entity);
-                return;
-            }
+                    $entity = PilgrimageObject::withTrashed()->findOrFail($activityLog->entity_id);
+                    $after = $logger->snapshot($entity);
+                    return;
+                }
 
-            if ($activityLog->entity_type === SiteColorScheme::class) {
-                $entity = SiteColorScheme::query()->findOrFail($activityLog->entity_id);
-                $before = $logger->snapshot($entity);
+                if ($activityLog->entity_type === SiteColorScheme::class) {
+                    $entity = SiteColorScheme::query()->findOrFail($activityLog->entity_id);
+                    $before = $logger->snapshot($entity);
 
-                $logger->runWithoutLogging(function () use ($entity, $snapshot): void {
-                    $values = Arr::only($snapshot, ['name', 'slug', 'colors', 'is_active']);
-                    $values['colors'] = $this->decodedArray($values['colors'] ?? []);
-                    $activate = (bool) ($values['is_active'] ?? false);
-                    unset($values['is_active']);
-                    $entity->update($values);
-                    if ($activate) {
-                        $entity->activate();
-                    }
-                });
+                    $logger->runWithoutLogging(function () use ($entity, $snapshot): void {
+                        $this->restoreColorScheme($entity, $snapshot);
+                    });
 
-                $entity->refresh();
-                $after = $logger->snapshot($entity);
-                return;
-            }
+                    $entity->refresh();
+                    $after = $logger->snapshot($entity);
+                    return;
+                }
 
-            if ($activityLog->entity_type === SiteSetting::class) {
-                $entity = SiteSetting::query()->findOrFail($activityLog->entity_id);
-                $before = $logger->snapshot($entity);
+                if ($activityLog->entity_type === SiteSetting::class) {
+                    $entity = SiteSetting::query()->findOrFail($activityLog->entity_id);
+                    $before = $logger->snapshot($entity);
 
-                $logger->runWithoutLogging(function () use ($entity, $snapshot): void {
-                    $values = Arr::only($snapshot, ['key', 'value']);
-                    $values['value'] = $this->decodedArray($values['value'] ?? []);
-                    $entity->update($values);
-                });
+                    $logger->runWithoutLogging(function () use ($entity, $snapshot): void {
+                        $values = Arr::only($snapshot, ['key', 'value']);
+                        $values['value'] = $this->decodedArray($values['value'] ?? []);
+                        $entity->update($values);
+                    });
 
-                $entity->refresh();
-                $after = $logger->snapshot($entity);
-                return;
-            }
+                    $entity->refresh();
+                    $after = $logger->snapshot($entity);
+                    return;
+                }
 
-            throw new RuntimeException('Этот тип записи нельзя восстановить автоматически.');
-        });
+                throw new RuntimeException('Этот тип записи нельзя восстановить автоматически.');
+            });
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'Не удалось восстановить редакцию. Изменения отменены транзакцией.');
+        }
 
         $logger->log(
             'revision_restored',
@@ -199,6 +203,37 @@ class ActivityLogController extends Controller
         if (! empty($snapshot['deleted_at']) && ! $object->trashed()) {
             $object->delete();
         }
+    }
+
+    private function restoreColorScheme(SiteColorScheme $scheme, array $snapshot): void
+    {
+        $values = Arr::only($snapshot, ['name', 'slug', 'colors']);
+        $values['colors'] = $this->decodedArray($values['colors'] ?? []);
+        $shouldBeActive = (bool) ($snapshot['is_active'] ?? false);
+
+        $scheme->update($values);
+
+        if ($shouldBeActive) {
+            $scheme->activate();
+            return;
+        }
+
+        if (! $scheme->is_active) {
+            return;
+        }
+
+        $replacement = SiteColorScheme::query()
+            ->whereKeyNot($scheme->id)
+            ->orderByDesc('is_active')
+            ->oldest('id')
+            ->first();
+
+        if (! $replacement) {
+            throw new RuntimeException('Нельзя сделать единственную цветовую схему неактивной.');
+        }
+
+        $replacement->activate();
+        $scheme->refresh();
     }
 
     private function canRestore(AdminActivityLog $log): bool

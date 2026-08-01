@@ -223,7 +223,7 @@ class ActivityLogController extends Controller
         }
 
         $replacement = SiteColorScheme::query()
-            ->whereKeyNot($scheme->id)
+            ->where('id', '<>', $scheme->id)
             ->orderByDesc('is_active')
             ->oldest('id')
             ->first();

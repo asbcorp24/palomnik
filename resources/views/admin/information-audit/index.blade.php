@@ -150,11 +150,27 @@
                             @if((int)$object->pending_update_requests_count > 0)
                                 <a class="btn btn-sm btn-outline-primary" href="{{ route('admin.service-review.index', ['type' => 'updates', 'status' => 'pending']) }}" title="Рассмотреть изменения"><i class="bi bi-building-check"></i></a>
                             @endif
-                            <a class="btn btn-sm btn-light" href="{{ route('admin.objects.edit', $object) }}" title="Редактировать"><i class="bi bi-pencil"></i></a>
-                            <form class="d-inline" method="POST" action="{{ route('admin.information-audit.verify', $object) }}" onsubmit="return confirm('Подтвердить актуальность сведений на 90 дней?')">
+                            <a class="btn btn-sm btn-light" href="{{ route('admin.objects.edit', $object) }}" title="Редактировать карточку"><i class="bi bi-pencil"></i></a>
+                            <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#verification-{{ $object->id }}" aria-expanded="false" title="Настроить и подтвердить"><i class="bi bi-patch-check"></i></button>
+                        </td>
+                    </tr>
+                    <tr class="collapse bg-light" id="verification-{{ $object->id }}">
+                        <td colspan="4">
+                            <form class="row g-3 align-items-end p-2" method="POST" action="{{ route('admin.information-audit.verify', $object) }}">
                                 @csrf
                                 @method('PUT')
-                                <button class="btn btn-sm btn-outline-success" type="submit" title="Подтвердить на 90 дней"><i class="bi bi-check2-circle"></i></button>
+                                <div class="col-lg-7">
+                                    <label class="form-label" for="source-{{ $object->id }}">Источник информации</label>
+                                    <input class="form-control" id="source-{{ $object->id }}" type="url" name="information_source_url" value="{{ $object->information_source_url }}" placeholder="https://официальный-сайт.ru/страница">
+                                    <div class="form-text">Официальный сайт храма, епархии или другой проверенный источник.</div>
+                                </div>
+                                <div class="col-md-6 col-lg-3">
+                                    <label class="form-label" for="next-{{ $object->id }}">Следующая проверка</label>
+                                    <input class="form-control" id="next-{{ $object->id }}" type="date" name="next_verification_at" value="{{ optional($object->next_verification_at)->format('Y-m-d') ?: now()->addDays(90)->format('Y-m-d') }}" min="{{ now()->format('Y-m-d') }}">
+                                </div>
+                                <div class="col-md-6 col-lg-2 d-grid">
+                                    <button class="btn btn-success" type="submit"><i class="bi bi-check2-circle me-1"></i>Подтвердить</button>
+                                </div>
                             </form>
                         </td>
                     </tr>

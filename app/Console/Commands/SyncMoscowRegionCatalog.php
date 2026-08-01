@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\MonasteryTempleLinkService;
 use App\Services\MoscowRegionCatalogSyncService;
 use Illuminate\Console\Command;
 use Throwable;
@@ -16,8 +17,10 @@ class SyncMoscowRegionCatalog extends Command
 
     protected $description = 'Синхронизировать храмы, монастыри и ближайшую инфраструктуру из двух JSON-файлов';
 
-    public function handle(MoscowRegionCatalogSyncService $service): int
-    {
+    public function handle(
+        MoscowRegionCatalogSyncService $service,
+        MonasteryTempleLinkService $hierarchyService
+    ): int {
         $clean = ! (bool) $this->option('no-clean');
 
         if ($clean && ! $this->option('yes')) {
@@ -43,6 +46,9 @@ class SyncMoscowRegionCatalog extends Command
 
         try {
             $result = $service->sync($objectsPath, $nearbyPath, $clean);
+            $hierarchy = $clean
+                ? $hierarchyService->link(true, true, true, 600)
+                : null;
         } catch (Throwable $exception) {
             report($exception);
             $this->error($exception->getMessage());
@@ -89,6 +95,19 @@ class SyncMoscowRegionCatalog extends Command
             .'; точек вместе со старыми объектами: '
             .$result['objects']['generated_points_archived'].'.'
         );
+
+        if ($hierarchy !== null) {
+            $this->line(
+                'Иерархия монастырей: проверено храмов и часовен '
+                .$hierarchy['scanned']
+                .', привязано '.$hierarchy['linked']
+                .', неоднозначных '.$hierarchy['ambiguous'].'.'
+            );
+        } else {
+            $this->comment(
+                'Иерархия монастырей не изменялась, потому что использован режим --no-clean.'
+            );
+        }
 
         return self::SUCCESS;
     }

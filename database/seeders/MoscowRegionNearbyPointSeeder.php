@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\PilgrimageObject;
 use App\Models\PointOfInterest;
+use App\Services\AdminActivityLogger;
 use Illuminate\Database\Seeder;
 use JsonException;
 use RuntimeException;
@@ -120,9 +121,32 @@ class MoscowRegionNearbyPointSeeder extends Seeder
             $updated++;
         }
 
+        $batchId = 'nearby-import-'.now()->format('YmdHis');
+        app(AdminActivityLogger::class)->log(
+            'import',
+            null,
+            null,
+            null,
+            [
+                'importer' => self::class,
+                'file' => $path,
+                'file_sha256' => hash_file('sha256', $path),
+                'source_points' => count($points),
+                'created' => $created,
+                'updated' => $updated,
+                'skipped' => $skipped,
+            ],
+            null,
+            'import',
+            $batchId,
+            PointOfInterest::class,
+            null,
+            'Импорт парковок, кафе и гостиниц рядом с храмами'
+        );
+
         $this->command?->info(
             "Импорт ближайших точек завершён: создано {$created}, "
-            ."обновлено {$updated}, пропущено {$skipped}."
+            ."обновлено {$updated}, пропущено {$skipped}. Пакет: {$batchId}."
         );
     }
 

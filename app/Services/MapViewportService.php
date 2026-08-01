@@ -19,15 +19,16 @@ class MapViewportService
     {
         $zoom = (float) $filters['zoom'];
         $bounds = $this->normalizedBounds($filters, $zoom);
-        $cacheKey = $this->cacheKey('objects', $filters, $bounds);
+        $mode = $zoom <= self::SERVER_CLUSTER_MAX_ZOOM ? 'clusters' : 'points';
+        $cacheKey = $this->cacheKey('objects-'.$mode, $filters, $bounds);
 
         return Cache::remember(
             $cacheKey,
             now()->addSeconds((int) config('palomnik.maps.viewport_cache_ttl', self::VIEWPORT_TTL_SECONDS)),
-            function () use ($filters, $bounds, $zoom): array {
+            function () use ($filters, $bounds, $zoom, $mode): array {
                 $query = $this->objectQuery($filters, $bounds);
 
-                return $zoom <= self::SERVER_CLUSTER_MAX_ZOOM
+                return $mode === 'clusters'
                     ? $this->serverClusters($query, $bounds, $zoom)
                     : $this->objectMarkers($query, $bounds, $zoom);
             }
@@ -53,7 +54,7 @@ class MapViewportService
             ];
         }
 
-        $cacheKey = $this->cacheKey('poi', $filters, $bounds);
+        $cacheKey = $this->cacheKey('poi-points', $filters, $bounds);
 
         return Cache::remember(
             $cacheKey,
@@ -147,7 +148,7 @@ class MapViewportService
                     'phone' => $object->phone,
                     'website' => $object->website,
                     'sanctities' => $object->sanctities->pluck('name')->values()->all(),
-                    'information_verified_at' => optional($object->information_verified_at)?->toIso8601String(),
+                    'information_verified_at' => $object->information_verified_at?->toIso8601String(),
                     'url' => route('objects.show', $object),
                 ];
             }
@@ -357,7 +358,7 @@ class MapViewportService
     {
         $payload = [
             'scope' => $scope,
-            'zoom' => round((float) $filters['zoom'], 1),
+            'zoom' => round((float) $filters['zoom'], 2),
             'bounds' => $bounds,
             'q' => trim((string) ($filters['q'] ?? '')),
             'type' => $filters['type'] ?? null,

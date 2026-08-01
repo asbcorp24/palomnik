@@ -87,7 +87,7 @@ class DayRouteController extends Controller
 
         $existingObjectIds = PilgrimageObject::query()
             ->published()
-            ->whereKey($objectIds)
+            ->whereKey($objectIds->all())
             ->pluck('id')
             ->map(fn ($id): int => (int) $id);
 

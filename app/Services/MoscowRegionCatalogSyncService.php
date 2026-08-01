@@ -417,6 +417,10 @@ class MoscowRegionCatalogSyncService
             }
         });
 
+        if (! $clean) {
+            return $stats;
+        }
+
         foreach ($slugMap as $duplicateSlug => $masterSlug) {
             if ($duplicateSlug === $masterSlug || isset($items[$duplicateSlug])) {
                 continue;
@@ -431,10 +435,6 @@ class MoscowRegionCatalogSyncService
 
             $this->mergeService->merge($master, $duplicate);
             $stats['duplicates_merged']++;
-        }
-
-        if (! $clean) {
-            return $stats;
         }
 
         $keepSlugs = array_keys($items);

@@ -44,6 +44,51 @@
     animation: focused-map-marker-pulse 1.7s ease-out infinite;
 }
 
+.focused-poi-marker {
+    display: inline-flex;
+    width: 42px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 4px solid #fffdf9;
+    border-radius: 50% 50% 50% 12%;
+    color: #fff;
+    background: #7c3aed;
+    box-shadow: 0 7px 16px rgba(30, 25, 20, 0.28);
+    cursor: pointer;
+    transform: rotate(-45deg);
+}
+
+.focused-poi-marker i {
+    font-size: 19px;
+    line-height: 1;
+    transform: rotate(45deg);
+}
+
+.focused-poi-marker--parking {
+    background: #2563eb;
+}
+
+.focused-poi-marker--hotel {
+    background: #0f766e;
+}
+
+.focused-poi-marker--cafe {
+    background: #b45309;
+}
+
+.focused-poi-marker--attraction {
+    background: #7c3aed;
+}
+
+.focused-poi-marker:hover,
+.focused-poi-marker:focus-visible {
+    z-index: 3;
+    outline: none;
+    filter: brightness(1.08);
+}
+
 @keyframes focused-map-marker-pulse {
     0% {
         opacity: 0.95;

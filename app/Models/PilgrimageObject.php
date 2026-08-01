@@ -16,6 +16,12 @@ class PilgrimageObject extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const VERIFICATION_UNVERIFIED = 'unverified';
+    public const VERIFICATION_VERIFIED = 'verified';
+    public const VERIFICATION_NEEDS_REVIEW = 'needs_review';
+    public const VERIFICATION_OUTDATED = 'outdated';
+    public const VERIFICATION_PENDING_UPDATE = 'pending_update';
+
     protected $fillable = [
         'object_type_id',
         'parent_object_id',
@@ -35,6 +41,11 @@ class PilgrimageObject extends Model
         'schedule_text',
         'parking_info',
         'accessibility_info',
+        'information_verified_at',
+        'information_source_url',
+        'verified_by',
+        'next_verification_at',
+        'verification_status',
         'is_published',
         'published_at',
     ];
@@ -42,9 +53,22 @@ class PilgrimageObject extends Model
     protected $casts = [
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
+        'information_verified_at' => 'datetime',
+        'next_verification_at' => 'datetime',
         'is_published' => 'boolean',
         'published_at' => 'datetime',
     ];
+
+    public static function verificationStatusLabels(): array
+    {
+        return [
+            self::VERIFICATION_UNVERIFIED => 'Не проверено',
+            self::VERIFICATION_VERIFIED => 'Подтверждено',
+            self::VERIFICATION_NEEDS_REVIEW => 'Требует проверки',
+            self::VERIFICATION_OUTDATED => 'Устарело',
+            self::VERIFICATION_PENDING_UPDATE => 'Получены изменения',
+        ];
+    }
 
     public function getRouteKeyName(): string
     {
@@ -82,6 +106,11 @@ class PilgrimageObject extends Model
     public function deanery(): BelongsTo
     {
         return $this->belongsTo(Deanery::class);
+    }
+
+    public function verifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
     }
 
     public function sanctities(): BelongsToMany
@@ -219,5 +248,12 @@ class PilgrimageObject extends Model
         }
 
         return $query->whereKey($matchingIds);
+    }
+
+    public function isInformationCurrent(): bool
+    {
+        return $this->verification_status === self::VERIFICATION_VERIFIED
+            && $this->information_verified_at !== null
+            && ($this->next_verification_at === null || $this->next_verification_at->isFuture());
     }
 }

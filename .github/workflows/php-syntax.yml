@@ -39,4 +39,5 @@ jobs:
           set -euo pipefail
           node --check public/js/map-viewport.js
           node --check public/js/map-enhancements.js
+          node --check public/js/map-religious-icons.js
           node --check public/js/map-focused-points.js

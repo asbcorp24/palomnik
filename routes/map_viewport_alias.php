@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\V1\MapObjectBySlugController;
 use App\Http\Controllers\Api\V1\MapViewportController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/map/object-by-slug/{slug}', MapObjectBySlugController::class)
+    ->middleware('throttle:240,1');
 
 Route::get('/map/objects', [MapViewportController::class, 'objects'])
     ->middleware('throttle:240,1');

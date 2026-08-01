@@ -19,7 +19,7 @@ class BookingController extends Controller
         BookingCrmService $service,
         AnalyticsService $analytics
     ): RedirectResponse {
-        $analytics->track($request, 'booking_form_started', $trip, [
+        $analytics->track($request, 'booking_submit_attempt', $trip, [
             'trip_id' => $trip->id,
             'route_id' => $trip->pilgrimage_route_id,
             'participants_count' => (int) $request->input('participants_count', 0),

@@ -33,7 +33,7 @@ jobs:
           find app bootstrap config database routes tests -type f -name '*.php' -print0 \
             | xargs -0 -n1 php -l
 
-      - name: Lint map JavaScript
+      - name: Lint JavaScript
         shell: bash
         run: |
           set -euo pipefail
@@ -42,3 +42,4 @@ jobs:
           node --check public/js/map-religious-icons.js
           node --check public/js/map-religious-icons-v2.js
           node --check public/js/map-focused-points.js
+          node --check public/js/admin-sanctity-picker.js

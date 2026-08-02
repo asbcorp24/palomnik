@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/session_controller.dart';
 import 'screens/auth_screen.dart';
-import 'screens/root_shell.dart';
+import 'screens/enhanced_root_shell.dart';
 import 'theme/app_theme.dart';
 
 class MoscowPilgrimApp extends StatelessWidget {
@@ -40,7 +40,7 @@ class MoscowPilgrimApp extends StatelessWidget {
           home: session.isRestoring
               ? const Scaffold(body: Center(child: CircularProgressIndicator()))
               : session.isAuthenticated
-                  ? RootShell(session: session)
+                  ? EnhancedRootShell(session: session)
                   : AuthScreen(session: session),
         );
       },

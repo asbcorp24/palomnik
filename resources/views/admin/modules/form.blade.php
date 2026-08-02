@@ -219,4 +219,15 @@
         </div>
     @endif
 </form>
+
+@if($resource === 'routes' && $item->exists)
+    <div class="mt-4">
+        @include('admin.audio-guides.form', [
+            'guideable' => $item,
+            'updateRouteName' => 'admin.routes.audio-guide.update',
+            'destroyRouteName' => 'admin.routes.audio-guide.destroy',
+            'fieldPrefix' => 'route',
+        ])
+    </div>
+@endif
 @endsection

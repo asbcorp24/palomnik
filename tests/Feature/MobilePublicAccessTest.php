@@ -22,6 +22,9 @@ class MobilePublicAccessTest extends TestCase
                 'meta' => ['current_page', 'last_page', 'per_page', 'total'],
             ]);
         $this->getJson('/api/v1/mobile/together')->assertOk();
+        $this->getJson('/api/v1/mobile/audio-guides')
+            ->assertOk()
+            ->assertJsonStructure(['data']);
     }
 
     public function test_personal_mobile_sections_still_require_authentication(): void

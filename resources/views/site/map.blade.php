@@ -204,5 +204,6 @@ window.pilgrimMapConfig = {!! json_encode(
         | JSON_HEX_QUOT
 ) !!};
 </script>
+<script src="{{ asset('js/map-religious-icons-v2.js') }}?v=2"></script>
 <script src="{{ asset('js/map-viewport.js') }}"></script>
 @endpush

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PilgrimageObject extends Model
@@ -125,6 +126,11 @@ class PilgrimageObject extends Model
         return $this->belongsToMany(PilgrimageRoute::class, 'pilgrimage_route_object')
             ->withPivot(['sort_order', 'stay_minutes', 'note'])
             ->withTimestamps();
+    }
+
+    public function audioGuide(): MorphOne
+    {
+        return $this->morphOne(AudioGuide::class, 'guideable');
     }
 
     public function media(): HasMany

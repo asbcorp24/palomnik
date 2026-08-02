@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Controller;
 use App\Models\Deanery;
+use App\Models\ObjectMedia;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
 use App\Models\Vicariate;
@@ -140,11 +141,25 @@ class ObjectController extends Controller
             'deanery',
             'coverMedia',
             'sanctities',
+            'audioGuide',
             'media',
             'reviews' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
             'userMedia' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
             'pointsOfInterest' => fn ($query) => $query->published()->ordered(),
         ]);
+
+        if ($object->audioGuide?->url) {
+            $mainAudioGuide = new ObjectMedia([
+                'type' => 'audio',
+                'path' => $object->audioGuide->path,
+                'title' => $object->audioGuide->title ?: 'Аудиогид',
+                'description' => $object->audioGuide->transcript,
+                'sort_order' => -1,
+                'is_cover' => false,
+            ]);
+
+            $object->setRelation('media', $object->media->prepend($mainAudioGuide));
+        }
 
         $analytics->track($request, 'object_view', $object, [
             'type' => $object->objectType?->slug,

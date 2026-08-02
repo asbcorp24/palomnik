@@ -15,6 +15,13 @@
     </div>
 </div>
 
+@include('admin.audio-guides.form', [
+    'guideable' => $object,
+    'updateRouteName' => 'admin.objects.audio-guide.update',
+    'destroyRouteName' => 'admin.objects.audio-guide.destroy',
+    'fieldPrefix' => 'object',
+])
+
 <div class="row g-4">
     <div class="col-xl-8">
         @if($object->media->where('type', 'image')->isNotEmpty())

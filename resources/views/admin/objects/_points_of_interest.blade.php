@@ -1,3 +1,10 @@
+@include('admin.audio-guides.form', [
+    'guideable' => $object,
+    'updateRouteName' => 'admin.objects.audio-guide.update',
+    'destroyRouteName' => 'admin.objects.audio-guide.destroy',
+    'fieldPrefix' => 'object-edit',
+])
+
 <div class="card-soft p-4 mt-4">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>

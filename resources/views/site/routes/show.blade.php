@@ -11,6 +11,7 @@
             <span class="badge rounded-pill object-type-badge">{{ $categories[$pilgrimageRoute->category] ?? $pilgrimageRoute->category }}</span>
             <span class="badge rounded-pill text-bg-light">{{ $difficulties[$pilgrimageRoute->difficulty] ?? $pilgrimageRoute->difficulty }}</span>
             @if($pilgrimageRoute->is_group)<span class="badge rounded-pill text-bg-light">Групповой</span>@endif
+            @if($pilgrimageRoute->audioGuide)<span class="badge rounded-pill text-bg-light"><i class="bi bi-headphones me-1"></i>Есть аудиогид</span>@endif
         </div>
         <h1 class="section-title mb-3">{{ $pilgrimageRoute->title }}</h1>
         @if($pilgrimageRoute->short_description)<p class="section-lead mb-0">{{ $pilgrimageRoute->short_description }}</p>@endif
@@ -22,6 +23,8 @@
         <div class="row g-5">
             <div class="col-lg-8">
                 @if($pilgrimageRoute->cover_url)<img class="detail-cover mb-5" src="{{ $pilgrimageRoute->cover_url }}" alt="{{ $pilgrimageRoute->title }}">@else<div class="object-placeholder detail-placeholder mb-5"><i class="bi bi-signpost-split"></i></div>@endif
+
+                @include('site.partials.audio-guide', ['audioGuide' => $pilgrimageRoute->audioGuide])
 
                 @if($pilgrimageRoute->description)<section class="mb-5"><div class="section-kicker mb-2">О маршруте</div><h2 class="h2 mb-4">Описание</h2><div class="text-secondary lh-lg">{!! nl2br(e($pilgrimageRoute->description)) !!}</div></section>@endif
                 @if($pilgrimageRoute->program)<section class="mb-5"><div class="section-kicker mb-2">Поэтапно</div><h2 class="h2 mb-4">Программа</h2><div class="filter-card lh-lg">{!! nl2br(e($pilgrimageRoute->program)) !!}</div></section>@endif

@@ -7,6 +7,7 @@ use App\Models\AudioGuide;
 use App\Models\PilgrimageObject;
 use App\Models\PilgrimageRoute;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 
 class MobileAudioGuideController extends Controller
 {
@@ -83,10 +84,16 @@ class MobileAudioGuideController extends Controller
 
     private function guideData(AudioGuide $guide): array
     {
+        $guideUrl = $guide->url;
+
+        if ($guideUrl && ! Str::startsWith($guideUrl, ['http://', 'https://'])) {
+            $guideUrl = url($guideUrl);
+        }
+
         return [
             'id' => (int) $guide->id,
             'title' => $guide->title ?: 'Аудиогид',
-            'url' => $guide->url ? url($guide->url) : null,
+            'url' => $guideUrl,
             'transcript' => $guide->transcript,
             'mime_type' => $guide->mime_type,
             'size' => (int) $guide->size,

@@ -19,7 +19,10 @@ class AudioGuideTest extends TestCase
     public function test_admin_can_add_audio_guide_to_object_and_public_page_plays_it(): void
     {
         Storage::fake('public');
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $admin = User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
+        ]);
         $object = $this->publishedObject();
 
         $this->actingAs($admin)
@@ -45,7 +48,10 @@ class AudioGuideTest extends TestCase
     public function test_route_manager_can_add_replace_and_remove_route_audio_guide(): void
     {
         Storage::fake('public');
-        $manager = User::factory()->create(['role' => User::ROLE_SERVICE_MANAGER]);
+        $manager = User::factory()->create([
+            'role' => User::ROLE_SERVICE_MANAGER,
+            'is_active' => true,
+        ]);
         $route = $this->publishedRoute();
 
         $this->actingAs($manager)

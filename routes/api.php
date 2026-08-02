@@ -4,7 +4,9 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DirectoryController;
 use App\Http\Controllers\Api\V1\MapController;
 use App\Http\Controllers\Api\V1\MobileActionController;
+use App\Http\Controllers\Api\V1\MobileAudioGuideController;
 use App\Http\Controllers\Api\V1\MobileBookingController;
+use App\Http\Controllers\Api\V1\MobileCommunityController;
 use App\Http\Controllers\Api\V1\MobileContentController;
 use App\Http\Controllers\Api\V1\MobileController;
 use App\Http\Controllers\Api\V1\MobileProfileController;
@@ -65,9 +67,16 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/calendar', [MobileController::class, 'calendar'])->name('calendar.index');
         Route::get('/calendar/{calendarEvent:slug}', [MobileController::class, 'event'])->name('calendar.show');
         Route::get('/community', [MobileController::class, 'community'])->name('community.index');
+        Route::get('/community/photos', [MobileCommunityController::class, 'photos'])->name('community.photos');
         Route::get('/community/{post:slug}', [MobileController::class, 'post'])->name('community.show');
         Route::get('/together', [MobileController::class, 'together'])->name('together.index');
         Route::get('/together/{jointPilgrimage:slug}', [MobileTogetherController::class, 'show'])->name('together.show');
+
+        Route::get('/audio-guides', [MobileAudioGuideController::class, 'index'])->name('audio-guides.index');
+        Route::get('/audio-guides/objects/{pilgrimageObject:slug}', [MobileAudioGuideController::class, 'object'])
+            ->name('audio-guides.objects.show');
+        Route::get('/audio-guides/routes/{pilgrimageRoute:slug}', [MobileAudioGuideController::class, 'route'])
+            ->name('audio-guides.routes.show');
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('/profile', [MobileProfileController::class, 'show'])->name('profile');

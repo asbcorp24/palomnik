@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/session_controller.dart';
-import 'screens/auth_screen.dart';
-import 'screens/enhanced_root_shell.dart';
+import 'screens/public_root_shell.dart';
 import 'theme/app_theme.dart';
 
 class MoscowPilgrimApp extends StatelessWidget {
@@ -17,7 +16,9 @@ class MoscowPilgrimApp extends StatelessWidget {
       animation: session,
       builder: (context, _) {
         final preferences = session.user?['preferences'];
-        final theme = preferences is Map ? '${preferences['theme'] ?? 'system'}' : 'system';
+        final theme = preferences is Map
+            ? '${preferences['theme'] ?? 'system'}'
+            : 'system';
         final themeMode = switch (theme) {
           'light' => ThemeMode.light,
           'dark' => ThemeMode.dark,
@@ -38,10 +39,10 @@ class MoscowPilgrimApp extends StatelessWidget {
             GlobalCupertinoLocalizations.delegate,
           ],
           home: session.isRestoring
-              ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-              : session.isAuthenticated
-                  ? EnhancedRootShell(session: session)
-                  : AuthScreen(session: session),
+              ? const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                )
+              : PublicRootShell(session: session),
         );
       },
     );

@@ -41,7 +41,7 @@ class PlatformModuleController extends Controller
                             $query->where('title', 'like', "%{$search}%");
                         });
                 } else {
-                    $query->where($resource === 'routes' ? 'title' : 'title', 'like', "%{$search}%");
+                    $query->where('title', 'like', "%{$search}%");
                 }
             });
         }
@@ -319,6 +319,13 @@ class PlatformModuleController extends Controller
 
     private function config(string $resource): array
     {
+        $user = request()->user();
+        abort_unless(
+            $user && $user->canManageModule($resource),
+            403,
+            'У вашей роли нет доступа к этому модулю.'
+        );
+
         $resources = [
             'routes' => [
                 'model' => PilgrimageRoute::class,

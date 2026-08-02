@@ -1,7 +1,7 @@
 name: moscow_pilgrim
 publish_to: none
 description: Мобильное приложение пользовательской части платформы «Московский паломник».
-version: 0.4.0+4
+version: 0.4.1+5
 
 environment:
   sdk: '>=3.10.0 <4.0.0'

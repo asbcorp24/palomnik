@@ -121,6 +121,7 @@
     </main>
 </div>
 <script src="{{ asset('assets/vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ asset('js/admin-sanctity-picker.js') }}?v=1"></script>
 @stack('scripts')
 </body>
 </html>

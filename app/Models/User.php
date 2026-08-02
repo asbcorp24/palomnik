@@ -24,6 +24,53 @@ class User extends Authenticatable implements MustVerifyEmailContract
     public const ROLE_ADMIN = 'admin';
     public const ROLE_SUPER_ADMIN = 'super_admin';
 
+    public const PERMISSION_BACKOFFICE_ACCESS = 'backoffice.access';
+    public const PERMISSION_SERVICE_ACCESS = 'service.access';
+    public const PERMISSION_ASSIGNED_OBJECTS_MANAGE = 'assigned-objects.manage';
+    public const PERMISSION_BOOKINGS_MANAGE = 'bookings.manage';
+    public const PERMISSION_MODERATION_MANAGE = 'moderation.manage';
+    public const PERMISSION_CONTENT_MANAGE = 'content.manage';
+    public const PERMISSION_USERS_VIEW = 'users.view';
+    public const PERMISSION_USERS_MANAGE = 'users.manage';
+    public const PERMISSION_ACTIVITY_VIEW = 'activity.view';
+    public const PERMISSION_SYSTEM_MANAGE = 'system.manage';
+    public const PERMISSION_ROUTES_MANAGE = 'routes.manage';
+    public const PERMISSION_TRIPS_MANAGE = 'trips.manage';
+
+    private const ROLE_PERMISSIONS = [
+        self::ROLE_PILGRIM => [],
+        self::ROLE_OBJECT_EDITOR => [
+            self::PERMISSION_SERVICE_ACCESS,
+            self::PERMISSION_ASSIGNED_OBJECTS_MANAGE,
+        ],
+        self::ROLE_SERVICE_MANAGER => [
+            self::PERMISSION_BACKOFFICE_ACCESS,
+            self::PERMISSION_SERVICE_ACCESS,
+            self::PERMISSION_ASSIGNED_OBJECTS_MANAGE,
+            self::PERMISSION_BOOKINGS_MANAGE,
+            self::PERMISSION_ROUTES_MANAGE,
+            self::PERMISSION_TRIPS_MANAGE,
+        ],
+        self::ROLE_MODERATOR => [
+            self::PERMISSION_BACKOFFICE_ACCESS,
+            self::PERMISSION_MODERATION_MANAGE,
+        ],
+        self::ROLE_ADMIN => [
+            self::PERMISSION_BACKOFFICE_ACCESS,
+            self::PERMISSION_SERVICE_ACCESS,
+            self::PERMISSION_ASSIGNED_OBJECTS_MANAGE,
+            self::PERMISSION_BOOKINGS_MANAGE,
+            self::PERMISSION_MODERATION_MANAGE,
+            self::PERMISSION_CONTENT_MANAGE,
+            self::PERMISSION_USERS_VIEW,
+            self::PERMISSION_USERS_MANAGE,
+            self::PERMISSION_ACTIVITY_VIEW,
+            self::PERMISSION_ROUTES_MANAGE,
+            self::PERMISSION_TRIPS_MANAGE,
+        ],
+        self::ROLE_SUPER_ADMIN => ['*'],
+    ];
+
     protected $fillable = [
         'name',
         'email',
@@ -58,6 +105,30 @@ class User extends Authenticatable implements MustVerifyEmailContract
         'avatar_url',
     ];
 
+    public static function roleLabels(): array
+    {
+        return [
+            self::ROLE_PILGRIM => 'Паломник',
+            self::ROLE_OBJECT_EDITOR => 'Редактор объектов',
+            self::ROLE_SERVICE_MANAGER => 'Паломническая служба',
+            self::ROLE_MODERATOR => 'Модератор',
+            self::ROLE_ADMIN => 'Администратор',
+            self::ROLE_SUPER_ADMIN => 'Главный администратор',
+        ];
+    }
+
+    public static function roleDescriptions(): array
+    {
+        return [
+            self::ROLE_PILGRIM => 'Личный кабинет паломника, маршруты, бронирования, отзывы и публикации.',
+            self::ROLE_OBJECT_EDITOR => 'Предлагает изменения и загружает материалы только для закреплённых объектов.',
+            self::ROLE_SERVICE_MANAGER => 'Управляет маршрутами, поездками, заявками и проверкой электронных билетов.',
+            self::ROLE_MODERATOR => 'Проверяет пользовательский контент, жалобы и изменения от представителей храмов.',
+            self::ROLE_ADMIN => 'Управляет каталогом, справочниками, контентом, модерацией и обычными пользователями.',
+            self::ROLE_SUPER_ADMIN => 'Имеет полный доступ, включая роли администраторов и системные настройки.',
+        ];
+    }
+
     public function getAvatarUrlAttribute(): ?string
     {
         return $this->avatar_path
@@ -75,14 +146,67 @@ class User extends Authenticatable implements MustVerifyEmailContract
         $this->notify(new ResetPasswordNotification($token));
     }
 
+    public function hasPermission(string $permission): bool
+    {
+        $permissions = self::ROLE_PERMISSIONS[$this->role] ?? [];
+
+        return in_array('*', $permissions, true) || in_array($permission, $permissions, true);
+    }
+
     public function isAdmin(): bool
     {
         return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN], true);
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === self::ROLE_SUPER_ADMIN;
+    }
+
+    public function isModerator(): bool
+    {
+        return $this->role === self::ROLE_MODERATOR;
+    }
+
+    public function isServiceManager(): bool
+    {
+        return $this->role === self::ROLE_SERVICE_MANAGER;
+    }
+
+    public function canAccessBackoffice(): bool
+    {
+        return $this->hasPermission(self::PERMISSION_BACKOFFICE_ACCESS);
+    }
+
     public function canManageObjects(): bool
     {
-        return $this->isAdmin() || in_array($this->role, [self::ROLE_OBJECT_EDITOR, self::ROLE_SERVICE_MANAGER], true);
+        return $this->hasPermission(self::PERMISSION_ASSIGNED_OBJECTS_MANAGE);
+    }
+
+    public function canManageModule(string $resource): bool
+    {
+        if ($this->hasPermission(self::PERMISSION_CONTENT_MANAGE)) {
+            return true;
+        }
+
+        return match ($resource) {
+            'routes' => $this->hasPermission(self::PERMISSION_ROUTES_MANAGE),
+            'trips' => $this->hasPermission(self::PERMISSION_TRIPS_MANAGE),
+            default => false,
+        };
+    }
+
+    public function canManageUser(User $target): bool
+    {
+        if (! $this->hasPermission(self::PERMISSION_USERS_MANAGE)) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return ! in_array($target->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN], true);
     }
 
     public function bookings(): HasMany

@@ -112,10 +112,10 @@ class NormalizeInterfaceTerminology
         $enhancementsUrl = htmlspecialchars(asset('js/map-enhancements.js'), ENT_QUOTES, 'UTF-8');
         $religiousIconsUrl = htmlspecialchars(asset('js/map-religious-icons.js'), ENT_QUOTES, 'UTF-8');
         $focusedPointsUrl = htmlspecialchars(asset('js/map-focused-points.js'), ENT_QUOTES, 'UTF-8');
+        $viewportUrl = htmlspecialchars(asset('js/map-viewport.js'), ENT_QUOTES, 'UTF-8');
+        $religiousIconsV2Url = htmlspecialchars(asset('js/map-religious-icons-v2.js'), ENT_QUOTES, 'UTF-8');
         $cssTag = '<link rel="stylesheet" href="'.$cssUrl.'">';
-        $scriptTags = '<script src="'.$enhancementsUrl.'"></script>'."\n"
-            .'<script src="'.$religiousIconsUrl.'"></script>'."\n"
-            .'<script src="'.$focusedPointsUrl.'"></script>';
+        $viewportTag = '<script src="'.$viewportUrl.'"></script>';
 
         if (! str_contains($html, $cssUrl)) {
             $html = str_contains($html, '</head>')
@@ -123,23 +123,41 @@ class NormalizeInterfaceTerminology
                 : $cssTag.$html;
         }
 
-        if (str_contains($html, $religiousIconsUrl)) {
+        if (str_contains($html, $viewportTag)) {
+            $html = str_replace(
+                [
+                    '<script src="'.$enhancementsUrl.'"></script>',
+                    '<script src="'.$religiousIconsUrl.'"></script>',
+                ],
+                '',
+                $html
+            );
+
+            $html = str_replace(
+                '<script src="'.$religiousIconsV2Url.'?v=3"></script>',
+                '<script src="'.$religiousIconsV2Url.'?v=4"></script>',
+                $html
+            );
+
+            if (! str_contains($html, $focusedPointsUrl)) {
+                $html = str_replace(
+                    $viewportTag,
+                    '<script src="'.$focusedPointsUrl.'"></script>'."\n".$viewportTag,
+                    $html
+                );
+            }
+
             return $html;
         }
 
-        $viewportUrl = htmlspecialchars(asset('js/map-viewport.js'), ENT_QUOTES, 'UTF-8');
-        $viewportTag = '<script src="'.$viewportUrl.'"></script>';
-
-        if (str_contains($html, $viewportTag)) {
-            return str_replace(
-                $viewportTag,
-                $scriptTags."\n".$viewportTag,
-                $html
-            );
+        if (str_contains($html, $enhancementsUrl)) {
+            return $html;
         }
 
+        $enhancementsTag = '<script src="'.$enhancementsUrl.'"></script>';
+
         return str_contains($html, '</body>')
-            ? str_replace('</body>', $scriptTags."\n</body>", $html)
-            : $html.$scriptTags;
+            ? str_replace('</body>', $enhancementsTag."\n</body>", $html)
+            : $html.$enhancementsTag;
     }
 }

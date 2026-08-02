@@ -5,7 +5,8 @@
         return;
     }
 
-    const LAYER_ID = 'pilgrim-religious-icons';
+    const LAYER_ID = 'pilgrim-points';
+    const LEGACY_LAYER_ID = 'pilgrim-religious-icons';
     const FALLBACK_LAYER_ID = 'pilgrim-religious-fallback';
     const SOURCE_ID = 'pilgrim-objects';
     const IMAGES = {
@@ -128,31 +129,37 @@
             });
         }
 
-        if (!map.getLayer(LAYER_ID)) {
-            map.addLayer({
-                id: LAYER_ID,
-                type: 'symbol',
-                source: SOURCE_ID,
-                filter: ['!', ['has', 'point_count']],
-                layout: {
-                    'icon-image': [
-                        'match', ['get', 'type_slug'],
-                        'monastery', IMAGES.monastery,
-                        'chapel', IMAGES.chapel,
-                        'church', IMAGES.temple,
-                        'cathedral', IMAGES.temple,
-                        'temple', IMAGES.temple,
-                        IMAGES.temple,
-                    ],
-                    'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.86, 14, 1.04, 18, 1.22],
-                    'icon-anchor': 'bottom',
-                    'icon-allow-overlap': true,
-                    'icon-ignore-placement': true,
-                    'icon-padding': 0,
-                    'visibility': 'visible',
-                },
-            });
+        if (map.getLayer(LEGACY_LAYER_ID)) {
+            map.removeLayer(LEGACY_LAYER_ID);
         }
+
+        if (map.getLayer(LAYER_ID)) {
+            map.removeLayer(LAYER_ID);
+        }
+
+        map.addLayer({
+            id: LAYER_ID,
+            type: 'symbol',
+            source: SOURCE_ID,
+            filter: ['!', ['has', 'point_count']],
+            layout: {
+                'icon-image': [
+                    'match', ['get', 'type_slug'],
+                    'monastery', IMAGES.monastery,
+                    'chapel', IMAGES.chapel,
+                    'church', IMAGES.temple,
+                    'cathedral', IMAGES.temple,
+                    'temple', IMAGES.temple,
+                    IMAGES.temple,
+                ],
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 10, 0.86, 14, 1.04, 18, 1.22],
+                'icon-anchor': 'bottom',
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true,
+                'icon-padding': 0,
+                'visibility': 'visible',
+            },
+        });
 
         map.moveLayer(FALLBACK_LAYER_ID);
         map.moveLayer(LAYER_ID);

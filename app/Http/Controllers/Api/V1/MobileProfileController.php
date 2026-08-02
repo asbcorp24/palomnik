@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\MobileUserResource;
 use App\Models\Achievement;
 use App\Services\AchievementService;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +30,7 @@ class MobileProfileController extends Controller
         ]);
 
         return response()->json([
-            'user' => $this->userData($user),
+            'user' => $this->userData($request, $user),
             'stats' => [
                 'bookings' => $user->bookings_count,
                 'visits' => $user->visits_count,
@@ -103,21 +104,14 @@ class MobileProfileController extends Controller
 
         $user->save();
 
-        return response()->json(['user' => $this->userData($user->fresh())]);
+        return response()->json([
+            'user' => $this->userData($request, $user->fresh()),
+        ]);
     }
 
-    private function userData($user): array
+    private function userData(Request $request, $user): array
     {
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'phone' => $user->phone,
-            'avatar_url' => $user->avatar_url,
-            'birth_date' => optional($user->birth_date)->format('Y-m-d'),
-            'preferences' => $user->preferences ?: [],
-            'is_verified_organizer' => (bool) $user->is_verified_organizer,
-        ];
+        return (new MobileUserResource($user))->resolve($request);
     }
 
     private function dateValue($value): ?string

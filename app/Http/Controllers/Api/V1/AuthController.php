@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\MobileUserResource;
 use App\Models\FavoriteList;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
@@ -66,7 +67,7 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $result['token'],
-            'user' => $this->userData($result['user']),
+            'user' => $this->userData($request, $result['user']),
         ], 201);
     }
 
@@ -96,13 +97,15 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => $this->userData($user),
+            'user' => $this->userData($request, $user),
         ]);
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['user' => $this->userData($request->user())]);
+        return response()->json([
+            'user' => $this->userData($request, $request->user()),
+        ]);
     }
 
     public function logout(Request $request): JsonResponse
@@ -112,18 +115,8 @@ class AuthController extends Controller
         return response()->json(['message' => 'Вы вышли из приложения.']);
     }
 
-    private function userData(User $user): array
+    private function userData(Request $request, User $user): array
     {
-        return [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'phone' => $user->phone,
-            'avatar_url' => $user->avatar_url,
-            'birth_date' => optional($user->birth_date)->format('Y-m-d'),
-            'preferences' => $user->preferences ?: [],
-            'email_verified' => $user->hasVerifiedEmail(),
-            'is_verified_organizer' => (bool) $user->is_verified_organizer,
-        ];
+        return (new MobileUserResource($user))->resolve($request);
     }
 }

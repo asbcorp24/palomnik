@@ -1,11 +1,16 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'api_client.dart';
 import 'push_service.dart';
+import 'user_access.dart';
 
 class SessionController extends ChangeNotifier {
   static const _tokenKey = 'auth_token';
+  static const _userKey = 'auth_user';
   static const _storage = FlutterSecureStorage();
 
   final ApiClient api = ApiClient.instance;
@@ -14,25 +19,35 @@ class SessionController extends ChangeNotifier {
   Map<String, dynamic>? _user;
   bool _restoring = true;
 
-  bool get isAuthenticated => _token != null && _token!.isNotEmpty;
+  bool get isAuthenticated =>
+      _token != null && _token!.isNotEmpty && _user != null;
   bool get isRestoring => _restoring;
   Map<String, dynamic>? get user => _user;
+  UserAccess get access => UserAccess.fromUser(
+        _user ?? const <String, dynamic>{},
+        siteBaseUrl: ApiClient.siteBaseUrl,
+      );
 
   Future<void> restore() async {
     _token = await _storage.read(key: _tokenKey);
+    _user = await _readStoredUser();
     api.setToken(_token);
 
-    if (isAuthenticated) {
+    if (_token != null && _token!.isNotEmpty) {
       try {
         final response = await api.dio.get('/auth/me');
-        _user = Map<String, dynamic>.from(response.data['user'] as Map);
-        await PushService.instance.initialize();
-      } catch (_) {
-        await _storage.delete(key: _tokenKey);
-        _token = null;
-        _user = null;
-        api.setToken(null);
+        await _setUser(
+          Map<String, dynamic>.from(response.data['user'] as Map),
+        );
+      } catch (error) {
+        if (_isUnauthorized(error) || _user == null) {
+          await _clearSession(notify: false);
+        }
       }
+    }
+
+    if (isAuthenticated) {
+      await PushService.instance.initialize();
     }
 
     _restoring = false;
@@ -69,7 +84,9 @@ class SessionController extends ChangeNotifier {
   Future<void> refreshProfile() async {
     if (!isAuthenticated) return;
     final response = await api.dio.get('/mobile/profile');
-    _user = Map<String, dynamic>.from(response.data['user'] as Map);
+    await _setUser(
+      Map<String, dynamic>.from(response.data['user'] as Map),
+    );
     notifyListeners();
   }
 
@@ -80,20 +97,51 @@ class SessionController extends ChangeNotifier {
         await api.dio.post('/auth/logout');
       }
     } finally {
-      await _storage.delete(key: _tokenKey);
-      _token = null;
-      _user = null;
-      api.setToken(null);
-      notifyListeners();
+      await _clearSession();
     }
   }
 
   Future<void> _acceptAuthResponse(Map response) async {
     _token = response['token'] as String;
-    _user = Map<String, dynamic>.from(response['user'] as Map);
+    await _setUser(Map<String, dynamic>.from(response['user'] as Map));
     await _storage.write(key: _tokenKey, value: _token);
     api.setToken(_token);
     await PushService.instance.initialize();
     notifyListeners();
+  }
+
+  Future<void> _setUser(Map<String, dynamic> value) async {
+    _user = value;
+    await _storage.write(key: _userKey, value: jsonEncode(value));
+  }
+
+  Future<Map<String, dynamic>?> _readStoredUser() async {
+    final encoded = await _storage.read(key: _userKey);
+    if (encoded == null || encoded.isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(encoded);
+      return decoded is Map
+          ? Map<String, dynamic>.from(decoded)
+          : null;
+    } catch (_) {
+      await _storage.delete(key: _userKey);
+      return null;
+    }
+  }
+
+  Future<void> _clearSession({bool notify = true}) async {
+    await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: _userKey);
+    _token = null;
+    _user = null;
+    api.setToken(null);
+    if (notify) notifyListeners();
+  }
+
+  bool _isUnauthorized(Object error) {
+    return error is DioException &&
+        (error.response?.statusCode == 401 ||
+            error.response?.statusCode == 419);
   }
 }

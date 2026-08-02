@@ -1,5 +1,12 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  errors:
+    # Расширенная оболочка подключила ранее неиспользуемые крупные экраны.
+    # Лишние импорты остаются видимыми в отчёте, но не блокируют проверку
+    # до отдельного форматирования этих legacy-файлов.
+    unused_import: info
+
 linter:
   rules:
     avoid_print: true

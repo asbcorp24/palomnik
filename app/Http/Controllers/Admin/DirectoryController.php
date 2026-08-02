@@ -8,6 +8,7 @@ use App\Models\ObjectType;
 use App\Models\Sanctity;
 use App\Models\Vicariate;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -17,18 +18,40 @@ use Illuminate\View\View;
 
 class DirectoryController extends Controller
 {
-    public function index(Request $request, string $resource): View
+    public function index(Request $request, string $resource): View|JsonResponse
     {
         $config = $this->config($resource);
         $query = $config['model']::query();
         $search = trim((string) $request->query('q'));
 
         if ($search !== '') {
-            $query->where('name', 'like', "%{$search}%");
+            $query->where(function ($query) use ($search): void {
+                $query->where('name', 'like', "%{$search}%")
+                    ->when(
+                        $query->getModel() instanceof Sanctity,
+                        fn ($query) => $query->orWhere('type', 'like', "%{$search}%")
+                    );
+            });
         }
 
         if ($resource === 'deaneries') {
             $query->with('vicariate');
+        }
+
+        if ($resource === 'sanctities' && $request->expectsJson()) {
+            $items = $query
+                ->where('slug', '<>', 'holy-spring')
+                ->orderBy('name')
+                ->limit(20)
+                ->get(['id', 'name', 'type']);
+
+            return response()->json([
+                'data' => $items->map(fn (Sanctity $sanctity): array => [
+                    'id' => $sanctity->id,
+                    'name' => $sanctity->name,
+                    'type' => $sanctity->type,
+                ])->values(),
+            ]);
         }
 
         $items = $query
@@ -54,14 +77,42 @@ class DirectoryController extends Controller
         ]);
     }
 
-    public function store(Request $request, string $resource): RedirectResponse
+    public function store(Request $request, string $resource): RedirectResponse|JsonResponse
     {
         $config = $this->config($resource);
         $data = $this->validated($request, $resource);
         $data = $this->handleSanctityImage($request, $resource, $data);
-        $data['slug'] = $this->makeUniqueSlug($config['model'], $data['slug'] ?? null, $data['name']);
 
-        $config['model']::query()->create($data);
+        if ($resource === 'sanctities' && $request->expectsJson()) {
+            $existing = Sanctity::query()
+                ->where('name', trim((string) $data['name']))
+                ->first();
+
+            if ($existing) {
+                return response()->json([
+                    'data' => [
+                        'id' => $existing->id,
+                        'name' => $existing->name,
+                        'type' => $existing->type,
+                    ],
+                    'existing' => true,
+                ]);
+            }
+        }
+
+        $data['slug'] = $this->makeUniqueSlug($config['model'], $data['slug'] ?? null, $data['name']);
+        $item = $config['model']::query()->create($data);
+
+        if ($resource === 'sanctities' && $request->expectsJson()) {
+            return response()->json([
+                'data' => [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'type' => $item->type,
+                ],
+                'existing' => false,
+            ], 201);
+        }
 
         return redirect()
             ->route('admin.directories.index', $resource)

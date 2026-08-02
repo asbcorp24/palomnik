@@ -173,9 +173,11 @@ Route::prefix('service')
         Route::put('/objects/{object}', [ServiceObjectController::class, 'update'])->name('objects.update');
         Route::post('/objects/{object}/media', [ServiceObjectController::class, 'storeMedia'])->name('objects.media.store');
 
-        Route::get('/tickets/scanner', [ServiceTicketScannerController::class, 'index'])->name('tickets.scanner');
-        Route::get('/tickets/lookup', [ServiceTicketScannerController::class, 'lookup'])->middleware('throttle:120,1')->name('tickets.lookup');
-        Route::post('/tickets/check-in', [ServiceTicketScannerController::class, 'checkIn'])->middleware('throttle:60,1')->name('tickets.check-in');
+        Route::middleware('permission:bookings.manage')->group(function () {
+            Route::get('/tickets/scanner', [ServiceTicketScannerController::class, 'index'])->name('tickets.scanner');
+            Route::get('/tickets/lookup', [ServiceTicketScannerController::class, 'lookup'])->middleware('throttle:120,1')->name('tickets.lookup');
+            Route::post('/tickets/check-in', [ServiceTicketScannerController::class, 'checkIn'])->middleware('throttle:60,1')->name('tickets.check-in');
+        });
     });
 
 Route::get('/admin/login', [AdminAuthController::class, 'showLoginForm'])->name('admin.login');
@@ -183,54 +185,53 @@ Route::post('/admin/login', [AdminAuthController::class, 'login'])->middleware('
 
 Route::prefix('admin')
     ->name('admin.')
-    ->middleware(['auth', 'verified', 'admin'])
+    ->middleware(['auth', 'verified', 'permission:backoffice.access'])
     ->group(function () {
         Route::post('/logout', [AdminAuthController::class, 'logout'])->name('logout');
         Route::get('/', AdminDashboardController::class)->name('dashboard');
         Route::redirect('/help', '/help?section=admin')->name('help');
 
-        Route::get('/crm', [AdminPilgrimageCrmController::class, 'index'])->name('crm.index');
-        Route::get('/crm/create', [AdminPilgrimageCrmController::class, 'create'])->name('crm.create');
-        Route::post('/crm', [AdminPilgrimageCrmController::class, 'store'])->name('crm.store');
-        Route::get('/crm/reports', [AdminPilgrimageCrmController::class, 'reports'])->name('crm.reports');
-        Route::get('/crm/export/bookings', [AdminPilgrimageCrmController::class, 'exportBookings'])->name('crm.export');
-        Route::post('/crm/bulk', [AdminPilgrimageCrmController::class, 'bulkUpdate'])->name('crm.bulk');
-        Route::get('/crm/trips/{trip}', [AdminPilgrimageCrmController::class, 'trip'])->name('crm.trip');
-        Route::get('/crm/trips/{trip}/export', [AdminPilgrimageCrmController::class, 'exportTrip'])->name('crm.trip.export');
-        Route::get('/crm/trips/{trip}/print', [AdminPilgrimageCrmController::class, 'printTrip'])->name('crm.trip.print');
-        Route::get('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'show'])->name('crm.show');
-        Route::put('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'update'])->name('crm.update');
-        Route::post('/crm/bookings/{booking}/notes', [AdminPilgrimageCrmController::class, 'addNote'])->name('crm.notes.store');
-        Route::post('/crm/bookings/{booking}/participants', [AdminPilgrimageCrmController::class, 'storeParticipant'])->name('crm.participants.store');
-        Route::put('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'updateParticipant'])->name('crm.participants.update');
-        Route::delete('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'destroyParticipant'])->name('crm.participants.destroy');
-        Route::redirect('/moderation/bookings', '/admin/crm')->name('crm.legacy-bookings');
+        Route::middleware('permission:bookings.manage')->group(function () {
+            Route::get('/crm', [AdminPilgrimageCrmController::class, 'index'])->name('crm.index');
+            Route::get('/crm/create', [AdminPilgrimageCrmController::class, 'create'])->name('crm.create');
+            Route::post('/crm', [AdminPilgrimageCrmController::class, 'store'])->name('crm.store');
+            Route::get('/crm/reports', [AdminPilgrimageCrmController::class, 'reports'])->name('crm.reports');
+            Route::get('/crm/export/bookings', [AdminPilgrimageCrmController::class, 'exportBookings'])->name('crm.export');
+            Route::post('/crm/bulk', [AdminPilgrimageCrmController::class, 'bulkUpdate'])->name('crm.bulk');
+            Route::get('/crm/trips/{trip}', [AdminPilgrimageCrmController::class, 'trip'])->name('crm.trip');
+            Route::get('/crm/trips/{trip}/export', [AdminPilgrimageCrmController::class, 'exportTrip'])->name('crm.trip.export');
+            Route::get('/crm/trips/{trip}/print', [AdminPilgrimageCrmController::class, 'printTrip'])->name('crm.trip.print');
+            Route::get('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'show'])->name('crm.show');
+            Route::put('/crm/bookings/{booking}', [AdminPilgrimageCrmController::class, 'update'])->name('crm.update');
+            Route::post('/crm/bookings/{booking}/notes', [AdminPilgrimageCrmController::class, 'addNote'])->name('crm.notes.store');
+            Route::post('/crm/bookings/{booking}/participants', [AdminPilgrimageCrmController::class, 'storeParticipant'])->name('crm.participants.store');
+            Route::put('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'updateParticipant'])->name('crm.participants.update');
+            Route::delete('/crm/participants/{participant}', [AdminPilgrimageCrmController::class, 'destroyParticipant'])->name('crm.participants.destroy');
+            Route::redirect('/moderation/bookings', '/admin/crm')->name('crm.legacy-bookings');
+        });
 
-        Route::resource('calendar', AdminCalendarEventController::class)
-            ->parameters(['calendar' => 'calendarEvent']);
+        Route::middleware('permission:content.manage')->group(function () {
+            Route::resource('calendar', AdminCalendarEventController::class)
+                ->parameters(['calendar' => 'calendarEvent']);
 
-        Route::resource('objects', AdminPilgrimageObjectController::class)->parameters(['objects' => 'object']);
-        Route::post('/objects/{object}/media', [AdminObjectMediaController::class, 'store'])->name('objects.media.store');
-        Route::get('/media/{media}/edit', [AdminObjectMediaController::class, 'edit'])->name('media.edit');
-        Route::put('/media/{media}', [AdminObjectMediaController::class, 'update'])->name('media.update');
-        Route::delete('/media/{media}', [AdminObjectMediaController::class, 'destroy'])->name('media.destroy');
+            Route::resource('objects', AdminPilgrimageObjectController::class)->parameters(['objects' => 'object']);
+            Route::post('/objects/{object}/media', [AdminObjectMediaController::class, 'store'])->name('objects.media.store');
+            Route::get('/media/{media}/edit', [AdminObjectMediaController::class, 'edit'])->name('media.edit');
+            Route::put('/media/{media}', [AdminObjectMediaController::class, 'update'])->name('media.update');
+            Route::delete('/media/{media}', [AdminObjectMediaController::class, 'destroy'])->name('media.destroy');
 
-        Route::get('/representatives', [AdminRepresentativeController::class, 'index'])->name('representatives.index');
-        Route::post('/representatives', [AdminRepresentativeController::class, 'store'])->name('representatives.store');
-        Route::put('/representatives/{representative}', [AdminRepresentativeController::class, 'update'])->name('representatives.update');
-        Route::delete('/representatives/{representative}', [AdminRepresentativeController::class, 'destroy'])->name('representatives.destroy');
+            Route::get('/representatives', [AdminRepresentativeController::class, 'index'])->name('representatives.index');
+            Route::post('/representatives', [AdminRepresentativeController::class, 'store'])->name('representatives.store');
+            Route::put('/representatives/{representative}', [AdminRepresentativeController::class, 'update'])->name('representatives.update');
+            Route::delete('/representatives/{representative}', [AdminRepresentativeController::class, 'destroy'])->name('representatives.destroy');
 
-        Route::get('/service-review', [AdminServiceReviewController::class, 'index'])->name('service-review.index');
-        Route::put('/service-review/requests/{updateRequest}', [AdminServiceReviewController::class, 'updateRequest'])->name('service-review.requests.update');
-        Route::put('/service-review/media/{submission}', [AdminServiceReviewController::class, 'media'])->name('service-review.media.update');
-
-        Route::get('/safety', [AdminSafetyController::class, 'index'])->name('safety.index');
-        Route::put('/safety/{report}', [AdminSafetyController::class, 'update'])->name('safety.update');
-        Route::put('/users/{user}/verified-organizer', [AdminSafetyController::class, 'verifyOrganizer'])->name('users.verify-organizer');
-
-        Route::get('/together', [AdminTogetherController::class, 'index'])->name('together.index');
-        Route::put('/together/{jointPilgrimage}', [AdminTogetherController::class, 'update'])->name('together.update');
-        Route::delete('/together/{jointPilgrimage}', [AdminTogetherController::class, 'destroy'])->name('together.destroy');
+            Route::get('/directories/{resource}', [AdminDirectoryController::class, 'index'])->name('directories.index');
+            Route::get('/directories/{resource}/create', [AdminDirectoryController::class, 'create'])->name('directories.create');
+            Route::post('/directories/{resource}', [AdminDirectoryController::class, 'store'])->name('directories.store');
+            Route::get('/directories/{resource}/{id}/edit', [AdminDirectoryController::class, 'edit'])->whereNumber('id')->name('directories.edit');
+            Route::put('/directories/{resource}/{id}', [AdminDirectoryController::class, 'update'])->whereNumber('id')->name('directories.update');
+            Route::delete('/directories/{resource}/{id}', [AdminDirectoryController::class, 'destroy'])->whereNumber('id')->name('directories.destroy');
+        });
 
         Route::get('/modules/{resource}', [AdminPlatformModuleController::class, 'index'])->name('modules.index');
         Route::get('/modules/{resource}/create', [AdminPlatformModuleController::class, 'create'])->name('modules.create');
@@ -239,18 +240,29 @@ Route::prefix('admin')
         Route::put('/modules/{resource}/{id}', [AdminPlatformModuleController::class, 'update'])->whereNumber('id')->name('modules.update');
         Route::delete('/modules/{resource}/{id}', [AdminPlatformModuleController::class, 'destroy'])->whereNumber('id')->name('modules.destroy');
 
-        Route::get('/moderation/{resource}', [AdminModerationController::class, 'index'])->name('moderation.index');
-        Route::put('/moderation/{resource}/{id}', [AdminModerationController::class, 'update'])->whereNumber('id')->name('moderation.update');
-        Route::delete('/moderation/{resource}/{id}', [AdminModerationController::class, 'destroy'])->whereNumber('id')->name('moderation.destroy');
+        Route::middleware('permission:moderation.manage')->group(function () {
+            Route::get('/service-review', [AdminServiceReviewController::class, 'index'])->name('service-review.index');
+            Route::put('/service-review/requests/{updateRequest}', [AdminServiceReviewController::class, 'updateRequest'])->name('service-review.requests.update');
+            Route::put('/service-review/media/{submission}', [AdminServiceReviewController::class, 'media'])->name('service-review.media.update');
 
-        Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
-        Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
-        Route::put('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
+            Route::get('/safety', [AdminSafetyController::class, 'index'])->name('safety.index');
+            Route::put('/safety/{report}', [AdminSafetyController::class, 'update'])->name('safety.update');
+            Route::put('/users/{user}/verified-organizer', [AdminSafetyController::class, 'verifyOrganizer'])->name('users.verify-organizer');
 
-        Route::get('/directories/{resource}', [AdminDirectoryController::class, 'index'])->name('directories.index');
-        Route::get('/directories/{resource}/create', [AdminDirectoryController::class, 'create'])->name('directories.create');
-        Route::post('/directories/{resource}', [AdminDirectoryController::class, 'store'])->name('directories.store');
-        Route::get('/directories/{resource}/{id}/edit', [AdminDirectoryController::class, 'edit'])->whereNumber('id')->name('directories.edit');
-        Route::put('/directories/{resource}/{id}', [AdminDirectoryController::class, 'update'])->whereNumber('id')->name('directories.update');
-        Route::delete('/directories/{resource}/{id}', [AdminDirectoryController::class, 'destroy'])->whereNumber('id')->name('directories.destroy');
+            Route::get('/together', [AdminTogetherController::class, 'index'])->name('together.index');
+            Route::put('/together/{jointPilgrimage}', [AdminTogetherController::class, 'update'])->name('together.update');
+            Route::delete('/together/{jointPilgrimage}', [AdminTogetherController::class, 'destroy'])->name('together.destroy');
+
+            Route::get('/moderation/{resource}', [AdminModerationController::class, 'index'])->name('moderation.index');
+            Route::put('/moderation/{resource}/{id}', [AdminModerationController::class, 'update'])->whereNumber('id')->name('moderation.update');
+            Route::delete('/moderation/{resource}/{id}', [AdminModerationController::class, 'destroy'])->whereNumber('id')->name('moderation.destroy');
+        });
+
+        Route::middleware('permission:users.view')->group(function () {
+            Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+            Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
+        });
+        Route::put('/users/{user}', [AdminUserController::class, 'update'])
+            ->middleware('permission:users.manage')
+            ->name('users.update');
     });

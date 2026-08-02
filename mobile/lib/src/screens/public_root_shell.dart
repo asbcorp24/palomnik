@@ -29,7 +29,10 @@ class _PublicRootShellState extends State<PublicRootShell> {
         const CatalogTab(),
         const MapLibreMapTab(),
         const CalendarTab(),
-        CommunityHubTab(session: widget.session),
+        CommunityHubTab(
+          session: widget.session,
+          onOpenProfile: () => _select(5),
+        ),
         widget.session.isAuthenticated
             ? EnhancedProfileTab(session: widget.session)
             : AuthScreen(session: widget.session),

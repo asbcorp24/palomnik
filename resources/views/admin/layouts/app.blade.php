@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Административная панель') — Московский паломник</title>
+    <title>@yield('title', 'Панель управления') — Московский паломник</title>
     <link href="{{ asset('assets/vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ asset('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') }}" rel="stylesheet">
     <style>
@@ -55,59 +55,95 @@
     @stack('styles')
 </head>
 <body>
-@php($adminUnreadCount = auth()->user()->unreadNotifications()->count())
+@php
+    $adminUser = auth()->user();
+    $adminUnreadCount = $adminUser->unreadNotifications()->count();
+    $roleLabel = \App\Models\User::roleLabels()[$adminUser->role] ?? $adminUser->role;
+@endphp
 <div class="admin-shell">
     <aside class="admin-sidebar">
-        <div class="brand-block d-flex align-items-center gap-3"><span class="brand-mark"><i class="bi bi-cross"></i></span><div><div class="brand-title">Московский паломник</div><div class="brand-subtitle">Управление платформой</div></div></div>
+        <div class="brand-block d-flex align-items-center gap-3"><span class="brand-mark"><i class="bi bi-cross"></i></span><div><div class="brand-title">Московский паломник</div><div class="brand-subtitle">{{ $roleLabel }}</div></div></div>
         <nav class="sidebar-nav">
             <div class="sidebar-label">Главное</div>
             <a class="sidebar-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}"><i class="bi bi-grid-1x2"></i><span>Обзор</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.analytics.*') ? 'active' : '' }}" href="{{ route('admin.analytics.index') }}"><i class="bi bi-graph-up-arrow"></i><span>Аналитика поведения</span></a>
+            @if($adminUser->hasPermission(\App\Models\User::PERMISSION_CONTENT_MANAGE))
+                <a class="sidebar-link {{ request()->routeIs('admin.analytics.*') ? 'active' : '' }}" href="{{ route('admin.analytics.index') }}"><i class="bi bi-graph-up-arrow"></i><span>Аналитика поведения</span></a>
+            @endif
             <a class="sidebar-link" href="{{ route('admin.help') }}"><i class="bi bi-question-circle"></i><span>Справка</span></a>
             <a class="sidebar-link" href="{{ route('home') }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i><span>Открыть сайт</span></a>
 
-            <div class="sidebar-label">Карта и объекты</div>
-            <a class="sidebar-link {{ request()->routeIs('admin.objects.*') || request()->routeIs('admin.media.*') ? 'active' : '' }}" href="{{ route('admin.objects.index') }}"><i class="bi bi-geo-alt"></i><span>Храмы и монастыри</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.duplicates.*') ? 'active' : '' }}" href="{{ route('admin.duplicates.index') }}"><i class="bi bi-intersect"></i><span>Возможные дубли</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.information-audit.*') ? 'active' : '' }}" href="{{ route('admin.information-audit.index') }}"><i class="bi bi-clipboard2-pulse"></i><span>Актуальность данных</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.points-of-interest.*') ? 'active' : '' }}" href="{{ route('admin.points-of-interest.index') }}"><i class="bi bi-pin-map-fill"></i><span>Точки интереса</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.representatives.*') ? 'active' : '' }}" href="{{ route('admin.representatives.index') }}"><i class="bi bi-person-badge"></i><span>Представители храмов</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.service-review.*') ? 'active' : '' }}" href="{{ route('admin.service-review.index') }}"><i class="bi bi-building-check"></i><span>Изменения от храмов</span></a>
-            <a class="sidebar-link" href="{{ route('map') }}" target="_blank" rel="noopener"><i class="bi bi-map"></i><span>Интерактивная карта</span></a>
+            @if($adminUser->hasPermission(\App\Models\User::PERMISSION_CONTENT_MANAGE))
+                <div class="sidebar-label">Карта и объекты</div>
+                <a class="sidebar-link {{ request()->routeIs('admin.objects.*') || request()->routeIs('admin.media.*') ? 'active' : '' }}" href="{{ route('admin.objects.index') }}"><i class="bi bi-geo-alt"></i><span>Храмы и монастыри</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.duplicates.*') ? 'active' : '' }}" href="{{ route('admin.duplicates.index') }}"><i class="bi bi-intersect"></i><span>Возможные дубли</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.information-audit.*') ? 'active' : '' }}" href="{{ route('admin.information-audit.index') }}"><i class="bi bi-clipboard2-pulse"></i><span>Актуальность данных</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.points-of-interest.*') ? 'active' : '' }}" href="{{ route('admin.points-of-interest.index') }}"><i class="bi bi-pin-map-fill"></i><span>Точки интереса</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.representatives.*') ? 'active' : '' }}" href="{{ route('admin.representatives.index') }}"><i class="bi bi-person-badge"></i><span>Представители храмов</span></a>
+                <a class="sidebar-link" href="{{ route('map') }}" target="_blank" rel="noopener"><i class="bi bi-map"></i><span>Интерактивная карта</span></a>
+            @endif
 
-            <div class="sidebar-label">Маршруты и события</div>
-            <a class="sidebar-link {{ request()->is('admin/modules/routes*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'routes') }}"><i class="bi bi-signpost-split"></i><span>Маршруты</span></a>
-            <a class="sidebar-link {{ request()->is('admin/modules/trips*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'trips') }}"><i class="bi bi-bus-front"></i><span>Расписание поездок</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.calendar.*') ? 'active' : '' }}" href="{{ route('admin.calendar.index') }}"><i class="bi bi-calendar-event"></i><span>Календарь событий</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.crm.*') ? 'active' : '' }}" href="{{ route('admin.crm.index') }}"><i class="bi bi-headset"></i><span>CRM заявок</span></a>
-            <a class="sidebar-link" href="{{ route('service.tickets.scanner') }}" target="_blank" rel="noopener"><i class="bi bi-qr-code-scan"></i><span>Сканер QR-билетов</span></a>
+            @if($adminUser->canManageModule('routes') || $adminUser->canManageModule('trips') || $adminUser->hasPermission(\App\Models\User::PERMISSION_BOOKINGS_MANAGE))
+                <div class="sidebar-label">Маршруты и поездки</div>
+                @if($adminUser->canManageModule('routes'))
+                    <a class="sidebar-link {{ request()->is('admin/modules/routes*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'routes') }}"><i class="bi bi-signpost-split"></i><span>Маршруты</span></a>
+                @endif
+                @if($adminUser->canManageModule('trips'))
+                    <a class="sidebar-link {{ request()->is('admin/modules/trips*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'trips') }}"><i class="bi bi-bus-front"></i><span>Расписание поездок</span></a>
+                @endif
+                @if($adminUser->hasPermission(\App\Models\User::PERMISSION_CONTENT_MANAGE))
+                    <a class="sidebar-link {{ request()->routeIs('admin.calendar.*') ? 'active' : '' }}" href="{{ route('admin.calendar.index') }}"><i class="bi bi-calendar-event"></i><span>Календарь событий</span></a>
+                @endif
+                @if($adminUser->hasPermission(\App\Models\User::PERMISSION_BOOKINGS_MANAGE))
+                    <a class="sidebar-link {{ request()->routeIs('admin.crm.*') ? 'active' : '' }}" href="{{ route('admin.crm.index') }}"><i class="bi bi-headset"></i><span>CRM заявок</span></a>
+                    <a class="sidebar-link" href="{{ route('service.tickets.scanner') }}" target="_blank" rel="noopener"><i class="bi bi-qr-code-scan"></i><span>Сканер QR-билетов</span></a>
+                @endif
+            @endif
 
-            <div class="sidebar-label">Геймификация</div>
-            <a class="sidebar-link {{ request()->is('admin/modules/achievements*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'achievements') }}"><i class="bi bi-trophy"></i><span>Достижения и паломнические маршруты</span></a>
-            <a class="sidebar-link {{ request()->is('admin/moderation/visits*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'visits') }}"><i class="bi bi-geo-fill"></i><span>Посещения</span></a>
+            @if($adminUser->hasPermission(\App\Models\User::PERMISSION_CONTENT_MANAGE))
+                <div class="sidebar-label">Геймификация</div>
+                <a class="sidebar-link {{ request()->is('admin/modules/achievements*') ? 'active' : '' }}" href="{{ route('admin.modules.index', 'achievements') }}"><i class="bi bi-trophy"></i><span>Достижения</span></a>
+            @endif
 
-            <div class="sidebar-label">Сообщество</div>
-            <a class="sidebar-link {{ request()->routeIs('admin.together.*') ? 'active' : '' }}" href="{{ route('admin.together.index') }}"><i class="bi bi-people-fill"></i><span>Паломничество вместе</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.safety.*') ? 'active' : '' }}" href="{{ route('admin.safety.index') }}"><i class="bi bi-shield-exclamation"></i><span>Безопасность и жалобы</span></a>
-            <a class="sidebar-link {{ request()->is('admin/moderation/reviews*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'reviews') }}"><i class="bi bi-chat-square-text"></i><span>Отзывы</span></a>
-            <a class="sidebar-link {{ request()->is('admin/moderation/media*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'media') }}"><i class="bi bi-camera"></i><span>Паломнические фото</span></a>
-            <a class="sidebar-link {{ request()->is('admin/moderation/posts*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'posts') }}"><i class="bi bi-journal-richtext"></i><span>Блог и заметки</span></a>
-            <a class="sidebar-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}"><i class="bi bi-people"></i><span>Пользователи</span></a>
+            @if($adminUser->hasPermission(\App\Models\User::PERMISSION_MODERATION_MANAGE))
+                <div class="sidebar-label">Модерация</div>
+                <a class="sidebar-link {{ request()->routeIs('admin.service-review.*') ? 'active' : '' }}" href="{{ route('admin.service-review.index') }}"><i class="bi bi-building-check"></i><span>Изменения от храмов</span></a>
+                <a class="sidebar-link {{ request()->is('admin/moderation/visits*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'visits') }}"><i class="bi bi-geo-fill"></i><span>Посещения</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.together.*') ? 'active' : '' }}" href="{{ route('admin.together.index') }}"><i class="bi bi-people-fill"></i><span>Паломничество вместе</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.safety.*') ? 'active' : '' }}" href="{{ route('admin.safety.index') }}"><i class="bi bi-shield-exclamation"></i><span>Безопасность и жалобы</span></a>
+                <a class="sidebar-link {{ request()->is('admin/moderation/reviews*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'reviews') }}"><i class="bi bi-chat-square-text"></i><span>Отзывы</span></a>
+                <a class="sidebar-link {{ request()->is('admin/moderation/media*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'media') }}"><i class="bi bi-camera"></i><span>Паломнические фото</span></a>
+                <a class="sidebar-link {{ request()->is('admin/moderation/posts*') ? 'active' : '' }}" href="{{ route('admin.moderation.index', 'posts') }}"><i class="bi bi-journal-richtext"></i><span>Блог и заметки</span></a>
+            @endif
 
-            <div class="sidebar-label">Справочники</div>
-            <a class="sidebar-link {{ request()->is('admin/directories/object-types*') ? 'active' : '' }}" href="{{ route('admin.directories.index', 'object-types') }}"><i class="bi bi-pin-map"></i><span>Типы объектов</span></a>
-            <a class="sidebar-link {{ request()->is('admin/directories/vicariates*') ? 'active' : '' }}" href="{{ route('admin.directories.index', 'vicariates') }}"><i class="bi bi-diagram-3"></i><span>Викариатства</span></a>
-            <a class="sidebar-link {{ request()->is('admin/directories/deaneries*') ? 'active' : '' }}" href="{{ route('admin.directories.index', 'deaneries') }}"><i class="bi bi-building"></i><span>Благочиния</span></a>
-            <a class="sidebar-link {{ request()->is('admin/directories/sanctities*') ? 'active' : '' }}" href="{{ route('admin.directories.index', 'sanctities') }}"><i class="bi bi-star"></i><span>Святыни</span></a>
+            @if($adminUser->hasPermission(\App\Models\User::PERMISSION_USERS_VIEW) || $adminUser->hasPermission(\App\Models\User::PERMISSION_ACTIVITY_VIEW) || $adminUser->hasPermission(\App\Models\User::PERMISSION_SYSTEM_MANAGE))
+                <div class="sidebar-label">Управление</div>
+                @if($adminUser->hasPermission(\App\Models\User::PERMISSION_USERS_VIEW))
+                    <a class="sidebar-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}"><i class="bi bi-people"></i><span>Пользователи</span></a>
+                @endif
+                @if($adminUser->hasPermission(\App\Models\User::PERMISSION_ACTIVITY_VIEW))
+                    <a class="sidebar-link {{ request()->routeIs('admin.activity.*') ? 'active' : '' }}" href="{{ route('admin.activity.index') }}"><i class="bi bi-journal-text"></i><span>Журнал действий</span></a>
+                @endif
+                @if($adminUser->hasPermission(\App\Models\User::PERMISSION_SYSTEM_MANAGE))
+                    <a class="sidebar-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}" href="{{ route('admin.settings.index') }}"><i class="bi bi-gear"></i><span>Настройки сайта</span></a>
+                @endif
+            @endif
+
+            @if($adminUser->hasPermission(\App\Models\User::PERMISSION_CONTENT_MANAGE))
+                <div class="sidebar-label">Справочники</div>
+                <a class="sidebar-link {{ request()->is('admin/directories/object-types*') ? 'active' : '' }}" href="{{ route('admin.directories.index', 'object-types') }}"><i class="bi bi-pin-map"></i><span>Типы объектов</span></a>
+                <a class="sidebar-link {{ request()->is('admin/directories/vicariates*') ? 'active' : '' }}" href="{{ route('admin.directories.index', 'vicariates') }}"><i class="bi bi-diagram-3"></i><span>Викариатства</span></a>
+                <a class="sidebar-link {{ request()->is('admin/directories/deaneries*') ? 'active' : '' }}" href="{{ route('admin.directories.index', 'deaneries') }}"><i class="bi bi-building"></i><span>Благочиния</span></a>
+                <a class="sidebar-link {{ request()->is('admin/directories/sanctities*') ? 'active' : '' }}" href="{{ route('admin.directories.index', 'sanctities') }}"><i class="bi bi-star"></i><span>Святыни</span></a>
+            @endif
         </nav>
     </aside>
 
     <main class="admin-main">
         <header class="admin-topbar">
-            <div class="d-flex align-items-center gap-3"><button class="btn btn-light sidebar-toggle" type="button" onclick="document.body.classList.toggle('sidebar-open')"><i class="bi bi-list"></i></button><div class="small text-secondary">Административная панель</div></div>
+            <div class="d-flex align-items-center gap-3"><button class="btn btn-light sidebar-toggle" type="button" onclick="document.body.classList.toggle('sidebar-open')"><i class="bi bi-list"></i></button><div><div class="small text-secondary">Панель управления</div><div class="small fw-semibold">{{ $roleLabel }}</div></div></div>
             <div class="d-flex align-items-center gap-3">
                 <a class="btn btn-sm btn-light position-relative" href="{{ route('notifications.index') }}" title="Уведомления"><i class="bi bi-bell"></i>@if($adminUnreadCount)<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ $adminUnreadCount > 99 ? '99+' : $adminUnreadCount }}</span>@endif</a>
-                <div class="text-end d-none d-sm-block"><div class="small fw-semibold">{{ auth()->user()->name }}</div><div class="small text-secondary">{{ auth()->user()->email }}</div></div>
+                <div class="text-end d-none d-sm-block"><div class="small fw-semibold">{{ $adminUser->name }}</div><div class="small text-secondary">{{ $adminUser->email }}</div></div>
                 <form method="POST" action="{{ route('admin.logout') }}">@csrf<button class="btn btn-sm btn-outline-secondary" type="submit" title="Выйти"><i class="bi bi-box-arrow-right"></i></button></form>
             </div>
         </header>

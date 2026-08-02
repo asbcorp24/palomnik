@@ -57,8 +57,15 @@
                                 <li><a class="dropdown-item rounded-3" href="{{ route('profile.bookings') }}"><i class="bi bi-ticket-perforated me-2"></i>Мои билеты</a></li>
                                 <li><a class="dropdown-item rounded-3" href="{{ route('route-plans.index') }}"><i class="bi bi-signpost-split me-2"></i>Мои маршруты</a></li>
                                 <li><a class="dropdown-item rounded-3" href="{{ route('together.my') }}"><i class="bi bi-people me-2"></i>Мои совместные поездки</a></li>
-                                @if(auth()->user()->canManageObjects())<li><a class="dropdown-item rounded-3" href="{{ route('service.dashboard') }}"><i class="bi bi-building-check me-2"></i>Кабинет представителя</a></li><li><a class="dropdown-item rounded-3" href="{{ route('service.tickets.scanner') }}"><i class="bi bi-qr-code-scan me-2"></i>Проверка билетов</a></li>@endif
-                                @if(auth()->user()->isAdmin())<li><a class="dropdown-item rounded-3" href="{{ route('admin.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>Админ-панель</a></li>@endif
+                                @if(auth()->user()->canManageObjects())
+                                    <li><a class="dropdown-item rounded-3" href="{{ route('service.dashboard') }}"><i class="bi bi-building-check me-2"></i>Рабочий кабинет</a></li>
+                                @endif
+                                @if(auth()->user()->hasPermission(\App\Models\User::PERMISSION_BOOKINGS_MANAGE))
+                                    <li><a class="dropdown-item rounded-3" href="{{ route('service.tickets.scanner') }}"><i class="bi bi-qr-code-scan me-2"></i>Проверка билетов</a></li>
+                                @endif
+                                @if(auth()->user()->canAccessBackoffice())
+                                    <li><a class="dropdown-item rounded-3" href="{{ route('admin.dashboard') }}"><i class="bi bi-speedometer2 me-2"></i>Панель управления</a></li>
+                                @endif
                                 <li><hr class="dropdown-divider"></li>
                                 <li><form method="POST" action="{{ route('logout') }}">@csrf<button class="dropdown-item rounded-3 text-danger" type="submit"><i class="bi bi-box-arrow-right me-2"></i>Выйти</button></form></li>
                             </ul>

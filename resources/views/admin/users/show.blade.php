@@ -5,7 +5,7 @@
 @section('content')
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
     <div><a class="small text-decoration-none text-secondary" href="{{ route('admin.users.index') }}"><i class="bi bi-arrow-left me-1"></i>Пользователи</a><h1 class="page-title mt-2">{{ $user->name }}</h1><div class="page-subtitle">Личный кабинет, права, безопасность и статистика пользователя.</div></div>
-    <div class="d-flex gap-2"><a class="btn btn-outline-green" href="{{ route('admin.representatives.index', ['q' => $user->email]) }}"><i class="bi bi-person-badge me-1"></i>Назначения объектов</a>@if($user->canManageObjects())<a class="btn btn-outline-green" href="{{ route('service.dashboard') }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Кабинет представителя</a>@endif</div>
+    <div class="d-flex gap-2"><a class="btn btn-outline-green" href="{{ route('admin.representatives.index', ['q' => $user->email]) }}"><i class="bi bi-person-badge me-1"></i>Назначения объектов</a>@if($user->canManageObjects())<a class="btn btn-outline-green" href="{{ route('service.dashboard') }}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Рабочий кабинет</a>@endif</div>
 </div>
 
 <div class="row g-4">
@@ -13,13 +13,20 @@
         <form method="POST" action="{{ route('admin.users.update', $user) }}">@csrf @method('PUT')
             <div class="card-soft p-4">
                 <h2 class="h5 mb-4">Профиль и доступ</h2>
-                <div class="mb-3"><label class="form-label required" for="name">Имя</label><input class="form-control" id="name" name="name" value="{{ old('name', $user->name) }}" required></div>
-                <div class="mb-3"><label class="form-label required" for="email">Email</label><input class="form-control" id="email" type="email" name="email" value="{{ old('email', $user->email) }}" required></div>
-                <div class="mb-3"><label class="form-label" for="phone">Телефон</label><input class="form-control" id="phone" name="phone" value="{{ old('phone', $user->phone) }}"></div>
-                <div class="mb-3"><label class="form-label required" for="role">Роль</label><select class="form-select" id="role" name="role" required>@foreach($roles as $value => $label)<option value="{{ $value }}" @selected(old('role', $user->role) === $value)>{{ $label }}</option>@endforeach</select></div>
-                <div class="form-check form-switch mb-3"><input type="hidden" name="is_active" value="0"><input class="form-check-input" id="is_active" type="checkbox" name="is_active" value="1" @checked((bool)old('is_active', $user->is_active))><label class="form-check-label" for="is_active">Учётная запись активна</label></div>
-                <div class="form-check form-switch mb-4"><input type="hidden" name="is_verified_organizer" value="0"><input class="form-check-input" id="is_verified_organizer" type="checkbox" name="is_verified_organizer" value="1" @checked((bool)old('is_verified_organizer', $user->is_verified_organizer))><label class="form-check-label" for="is_verified_organizer">Проверенный организатор</label><div class="form-text">Отметка показывается в совместных паломничествах.</div></div>
-                <button class="btn btn-gold w-100" type="submit">Сохранить профиль</button>
+                @unless($canEditUser)<div class="alert alert-warning small">Эту учётную запись может изменять только главный администратор.</div>@endunless
+                <fieldset @disabled(! $canEditUser)>
+                    <div class="mb-3"><label class="form-label required" for="name">Имя</label><input class="form-control" id="name" name="name" value="{{ old('name', $user->name) }}" required></div>
+                    <div class="mb-3"><label class="form-label required" for="email">Email</label><input class="form-control" id="email" type="email" name="email" value="{{ old('email', $user->email) }}" required></div>
+                    <div class="mb-3"><label class="form-label" for="phone">Телефон</label><input class="form-control" id="phone" name="phone" value="{{ old('phone', $user->phone) }}"></div>
+                    <div class="mb-3">
+                        <label class="form-label required" for="role">Роль</label>
+                        <select class="form-select" id="role" name="role" required>@foreach($roles as $value => $label)<option value="{{ $value }}" @selected(old('role', $user->role) === $value)>{{ $label }}</option>@endforeach</select>
+                        <div class="form-text" id="roleDescription">{{ $roleDescriptions[old('role', $user->role)] ?? '' }}</div>
+                    </div>
+                    <div class="form-check form-switch mb-3"><input type="hidden" name="is_active" value="0"><input class="form-check-input" id="is_active" type="checkbox" name="is_active" value="1" @checked((bool)old('is_active', $user->is_active))><label class="form-check-label" for="is_active">Учётная запись активна</label></div>
+                    <div class="form-check form-switch mb-4"><input type="hidden" name="is_verified_organizer" value="0"><input class="form-check-input" id="is_verified_organizer" type="checkbox" name="is_verified_organizer" value="1" @checked((bool)old('is_verified_organizer', $user->is_verified_organizer))><label class="form-check-label" for="is_verified_organizer">Проверенный организатор</label><div class="form-text">Отметка показывается в совместных паломничествах.</div></div>
+                    <button class="btn btn-gold w-100" type="submit">Сохранить профиль</button>
+                </fieldset>
             </div>
         </form>
 
@@ -59,3 +66,14 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(() => {
+    const descriptions = @json($roleDescriptions);
+    const select = document.getElementById('role');
+    const output = document.getElementById('roleDescription');
+    select?.addEventListener('change', () => { if (output) output.textContent = descriptions[select.value] || ''; });
+})();
+</script>
+@endpush

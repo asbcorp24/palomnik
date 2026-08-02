@@ -9,7 +9,7 @@ Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 
 Route::prefix('admin/settings')
     ->name('admin.settings.')
-    ->middleware(['auth', 'verified', 'admin'])
+    ->middleware(['auth', 'verified', 'permission:system.manage'])
     ->group(function (): void {
         Route::get('/', [SiteSettingController::class, 'index'])->name('index');
         Route::post('/themes', [SiteSettingController::class, 'storeTheme'])->name('themes.store');

@@ -12,7 +12,7 @@ class AuthController extends Controller
 {
     public function showLoginForm(): View|RedirectResponse
     {
-        if (Auth::check() && Auth::user()->isAdmin()) {
+        if (Auth::check() && Auth::user()->canAccessBackoffice()) {
             return redirect()->route('admin.dashboard');
         }
 
@@ -36,13 +36,13 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        if (! $request->user()->is_active || ! $request->user()->isAdmin()) {
+        if (! $request->user()->is_active || ! $request->user()->canAccessBackoffice()) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
             return back()->withErrors([
-                'email' => 'У этой учётной записи нет доступа к административной панели.',
+                'email' => 'У этой учётной записи нет доступа к панели управления.',
             ]);
         }
 

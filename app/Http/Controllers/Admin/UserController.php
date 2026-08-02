@@ -39,11 +39,11 @@ class UserController extends Controller
         return view('admin.users.index', [
             'users' => $users,
             'filters' => $filters,
-            'roles' => $this->roles(),
+            'roles' => User::roleLabels(),
         ]);
     }
 
-    public function show(User $user): View
+    public function show(Request $request, User $user): View
     {
         $user->loadCount(['visits', 'bookings', 'achievements', 'reviews', 'blogPosts', 'media', 'favoriteLists', 'objectRepresentatives', 'receivedReports']);
         $user->load([
@@ -55,22 +55,32 @@ class UserController extends Controller
 
         return view('admin.users.show', [
             'user' => $user,
-            'roles' => $this->roles(),
+            'roles' => $this->assignableRoles($request->user(), $user),
+            'roleDescriptions' => User::roleDescriptions(),
+            'canEditUser' => $request->user()->canManageUser($user),
         ]);
     }
 
     public function update(Request $request, User $user): RedirectResponse
     {
+        $actor = $request->user();
+        abort_unless($actor->canManageUser($user), 403, 'У вашей роли нет права изменять этого пользователя.');
+
+        $assignableRoles = $this->assignableRoles($actor, $user);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:64', Rule::unique('users', 'phone')->ignore($user->id)],
-            'role' => ['required', Rule::in(array_keys($this->roles()))],
+            'role' => ['required', Rule::in(array_keys($assignableRoles))],
             'is_active' => ['nullable', 'boolean'],
             'is_verified_organizer' => ['nullable', 'boolean'],
         ]);
 
-        if ($user->is(auth()->user()) && ! $request->boolean('is_active')) {
+        if ($user->is($actor) && $data['role'] !== $user->role) {
+            return back()->with('error', 'Нельзя изменить собственную роль.');
+        }
+
+        if ($user->is($actor) && ! $request->boolean('is_active')) {
             return back()->with('error', 'Нельзя отключить собственную учётную запись.');
         }
 
@@ -82,15 +92,20 @@ class UserController extends Controller
         return back()->with('success', 'Профиль пользователя обновлён.');
     }
 
-    private function roles(): array
+    private function assignableRoles(User $actor, User $target): array
     {
-        return [
-            User::ROLE_PILGRIM => 'Паломник',
-            User::ROLE_OBJECT_EDITOR => 'Редактор объектов',
-            User::ROLE_SERVICE_MANAGER => 'Паломническая служба',
-            User::ROLE_MODERATOR => 'Модератор',
-            User::ROLE_ADMIN => 'Администратор',
-            User::ROLE_SUPER_ADMIN => 'Главный администратор',
-        ];
+        $roles = User::roleLabels();
+
+        if ($actor->isSuperAdmin()) {
+            return $roles;
+        }
+
+        unset($roles[User::ROLE_ADMIN], $roles[User::ROLE_SUPER_ADMIN]);
+
+        if (isset(User::roleLabels()[$target->role])) {
+            $roles[$target->role] = User::roleLabels()[$target->role];
+        }
+
+        return $roles;
     }
 }

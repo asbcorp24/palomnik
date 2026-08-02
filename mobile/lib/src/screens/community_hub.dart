@@ -11,9 +11,14 @@ import 'content_features.dart';
 import 'pilgrimage_photos.dart';
 
 class CommunityHubTab extends StatelessWidget {
-  const CommunityHubTab({super.key, required this.session});
+  const CommunityHubTab({
+    super.key,
+    required this.session,
+    required this.onOpenProfile,
+  });
 
   final SessionController session;
+  final VoidCallback onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +48,7 @@ class CommunityHubTab extends StatelessWidget {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Читайте путевые заметки, смотрите фотографии и находите попутчиков. Публичные материалы доступны без регистрации.',
+                  'Путевые заметки, фотографии и совместные поездки доступны для просмотра без регистрации.',
                   style: TextStyle(color: Colors.white70, height: 1.45),
                 ),
               ],
@@ -65,7 +70,7 @@ class CommunityHubTab extends StatelessWidget {
           _CommunitySectionCard(
             icon: Icons.diversity_3_outlined,
             title: 'Паломничество вместе',
-            subtitle: 'Открытые совместные поездки и поиск попутчиков',
+            subtitle: 'Открытые поездки и поиск попутчиков',
             onTap: () => _open(
               context,
               session.isAuthenticated
@@ -107,13 +112,13 @@ class CommunityHubTab extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                     const Text(
-                      'Войдите в профиль, чтобы публиковать заметки и фотографии, создавать поездки, вступать в группы и писать сообщения.',
+                      'Войдите, чтобы публиковать материалы, вступать в поездки и общаться с участниками.',
                     ),
                     const SizedBox(height: 14),
                     FilledButton.icon(
-                      onPressed: () => DefaultTabController.of(context),
+                      onPressed: onOpenProfile,
                       icon: const Icon(Icons.login),
-                      label: const Text('Вход доступен в разделе «Профиль»'),
+                      label: const Text('Войти или зарегистрироваться'),
                     ),
                   ],
                 ),
@@ -142,18 +147,16 @@ class PublicCommunityPostsScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return FutureListPage(
-      title: 'Путевые заметки',
-      loader: _load,
-      builder: (item) => BasicCard(
-        title: '${item['title'] ?? 'Путевая заметка'}',
-        subtitle: '${item['excerpt'] ?? ''}',
-        icon: Icons.article_outlined,
-        onTap: () => _openSite('/community/${item['slug']}'),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => FutureListPage(
+        title: 'Путевые заметки',
+        loader: _load,
+        builder: (item) => BasicCard(
+          title: '${item['title'] ?? 'Путевая заметка'}',
+          subtitle: '${item['excerpt'] ?? ''}',
+          icon: Icons.article_outlined,
+          onTap: () => _openSite('/community/${item['slug']}'),
+        ),
+      );
 }
 
 class PublicTogetherScreen extends StatelessWidget {
@@ -168,27 +171,25 @@ class PublicTogetherScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return FutureListPage(
-      title: 'Паломничество вместе',
-      loader: _load,
-      header: const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text(
-            'Список поездок доступен без регистрации. Для вступления, создания поездки и общения войдите в профиль.',
+  Widget build(BuildContext context) => FutureListPage(
+        title: 'Паломничество вместе',
+        loader: _load,
+        header: const Card(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'Просмотр доступен без регистрации. Для вступления, создания поездки и общения войдите в профиль.',
+            ),
           ),
         ),
-      ),
-      builder: (item) => BasicCard(
-        title: '${item['title'] ?? 'Совместное паломничество'}',
-        subtitle:
-            '${item['meeting_place'] ?? ''}\n${formatDate(item['starts_at'])}\n${item['participants_count'] ?? item['approved_members_count'] ?? 1}/${item['max_participants'] ?? '∞'} участников',
-        icon: Icons.groups_outlined,
-        onTap: () => _openSite('/community/together/${item['slug']}'),
-      ),
-    );
-  }
+        builder: (item) => BasicCard(
+          title: '${item['title'] ?? 'Совместное паломничество'}',
+          subtitle:
+              '${item['meeting_place'] ?? ''}\n${formatDate(item['starts_at'])}\n${item['participants_count'] ?? item['approved_members_count'] ?? 1}/${item['max_participants'] ?? '∞'} участников',
+          icon: Icons.groups_outlined,
+          onTap: () => _openSite('/community/together/${item['slug']}'),
+        ),
+      );
 }
 
 class PublicCommunityPhotosScreen extends StatefulWidget {
@@ -230,15 +231,7 @@ class _PublicCommunityPhotosScreenState
 
           final photos = snapshot.data ?? const [];
           if (photos.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(28),
-                child: Text(
-                  'Опубликованных фотографий пока нет.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
+            return const Center(child: Text('Опубликованных фотографий пока нет.'));
           }
 
           return RefreshIndicator(
@@ -258,13 +251,8 @@ class _PublicCommunityPhotosScreenState
               itemCount: photos.length,
               itemBuilder: (context, index) {
                 final photo = photos[index];
-                final author = photo['author'] is Map
-                    ? Map<String, dynamic>.from(photo['author'] as Map)
-                    : const <String, dynamic>{};
-                final route = photo['route'] is Map
-                    ? Map<String, dynamic>.from(photo['route'] as Map)
-                    : const <String, dynamic>{};
-
+                final author = _asMap(photo['author']);
+                final route = _asMap(photo['route']);
                 return Card(
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
@@ -334,10 +322,7 @@ class _PublicCommunityPhotosScreenState
           children: [
             Flexible(
               child: InteractiveViewer(
-                child: Image.network(
-                  '${photo['url'] ?? ''}',
-                  fit: BoxFit.contain,
-                ),
+                child: Image.network('${photo['url'] ?? ''}', fit: BoxFit.contain),
               ),
             ),
             Padding(
@@ -380,25 +365,23 @@ class _CommunitySectionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.cream,
-          child: Icon(icon, color: AppTheme.green),
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.cream,
+            child: Icon(icon, color: AppTheme.green),
+          ),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Text(subtitle),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: onTap,
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 5),
-          child: Text(subtitle),
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
-    );
-  }
+      );
 }
 
 class _SectionHeading extends StatelessWidget {
@@ -407,19 +390,21 @@ class _SectionHeading extends StatelessWidget {
   final String title;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 18, 4, 9),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppTheme.green,
-              fontWeight: FontWeight.w700,
-            ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 18, 4, 9),
+        child: Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppTheme.green,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      );
 }
+
+Map<String, dynamic> _asMap(dynamic value) => value is Map
+    ? Map<String, dynamic>.from(value)
+    : const <String, dynamic>{};
 
 Future<void> _openSite(String path) async {
   final uri = Uri.parse('${ApiClient.siteBaseUrl}$path');

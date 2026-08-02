@@ -43,14 +43,10 @@ class DirectoryController extends Controller
                 ->where('slug', '<>', 'holy-spring')
                 ->orderBy('name')
                 ->limit(20)
-                ->get(['id', 'name', 'type']);
+                ->get(['id', 'name', 'type', 'image_path']);
 
             return response()->json([
-                'data' => $items->map(fn (Sanctity $sanctity): array => [
-                    'id' => $sanctity->id,
-                    'name' => $sanctity->name,
-                    'type' => $sanctity->type,
-                ])->values(),
+                'data' => $items->map(fn (Sanctity $sanctity): array => $this->sanctityJson($sanctity))->values(),
             ]);
         }
 
@@ -81,7 +77,6 @@ class DirectoryController extends Controller
     {
         $config = $this->config($resource);
         $data = $this->validated($request, $resource);
-        $data = $this->handleSanctityImage($request, $resource, $data);
 
         if ($resource === 'sanctities' && $request->expectsJson()) {
             $existing = Sanctity::query()
@@ -89,27 +84,27 @@ class DirectoryController extends Controller
                 ->first();
 
             if ($existing) {
+                if ($request->hasFile('image') && ! $existing->image_path) {
+                    $existing->update([
+                        'image_path' => $request->file('image')->store('sanctities', 'public'),
+                    ]);
+                    $existing->refresh();
+                }
+
                 return response()->json([
-                    'data' => [
-                        'id' => $existing->id,
-                        'name' => $existing->name,
-                        'type' => $existing->type,
-                    ],
+                    'data' => $this->sanctityJson($existing),
                     'existing' => true,
                 ]);
             }
         }
 
+        $data = $this->handleSanctityImage($request, $resource, $data);
         $data['slug'] = $this->makeUniqueSlug($config['model'], $data['slug'] ?? null, $data['name']);
         $item = $config['model']::query()->create($data);
 
         if ($resource === 'sanctities' && $request->expectsJson()) {
             return response()->json([
-                'data' => [
-                    'id' => $item->id,
-                    'name' => $item->name,
-                    'type' => $item->type,
-                ],
+                'data' => $this->sanctityJson($item),
                 'existing' => false,
             ], 201);
         }
@@ -245,6 +240,16 @@ class DirectoryController extends Controller
         }
 
         return $data;
+    }
+
+    private function sanctityJson(Sanctity $sanctity): array
+    {
+        return [
+            'id' => $sanctity->id,
+            'name' => $sanctity->name,
+            'type' => $sanctity->type,
+            'image_url' => $sanctity->image_url,
+        ];
     }
 
     private function makeUniqueSlug(string $modelClass, ?string $slug, string $name, ?int $ignoreId = null): string

@@ -1,6 +1,9 @@
 (function () {
     'use strict';
 
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
     function text(value) {
         return String(value ?? '').trim();
     }
@@ -13,22 +16,49 @@
         style.textContent = `
             .sanctity-picker { position:relative; margin-bottom:1.5rem; }
             .sanctity-selected { display:flex; flex-wrap:wrap; gap:.5rem; min-height:42px; padding:.65rem; border:1px solid rgba(111,77,55,.16); border-radius:12px; background:#fff; }
-            .sanctity-chip { display:inline-flex; align-items:center; gap:.4rem; max-width:100%; padding:.42rem .6rem; border-radius:999px; background:rgba(38,68,59,.1); color:#26443b; font-size:.82rem; }
+            .sanctity-chip { display:inline-flex; align-items:center; gap:.45rem; max-width:100%; padding:.34rem .55rem .34rem .36rem; border-radius:999px; background:rgba(38,68,59,.1); color:#26443b; font-size:.82rem; }
+            .sanctity-chip__image,.sanctity-result__image { flex:0 0 auto; border-radius:50%; object-fit:cover; background:#f7f0e6; border:1px solid rgba(111,77,55,.12); }
+            .sanctity-chip__image { width:30px; height:30px; }
+            .sanctity-chip__placeholder { width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; border-radius:50%; background:#fff; color:#b08a3e; border:1px solid rgba(111,77,55,.12); }
             .sanctity-chip__label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
             .sanctity-chip__type { color:#746c64; font-size:.72rem; }
             .sanctity-chip__remove { width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:50%; background:transparent; color:#6f4d37; padding:0; }
             .sanctity-chip__remove:hover { background:rgba(111,77,55,.12); }
             .sanctity-empty { color:#746c64; font-size:.82rem; padding:.25rem; }
             .sanctity-search-wrap { position:relative; margin-top:.75rem; }
-            .sanctity-search-results { position:absolute; z-index:1060; left:0; right:0; top:calc(100% + 5px); max-height:290px; overflow:auto; background:#fffdf9; border:1px solid rgba(111,77,55,.2); border-radius:12px; box-shadow:0 14px 35px rgba(47,37,28,.14); }
-            .sanctity-result { width:100%; display:flex; justify-content:space-between; gap:1rem; text-align:left; padding:.72rem .8rem; border:0; border-bottom:1px solid rgba(111,77,55,.09); background:transparent; }
+            .sanctity-search-results { position:absolute; z-index:1060; left:0; right:0; top:calc(100% + 5px); max-height:320px; overflow:auto; background:#fffdf9; border:1px solid rgba(111,77,55,.2); border-radius:12px; box-shadow:0 14px 35px rgba(47,37,28,.14); }
+            .sanctity-result { width:100%; display:flex; align-items:center; gap:.7rem; text-align:left; padding:.65rem .75rem; border:0; border-bottom:1px solid rgba(111,77,55,.09); background:transparent; }
             .sanctity-result:last-child { border-bottom:0; }
             .sanctity-result:hover,.sanctity-result:focus { background:rgba(176,138,62,.1); outline:0; }
-            .sanctity-result__type { color:#746c64; font-size:.75rem; white-space:nowrap; }
+            .sanctity-result__image { width:42px; height:42px; }
+            .sanctity-result__placeholder { width:42px; height:42px; display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; border-radius:50%; background:#f7f0e6; color:#b08a3e; border:1px solid rgba(111,77,55,.12); }
+            .sanctity-result__body { min-width:0; flex:1 1 auto; }
+            .sanctity-result__name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+            .sanctity-result__type { display:block; color:#746c64; font-size:.75rem; }
             .sanctity-create { margin-top:.75rem; padding:.85rem; border:1px dashed rgba(38,68,59,.28); border-radius:12px; background:rgba(38,68,59,.035); }
             .sanctity-create[hidden],.sanctity-search-results[hidden] { display:none !important; }
+            .sanctity-photo-preview { display:flex; align-items:center; gap:.75rem; margin-top:.55rem; }
+            .sanctity-photo-preview[hidden] { display:none !important; }
+            .sanctity-photo-preview img { width:72px; height:72px; object-fit:cover; border-radius:12px; border:1px solid rgba(111,77,55,.16); background:#fff; }
         `;
         document.head.appendChild(style);
+    }
+
+    function imageNode(item, className, placeholderClassName) {
+        const imageUrl = text(item.image_url);
+        if (imageUrl) {
+            const image = document.createElement('img');
+            image.className = className;
+            image.src = imageUrl;
+            image.alt = '';
+            image.loading = 'lazy';
+            return image;
+        }
+
+        const placeholder = document.createElement('span');
+        placeholder.className = placeholderClassName;
+        placeholder.innerHTML = '<i class="bi bi-star"></i>';
+        return placeholder;
     }
 
     function init() {
@@ -57,6 +87,7 @@
                 id: String(input.value),
                 name: text(label?.querySelector('.d-block')?.textContent || label?.textContent),
                 type: text(label?.querySelector('.text-secondary')?.textContent),
+                image_url: text(label?.dataset.sanctityImage),
             });
         });
 
@@ -90,6 +121,15 @@
                     <label class="form-label small mb-1">Краткое описание</label>
                     <textarea class="form-control form-control-sm" rows="2" data-sanctity-new-description></textarea>
                 </div>
+                <div class="mb-2">
+                    <label class="form-label small mb-1">Фотография</label>
+                    <input class="form-control form-control-sm" type="file" accept="image/jpeg,image/png,image/webp" data-sanctity-new-image>
+                    <div class="form-text">JPG, PNG или WebP, до 5 МБ.</div>
+                    <div class="sanctity-photo-preview" data-sanctity-photo-preview hidden>
+                        <img alt="Предпросмотр фотографии святыни" data-sanctity-photo-preview-image>
+                        <button class="btn btn-sm btn-light" type="button" data-sanctity-photo-clear><i class="bi bi-x-lg me-1"></i>Убрать фото</button>
+                    </div>
+                </div>
                 <div class="small text-danger mb-2 d-none" data-sanctity-create-error></div>
                 <div class="d-flex gap-2">
                     <button class="btn btn-sm btn-gold" type="button" data-sanctity-create-submit>Создать и выбрать</button>
@@ -110,10 +150,15 @@
         const newName = picker.querySelector('[data-sanctity-new-name]');
         const newType = picker.querySelector('[data-sanctity-new-type]');
         const newDescription = picker.querySelector('[data-sanctity-new-description]');
+        const newImage = picker.querySelector('[data-sanctity-new-image]');
+        const photoPreview = picker.querySelector('[data-sanctity-photo-preview]');
+        const photoPreviewImage = picker.querySelector('[data-sanctity-photo-preview-image]');
+        const photoClear = picker.querySelector('[data-sanctity-photo-clear]');
         const createError = picker.querySelector('[data-sanctity-create-error]');
         const selectedIds = new Set();
         let searchTimer = null;
         let searchController = null;
+        let previewUrl = '';
 
         function updateEmptyState() {
             const existing = selectedBox.querySelector('.sanctity-empty');
@@ -165,7 +210,7 @@
                 updateEmptyState();
             });
 
-            chip.append(hidden, label, remove);
+            chip.append(hidden, imageNode(item, 'sanctity-chip__image', 'sanctity-chip__placeholder'), label, remove);
             selectedBox.appendChild(chip);
             updateEmptyState();
         }
@@ -190,18 +235,24 @@
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'sanctity-result';
+                button.appendChild(imageNode(item, 'sanctity-result__image', 'sanctity-result__placeholder'));
+
+                const body = document.createElement('span');
+                body.className = 'sanctity-result__body';
 
                 const name = document.createElement('span');
+                name.className = 'sanctity-result__name';
                 name.textContent = text(item.name);
-                button.appendChild(name);
+                body.appendChild(name);
 
                 if (text(item.type)) {
                     const type = document.createElement('span');
                     type.className = 'sanctity-result__type';
                     type.textContent = text(item.type);
-                    button.appendChild(type);
+                    body.appendChild(type);
                 }
 
+                button.appendChild(body);
                 button.addEventListener('click', function () {
                     addSelected(item);
                     searchInput.value = '';
@@ -255,6 +306,22 @@
             if (!picker.contains(event.target)) resultsBox.hidden = true;
         });
 
+        function clearImage() {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = '';
+            newImage.value = '';
+            photoPreviewImage.removeAttribute('src');
+            photoPreview.hidden = true;
+        }
+
+        function resetCreateForm() {
+            newName.value = '';
+            newType.value = '';
+            newDescription.value = '';
+            clearImage();
+            createError.classList.add('d-none');
+        }
+
         function toggleCreate(show) {
             createBox.hidden = !show;
             if (show) newName.focus();
@@ -265,11 +332,39 @@
         });
         createCancel.addEventListener('click', function () {
             toggleCreate(false);
+            resetCreateForm();
+        });
+        photoClear.addEventListener('click', clearImage);
+
+        newImage.addEventListener('change', function () {
             createError.classList.add('d-none');
+            const file = newImage.files && newImage.files[0];
+            if (!file) {
+                clearImage();
+                return;
+            }
+            if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+                clearImage();
+                createError.textContent = 'Разрешены только JPG, PNG и WebP.';
+                createError.classList.remove('d-none');
+                return;
+            }
+            if (file.size > MAX_IMAGE_SIZE) {
+                clearImage();
+                createError.textContent = 'Размер фотографии не должен превышать 5 МБ.';
+                createError.classList.remove('d-none');
+                return;
+            }
+
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            previewUrl = URL.createObjectURL(file);
+            photoPreviewImage.src = previewUrl;
+            photoPreview.hidden = false;
         });
 
         createSubmit.addEventListener('click', async function () {
             const name = text(newName.value);
+            const image = newImage.files && newImage.files[0];
             createError.classList.add('d-none');
 
             if (!name) {
@@ -278,24 +373,30 @@
                 newName.focus();
                 return;
             }
+            if (image && (!ALLOWED_IMAGE_TYPES.includes(image.type) || image.size > MAX_IMAGE_SIZE)) {
+                createError.textContent = 'Проверьте формат и размер фотографии.';
+                createError.classList.remove('d-none');
+                return;
+            }
 
             createSubmit.disabled = true;
             createSubmit.textContent = 'Сохраняем…';
 
             try {
+                const formData = new FormData();
+                formData.append('name', name);
+                if (text(newType.value)) formData.append('type', text(newType.value));
+                if (text(newDescription.value)) formData.append('description', text(newDescription.value));
+                if (image) formData.append('image', image);
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
-                        'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': csrf,
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify({
-                        name: name,
-                        type: text(newType.value) || null,
-                        description: text(newDescription.value) || null,
-                    }),
+                    body: formData,
                 });
                 const payload = await response.json();
                 if (!response.ok || !payload.data) {
@@ -306,9 +407,7 @@
                 }
 
                 addSelected(payload.data);
-                newName.value = '';
-                newType.value = '';
-                newDescription.value = '';
+                resetCreateForm();
                 toggleCreate(false);
                 searchInput.value = '';
                 resultsBox.hidden = true;

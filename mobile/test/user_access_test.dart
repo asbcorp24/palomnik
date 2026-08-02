@@ -47,6 +47,21 @@ void main() {
     expect(access.workspaces.single.url, 'https://palom.example/admin');
   });
 
+  test('does not override an explicit empty server workspace list', () {
+    final access = UserAccess.fromUser(
+      {
+        'role': 'moderator',
+        'capabilities': {'moderation_manage': true},
+        'workspaces': <Map<String, dynamic>>[],
+      },
+      siteBaseUrl: 'https://palom.example',
+    );
+
+    expect(access.can('moderation_manage'), isTrue);
+    expect(access.workspaces, isEmpty);
+    expect(access.isStaff, isFalse);
+  });
+
   test('pilgrim remains a user without staff workspaces', () {
     final access = UserAccess.fromUser(
       {'role': 'pilgrim', 'email_verified': false},

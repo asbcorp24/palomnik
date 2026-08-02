@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 
@@ -68,6 +69,11 @@ class PilgrimageRoute extends Model
             ->withPivot(['sort_order', 'stay_minutes', 'note'])
             ->withTimestamps()
             ->orderByPivot('sort_order');
+    }
+
+    public function audioGuide(): MorphOne
+    {
+        return $this->morphOne(AudioGuide::class, 'guideable');
     }
 
     public function pilgrimagePhotos(): HasMany

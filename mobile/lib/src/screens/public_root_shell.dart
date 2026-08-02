@@ -4,11 +4,11 @@ import '../core/session_controller.dart';
 import '../data/cached_api.dart';
 import '../theme/app_theme.dart';
 import 'app_sections.dart';
+import 'audio_guides.dart';
 import 'auth_screen.dart';
 import 'community_hub.dart';
 import 'enhanced_root_shell.dart';
 import 'maplibre_map.dart';
-import 'user_features.dart';
 
 class PublicRootShell extends StatefulWidget {
   const PublicRootShell({super.key, required this.session});
@@ -23,10 +23,8 @@ class _PublicRootShellState extends State<PublicRootShell> {
   int _index = 0;
 
   List<Widget> get _pages => [
-        widget.session.isAuthenticated
-            ? HomeTab(session: widget.session)
-            : PublicHomeTab(onOpenCommunity: () => _select(4)),
-        const CatalogTab(),
+        PublicHomeTab(onOpenCommunity: () => _select(4)),
+        const AudioCatalogTab(),
         const MapLibreMapTab(),
         const CalendarTab(),
         CommunityHubTab(
@@ -114,6 +112,13 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
     return Map<String, dynamic>.from(payload as Map);
   }
 
+  void _openAudioGuides() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AudioGuidesScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -129,6 +134,11 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Аудиогиды',
+            onPressed: _openAudioGuides,
+            icon: const Icon(Icons.headphones_outlined),
+          ),
           IconButton(
             tooltip: 'Сообщество',
             onPressed: widget.onOpenCommunity,
@@ -200,7 +210,7 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Храмы, монастыри, маршруты, события и материалы сообщества доступны без обязательной регистрации.',
+                        'Храмы, монастыри, маршруты, события, аудиогиды и материалы сообщества доступны без обязательной регистрации.',
                         style: TextStyle(color: Colors.white70, height: 1.5),
                       ),
                       const SizedBox(height: 18),
@@ -212,9 +222,9 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                             style: FilledButton.styleFrom(
                               backgroundColor: AppTheme.gold,
                             ),
-                            onPressed: widget.onOpenCommunity,
-                            icon: const Icon(Icons.groups),
-                            label: const Text('Сообщество'),
+                            onPressed: _openAudioGuides,
+                            icon: const Icon(Icons.headphones),
+                            label: const Text('Аудиогиды'),
                           ),
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
@@ -224,11 +234,20 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const RoutesScreen(),
+                                builder: (_) => const AudioRoutesScreen(),
                               ),
                             ),
                             icon: const Icon(Icons.route),
                             label: const Text('Маршруты'),
+                          ),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white54),
+                            ),
+                            onPressed: widget.onOpenCommunity,
+                            icon: const Icon(Icons.groups),
+                            label: const Text('Сообщество'),
                           ),
                         ],
                       ),
@@ -240,14 +259,14 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                   const EmptyCard(text: 'Объекты пока не опубликованы.')
                 else
                   SizedBox(
-                    height: 255,
+                    height: 285,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: objects.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (context, index) => SizedBox(
                         width: 280,
-                        child: ObjectCard(item: objects[index]),
+                        child: AudioObjectPreviewCard(item: objects[index]),
                       ),
                     ),
                   ),
@@ -266,7 +285,7 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => RouteDetailScreen(
+                            builder: (_) => AudioRouteDetailScreen(
                               slug: '${route['slug']}',
                             ),
                           ),

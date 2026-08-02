@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DirectoryController;
 use App\Http\Controllers\Api\V1\MapController;
 use App\Http\Controllers\Api\V1\MobileActionController;
+use App\Http\Controllers\Api\V1\MobileAudioGuideController;
 use App\Http\Controllers\Api\V1\MobileBookingController;
 use App\Http\Controllers\Api\V1\MobileCommunityController;
 use App\Http\Controllers\Api\V1\MobileContentController;
@@ -70,6 +71,12 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/community/{post:slug}', [MobileController::class, 'post'])->name('community.show');
         Route::get('/together', [MobileController::class, 'together'])->name('together.index');
         Route::get('/together/{jointPilgrimage:slug}', [MobileTogetherController::class, 'show'])->name('together.show');
+
+        Route::get('/audio-guides', [MobileAudioGuideController::class, 'index'])->name('audio-guides.index');
+        Route::get('/audio-guides/objects/{pilgrimageObject:slug}', [MobileAudioGuideController::class, 'object'])
+            ->name('audio-guides.objects.show');
+        Route::get('/audio-guides/routes/{pilgrimageRoute:slug}', [MobileAudioGuideController::class, 'route'])
+            ->name('audio-guides.routes.show');
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('/profile', [MobileProfileController::class, 'show'])->name('profile');

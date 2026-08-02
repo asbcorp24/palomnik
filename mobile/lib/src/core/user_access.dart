@@ -63,6 +63,7 @@ class UserAccess {
 
     final workspaces = <UserWorkspace>[];
     final workspaceSource = user['workspaces'];
+    final hasServerWorkspacePayload = workspaceSource is List;
     if (workspaceSource is List) {
       for (final value in workspaceSource) {
         if (value is Map) {
@@ -72,7 +73,9 @@ class UserAccess {
       }
     }
 
-    if (workspaces.isEmpty && siteBaseUrl.isNotEmpty) {
+    if (!hasServerWorkspacePayload &&
+        workspaces.isEmpty &&
+        siteBaseUrl.isNotEmpty) {
       workspaces.addAll(
         _legacyWorkspaces(
           roleCode,

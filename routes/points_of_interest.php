@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin')
     ->name('admin.')
-    ->middleware(['auth', 'verified', 'admin'])
+    ->middleware(['auth', 'verified', 'permission:content.manage'])
     ->group(function () {
         Route::resource('points-of-interest', PointOfInterestController::class)
             ->except('show')

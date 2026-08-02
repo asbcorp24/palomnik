@@ -160,7 +160,10 @@ class PilgrimageObjectController extends Controller
                 $query->where('is_active', true);
 
                 if ($object->exists && $object->object_type_id) {
-                    $query->orWhereKey($object->object_type_id);
+                    $query->orWhere(
+                        $query->getModel()->getQualifiedKeyName(),
+                        $object->object_type_id
+                    );
                 }
             })
             ->orderBy('sort_order')

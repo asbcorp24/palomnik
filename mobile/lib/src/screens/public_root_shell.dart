@@ -8,6 +8,7 @@ import 'auth_screen.dart';
 import 'community_hub.dart';
 import 'enhanced_root_shell.dart';
 import 'maplibre_map.dart';
+import 'user_features.dart';
 
 class PublicRootShell extends StatefulWidget {
   const PublicRootShell({super.key, required this.session});
@@ -270,28 +271,22 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                       ),
                     ),
                 const SizedBox(height: 18),
-                Card(
+                const Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(18),
+                    padding: EdgeInsets.all(18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Личный кабинет — по желанию',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 18,
                           ),
                         ),
-                        const SizedBox(height: 7),
-                        const Text(
-                          'Регистрация нужна только для избранного, бронирований, публикаций, отметок посещения и участия в совместных поездках.',
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.login),
-                          label: const Text('Вход — в нижнем разделе «Войти»'),
+                        SizedBox(height: 7),
+                        Text(
+                          'Регистрация нужна только для избранного, бронирований, публикаций, отметок посещения и участия в совместных поездках. Вход находится в нижнем разделе «Войти».',
                         ),
                       ],
                     ),

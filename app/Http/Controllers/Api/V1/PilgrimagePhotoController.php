@@ -34,6 +34,8 @@ class PilgrimagePhotoController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->normalizePublicationFlag($request);
+
         $data = $request->validate([
             'file' => ['required', 'file', 'mimetypes:image/jpeg,image/png,image/webp', 'max:30720'],
             'pilgrimage_route_id' => ['nullable', 'integer', 'exists:pilgrimage_routes,id'],
@@ -145,6 +147,25 @@ class PilgrimagePhotoController extends Controller
         }
 
         return $route->id;
+    }
+
+    private function normalizePublicationFlag(Request $request): void
+    {
+        $value = $request->input('request_publication');
+
+        if (! is_string($value)) {
+            return;
+        }
+
+        $normalized = match (strtolower(trim($value))) {
+            'true', '1' => true,
+            'false', '0' => false,
+            default => null,
+        };
+
+        if ($normalized !== null) {
+            $request->merge(['request_publication' => $normalized]);
+        }
     }
 
     private function photoData(UserMedia $photo): array

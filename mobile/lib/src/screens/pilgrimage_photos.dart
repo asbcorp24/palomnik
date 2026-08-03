@@ -148,7 +148,7 @@ class _PilgrimagePhotosScreenState extends State<PilgrimagePhotosScreen> {
             ? null
             : description.text.trim(),
         'pilgrimage_route_id': routeId,
-        'request_publication': requestPublication,
+        'request_publication': requestPublication ? '1' : '0',
       });
 
       await ApiClient.instance.dio.post('/mobile/media', data: form);

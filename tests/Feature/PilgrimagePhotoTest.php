@@ -126,6 +126,34 @@ class PilgrimagePhotoTest extends TestCase
             ->assertJsonPath('data.route.id', $route->id);
     }
 
+    public function test_mobile_multipart_upload_accepts_string_boolean_values_from_existing_apps(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $route = $this->publishedRoute();
+        Sanctum::actingAs($user);
+
+        $this->post('/api/v1/mobile/media', [
+            'file' => UploadedFile::fake()->image('private-mobile.jpg', 1200, 800),
+            'title' => 'Личное фото',
+            'request_publication' => 'false',
+        ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'private')
+            ->assertJsonPath('data.publication_requested', false);
+
+        $this->post('/api/v1/mobile/media', [
+            'file' => UploadedFile::fake()->image('public-mobile.jpg', 1200, 800),
+            'title' => 'Фото на модерацию',
+            'pilgrimage_route_id' => $route->id,
+            'request_publication' => 'true',
+        ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.publication_requested', true)
+            ->assertJsonPath('data.route.id', $route->id);
+    }
+
     private function publishedRoute(): PilgrimageRoute
     {
         return PilgrimageRoute::query()->create([

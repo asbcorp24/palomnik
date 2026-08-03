@@ -1,7 +1,7 @@
 name: moscow_pilgrim
 publish_to: none
 description: Мобильное приложение пользовательской части платформы «Московский паломник».
-version: 0.4.4+8
+version: 0.4.5+9
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
@@ -13,6 +13,7 @@ flutter:
     enable-swift-package-manager: true
   assets:
     - assets/images/
+    - assets/icon/
 
 dependencies:
   flutter:
@@ -44,3 +45,4 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4

@@ -19,24 +19,22 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  cupertino_icons: ^1.0.8
-  dio: ^5.9.1
-  flutter_secure_storage: ^10.0.0
+  dio: ^5.10.0
+  flutter_secure_storage: ^10.3.1
+  cached_network_image: ^3.4.1
+  table_calendar: ^3.2.0
+  qr_flutter: ^4.1.0
+  maplibre: ^0.3.5
+  yandex_mapkit: ^4.2.1
+  webview_flutter: ^4.13.1
   geolocator: ^14.0.2
   url_launcher: ^6.3.2
-  cached_network_image: ^3.4.1
+  image_picker: ^1.2.0
+  shared_preferences: ^2.5.3
   intl: ^0.20.2
-  mobile_scanner: ^7.2.0
-  qr_flutter: ^4.1.0
-  image_picker: ^1.2.1
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
-  path_provider: ^2.1.5
   sqflite: ^2.4.2
   path: ^1.9.1
-  connectivity_plus: ^7.0.0
-  permission_handler: ^12.0.1
-  maplibre_gl: ^0.25.0
+  connectivity_plus: ^6.1.5
   firebase_core: ^4.12.1
   firebase_messaging: ^16.4.3
   flutter_local_notifications: ^20.1.0

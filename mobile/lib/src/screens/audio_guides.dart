@@ -6,6 +6,7 @@ import '../core/api_client.dart';
 import '../data/cached_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/audio_guide_player.dart';
+import '../widgets/zoomable_network_image.dart';
 
 class AudioCatalogTab extends StatefulWidget {
   const AudioCatalogTab({super.key});
@@ -127,6 +128,7 @@ class AudioObjectPreviewCard extends StatelessWidget {
     final cover = _coverUrl(item);
     final location = _asMap(item['location']);
     final address = item['address'] ?? location['address'];
+    final name = '${item['name'] ?? 'Паломнический объект'}';
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -145,8 +147,9 @@ class AudioObjectPreviewCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (cover != null)
-              Image.network(
-                cover,
+              ZoomableNetworkImage(
+                url: cover,
+                caption: name,
                 height: 150,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -166,7 +169,7 @@ class AudioObjectPreviewCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${item['name'] ?? 'Паломнический объект'}',
+                          name,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
@@ -251,13 +254,15 @@ class _AudioObjectDetailScreenState extends State<AudioObjectDetailScreen> {
           final sanctities = _mapList(item['sanctities']);
           final lat = location['latitude'];
           final lon = location['longitude'];
+          final name = '${item['name'] ?? 'Паломнический объект'}';
 
           return ListView(
             padding: const EdgeInsets.only(bottom: 32),
             children: [
               if (cover != null)
-                Image.network(
-                  cover,
+                ZoomableNetworkImage(
+                  url: cover,
+                  caption: name,
                   height: 270,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -271,7 +276,7 @@ class _AudioObjectDetailScreenState extends State<AudioObjectDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${item['name'] ?? ''}',
+                      name,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             color: AppTheme.green,
                             fontWeight: FontWeight.w700,

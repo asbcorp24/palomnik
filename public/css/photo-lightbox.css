@@ -1,0 +1,300 @@
+.pm-lightbox-trigger {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    cursor: zoom-in;
+}
+
+.pm-lightbox-trigger > img,
+img.pm-lightbox-image {
+    cursor: zoom-in;
+}
+
+.pm-lightbox-trigger::after {
+    content: "";
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255, 255, 255, .58);
+    border-radius: 50%;
+    background: rgba(18, 27, 24, .68) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M6.5 2.5h-4v4M9.5 2.5h4v4M6.5 13.5h-4v-4M9.5 13.5h4v-4'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+    box-shadow: 0 7px 22px rgba(0, 0, 0, .24);
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity .2s ease, transform .2s ease, background-color .2s ease;
+    pointer-events: none;
+}
+
+.pm-lightbox-trigger:hover::after,
+.pm-lightbox-trigger:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.pm-lightbox-trigger:focus-visible,
+img.pm-lightbox-image:focus-visible {
+    outline: 3px solid var(--pm-gold, #b58a32);
+    outline-offset: 3px;
+}
+
+body.pm-lightbox-open {
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
+.pm-lightbox[hidden] {
+    display: none !important;
+}
+
+.pm-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 10080;
+    display: grid;
+    place-items: center;
+    padding: clamp(12px, 3vw, 42px);
+    background: rgba(9, 13, 12, .93);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    animation: pm-lightbox-fade-in .18s ease-out;
+    touch-action: none;
+}
+
+.pm-lightbox__stage {
+    position: relative;
+    display: flex;
+    width: min(100%, 1500px);
+    height: min(100%, 980px);
+    align-items: center;
+    justify-content: center;
+}
+
+.pm-lightbox__figure {
+    position: relative;
+    display: grid;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    margin: 0;
+    grid-template-rows: minmax(0, 1fr) auto;
+    place-items: center;
+}
+
+.pm-lightbox__image-wrap {
+    position: relative;
+    display: grid;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    place-items: center;
+    overflow: hidden;
+}
+
+.pm-lightbox__image {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 6px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .52);
+    opacity: 0;
+    transform: scale(.985);
+    transition: opacity .2s ease, transform .2s ease;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.pm-lightbox__image.is-loaded {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.pm-lightbox__caption {
+    width: min(100%, 960px);
+    min-height: 28px;
+    padding: 15px 64px 0;
+    color: rgba(255, 255, 255, .9);
+    font-size: clamp(.86rem, 1.5vw, 1rem);
+    line-height: 1.45;
+    text-align: center;
+}
+
+.pm-lightbox__counter {
+    position: absolute;
+    top: 13px;
+    left: 14px;
+    min-width: 48px;
+    padding: 7px 11px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .34);
+    color: rgba(255, 255, 255, .88);
+    font-size: .78rem;
+    text-align: center;
+}
+
+.pm-lightbox__button {
+    position: absolute;
+    z-index: 2;
+    display: grid;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, .2);
+    border-radius: 50%;
+    background: rgba(8, 14, 12, .66);
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+    transition: transform .16s ease, background-color .16s ease, border-color .16s ease;
+}
+
+.pm-lightbox__button:hover,
+.pm-lightbox__button:focus-visible {
+    border-color: rgba(255, 255, 255, .48);
+    background: rgba(38, 68, 59, .92);
+    transform: scale(1.06);
+    outline: none;
+}
+
+.pm-lightbox__button svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.pm-lightbox__close {
+    top: 0;
+    right: 0;
+}
+
+.pm-lightbox__previous {
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+}
+
+.pm-lightbox__previous:hover,
+.pm-lightbox__previous:focus-visible {
+    transform: translateY(-50%) scale(1.06);
+}
+
+.pm-lightbox__next {
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+}
+
+.pm-lightbox__next:hover,
+.pm-lightbox__next:focus-visible {
+    transform: translateY(-50%) scale(1.06);
+}
+
+.pm-lightbox__button[hidden] {
+    display: none;
+}
+
+.pm-lightbox__loader {
+    position: absolute;
+    width: 42px;
+    height: 42px;
+    border: 3px solid rgba(255, 255, 255, .2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: pm-lightbox-spin .75s linear infinite;
+}
+
+.pm-lightbox__loader[hidden] {
+    display: none;
+}
+
+.pm-lightbox__error {
+    max-width: 420px;
+    padding: 20px;
+    color: rgba(255, 255, 255, .8);
+    text-align: center;
+}
+
+.pm-lightbox__error[hidden] {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .pm-lightbox {
+        padding: 8px;
+    }
+
+    .pm-lightbox__stage {
+        width: 100%;
+        height: 100%;
+    }
+
+    .pm-lightbox__image {
+        border-radius: 2px;
+    }
+
+    .pm-lightbox__button {
+        width: 44px;
+        height: 44px;
+        background: rgba(8, 14, 12, .76);
+    }
+
+    .pm-lightbox__close {
+        top: 4px;
+        right: 4px;
+    }
+
+    .pm-lightbox__previous {
+        left: 4px;
+    }
+
+    .pm-lightbox__next {
+        right: 4px;
+    }
+
+    .pm-lightbox__counter {
+        top: 8px;
+        left: 8px;
+    }
+
+    .pm-lightbox__caption {
+        padding: 12px 56px 8px;
+        font-size: .84rem;
+    }
+
+    .pm-lightbox-trigger::after {
+        width: 36px;
+        height: 36px;
+        right: 9px;
+        bottom: 9px;
+        opacity: .88;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pm-lightbox,
+    .pm-lightbox__image,
+    .pm-lightbox__button,
+    .pm-lightbox-trigger::after {
+        animation: none;
+        transition: none;
+    }
+}
+
+@keyframes pm-lightbox-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes pm-lightbox-spin {
+    to { transform: rotate(360deg); }
+}

@@ -70,6 +70,9 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::get('/community/photos', [MobileCommunityController::class, 'photos'])->name('community.photos');
         Route::get('/community/{post:slug}', [MobileController::class, 'post'])->name('community.show');
         Route::get('/together', [MobileController::class, 'together'])->name('together.index');
+        Route::get('/together/my', [MobileActionController::class, 'myJointPilgrimages'])
+            ->middleware('auth:sanctum')
+            ->name('together.my');
         Route::get('/together/{jointPilgrimage:slug}', [MobileTogetherController::class, 'show'])->name('together.show');
 
         Route::get('/audio-guides', [MobileAudioGuideController::class, 'index'])->name('audio-guides.index');
@@ -98,7 +101,6 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::put('/posts/{post}', [MobileContentController::class, 'updatePost'])->name('posts.update');
             Route::delete('/posts/{post}', [MobileContentController::class, 'destroyPost'])->name('posts.destroy');
 
-            Route::get('/together/my', [MobileActionController::class, 'myJointPilgrimages'])->name('together.my');
             Route::post('/together', [MobileController::class, 'createJoint'])->name('together.store');
             Route::post('/together/{jointPilgrimage:slug}/join', [MobileController::class, 'joinJoint'])->name('together.join');
             Route::delete('/together/{jointPilgrimage:slug}/leave', [MobileController::class, 'leaveJoint'])->name('together.leave');

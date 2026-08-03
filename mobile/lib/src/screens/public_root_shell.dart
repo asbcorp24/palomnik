@@ -23,13 +23,17 @@ class _PublicRootShellState extends State<PublicRootShell> {
   int _index = 0;
 
   List<Widget> get _pages => [
-        PublicHomeTab(onOpenCommunity: () => _select(4)),
+        PublicHomeTab(
+          onOpenAudioGuides: () => _select(2),
+          onOpenCommunity: () => _select(5),
+        ),
         const AudioCatalogTab(),
+        const AudioGuidesScreen(),
         const MapLibreMapTab(),
         const CalendarTab(),
         CommunityHubTab(
           session: widget.session,
-          onOpenProfile: () => _select(5),
+          onOpenProfile: () => _select(6),
         ),
         widget.session.isAuthenticated
             ? EnhancedProfileTab(session: widget.session)
@@ -59,6 +63,11 @@ class _PublicRootShellState extends State<PublicRootShell> {
             icon: Icon(Icons.church_outlined),
             selectedIcon: Icon(Icons.church),
             label: 'Святыни',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.headphones_outlined),
+            selectedIcon: Icon(Icons.headphones),
+            label: 'Аудиогиды',
           ),
           const NavigationDestination(
             icon: Icon(Icons.map_outlined),
@@ -93,8 +102,13 @@ class _PublicRootShellState extends State<PublicRootShell> {
 }
 
 class PublicHomeTab extends StatefulWidget {
-  const PublicHomeTab({super.key, required this.onOpenCommunity});
+  const PublicHomeTab({
+    super.key,
+    required this.onOpenAudioGuides,
+    required this.onOpenCommunity,
+  });
 
+  final VoidCallback onOpenAudioGuides;
   final VoidCallback onOpenCommunity;
 
   @override
@@ -112,12 +126,7 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
     return Map<String, dynamic>.from(payload as Map);
   }
 
-  void _openAudioGuides() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const AudioGuidesScreen()),
-    );
-  }
+  void _openAudioGuides() => widget.onOpenAudioGuides();
 
   @override
   Widget build(BuildContext context) {

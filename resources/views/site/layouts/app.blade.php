@@ -13,6 +13,7 @@
     <link href="{{ asset('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') }}" rel="stylesheet">
     <link href="{{ asset('css/pilgrim-site.css') }}" rel="stylesheet">
     <link href="{{ asset('css/pilgrim-account.css') }}" rel="stylesheet">
+    <link href="{{ asset('css/photo-lightbox.css') }}?v=1" rel="stylesheet">
     @stack('styles')
 </head>
 @php
@@ -108,6 +109,7 @@
 
 <script src="{{ asset('assets/vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ asset('js/together-chat.js') }}"></script>
+<script src="{{ asset('js/photo-lightbox.js') }}?v=1"></script>
 <script>
 (function () {
     if (document.body.dataset.themePreference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('theme-dark');

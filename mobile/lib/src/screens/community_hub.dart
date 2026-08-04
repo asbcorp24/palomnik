@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../core/api_client.dart';
 import '../core/session_controller.dart';
 import '../data/cached_api.dart';
 import '../theme/app_theme.dart';
@@ -9,6 +7,7 @@ import 'advanced_features.dart';
 import 'app_sections.dart';
 import 'content_features.dart';
 import 'pilgrimage_photos.dart';
+import 'user_features.dart';
 
 class CommunityHubTab extends StatelessWidget {
   const CommunityHubTab({
@@ -75,7 +74,7 @@ class CommunityHubTab extends StatelessWidget {
               context,
               session.isAuthenticated
                   ? const TogetherScreen()
-                  : const PublicTogetherScreen(),
+                  : PublicTogetherScreen(onOpenProfile: onOpenProfile),
             ),
           ),
           if (session.isAuthenticated) ...[
@@ -154,13 +153,25 @@ class PublicCommunityPostsScreen extends StatelessWidget {
           title: '${item['title'] ?? 'Путевая заметка'}',
           subtitle: '${item['excerpt'] ?? ''}',
           icon: Icons.article_outlined,
-          onTap: () => _openSite('/community/${item['slug']}'),
+          onTap: item['slug'] == null
+              ? null
+              : () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PostDetailScreen(slug: '${item['slug']}'),
+                    ),
+                  ),
         ),
       );
 }
 
 class PublicTogetherScreen extends StatelessWidget {
-  const PublicTogetherScreen({super.key});
+  const PublicTogetherScreen({
+    super.key,
+    required this.onOpenProfile,
+  });
+
+  final VoidCallback onOpenProfile;
 
   Future<List<Map<String, dynamic>>> _load() async {
     final payload = await CachedApi.instance.get(
@@ -187,7 +198,223 @@ class PublicTogetherScreen extends StatelessWidget {
           subtitle:
               '${item['meeting_place'] ?? ''}\n${formatDate(item['starts_at'])}\n${item['participants_count'] ?? item['approved_members_count'] ?? 1}/${item['max_participants'] ?? '∞'} участников',
           icon: Icons.groups_outlined,
-          onTap: () => _openSite('/community/together/${item['slug']}'),
+          onTap: item['slug'] == null
+              ? null
+              : () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PublicTogetherDetailScreen(
+                        slug: '${item['slug']}',
+                        onOpenProfile: onOpenProfile,
+                      ),
+                    ),
+                  ),
+        ),
+      );
+}
+
+class PublicTogetherDetailScreen extends StatefulWidget {
+  const PublicTogetherDetailScreen({
+    super.key,
+    required this.slug,
+    required this.onOpenProfile,
+  });
+
+  final String slug;
+  final VoidCallback onOpenProfile;
+
+  @override
+  State<PublicTogetherDetailScreen> createState() =>
+      _PublicTogetherDetailScreenState();
+}
+
+class _PublicTogetherDetailScreenState
+    extends State<PublicTogetherDetailScreen> {
+  late Future<Map<String, dynamic>> _future = _load();
+
+  Future<Map<String, dynamic>> _load({bool refresh = false}) async {
+    final payload = await CachedApi.instance.get(
+      '/mobile/together/${widget.slug}',
+      forceRefresh: refresh,
+    ) as Map;
+    return Map<String, dynamic>.from(payload['data'] as Map);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Паломничество вместе')),
+        body: FutureBuilder<Map<String, dynamic>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return ErrorPane(
+                error: snapshot.error!,
+                onRetry: () => setState(() => _future = _load(refresh: true)),
+              );
+            }
+
+            final item = snapshot.data!;
+            final organizer = _asMap(item['organizer']);
+            final route = _asMap(item['route']);
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                final future = _load(refresh: true);
+                setState(() => _future = future);
+                await future;
+              },
+              child: ListView(
+                padding: const EdgeInsets.all(18),
+                children: [
+                  Text(
+                    '${item['title'] ?? 'Совместное паломничество'}',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: AppTheme.green,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (organizer['name'] != null)
+                    _InfoRow(
+                      icon: Icons.person_outline,
+                      text:
+                          'Организатор: ${organizer['name']}${organizer['is_verified_organizer'] == true ? ' ✓' : ''}',
+                    ),
+                  _InfoRow(
+                    icon: Icons.calendar_month_outlined,
+                    text: formatDate(item['starts_at']),
+                  ),
+                  if ('${item['ends_at'] ?? ''}'.trim().isNotEmpty)
+                    _InfoRow(
+                      icon: Icons.event_available_outlined,
+                      text: 'Окончание: ${formatDate(item['ends_at'])}',
+                    ),
+                  _InfoRow(
+                    icon: Icons.location_on_outlined,
+                    text: '${item['meeting_place'] ?? 'Место встречи уточняется'}',
+                  ),
+                  _InfoRow(
+                    icon: Icons.groups_outlined,
+                    text:
+                        '${item['participants_count'] ?? 1}/${item['max_participants'] ?? '∞'} участников'
+                        '${item['available_places'] != null ? ' · свободно ${item['available_places']}' : ''}',
+                  ),
+                  if ('${item['transport_mode'] ?? ''}'.trim().isNotEmpty)
+                    _InfoRow(
+                      icon: Icons.directions_bus_outlined,
+                      text: _transportLabel('${item['transport_mode']}'),
+                    ),
+                  if ('${item['description'] ?? ''}'.trim().isNotEmpty) ...[
+                    const _SectionHeading('План поездки'),
+                    Text(
+                      '${item['description']}',
+                      style: const TextStyle(height: 1.6, fontSize: 16),
+                    ),
+                  ],
+                  if (route.isNotEmpty) ...[
+                    const _SectionHeading('Маршрут'),
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.route, color: AppTheme.green),
+                        title: Text('${route['title'] ?? 'Паломнический маршрут'}'),
+                        subtitle: Text('${route['short_description'] ?? ''}'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: route['slug'] == null
+                            ? null
+                            : () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => RouteDetailScreen(
+                                      slug: '${route['slug']}',
+                                    ),
+                                  ),
+                                ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  Card(
+                    color: AppTheme.cream,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Хотите присоединиться?',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Войдите в приложение, чтобы отправить заявку, связаться с организатором и участвовать в обсуждении.',
+                          ),
+                          const SizedBox(height: 14),
+                          FilledButton.icon(
+                            onPressed: _openProfile,
+                            icon: const Icon(Icons.login),
+                            label: const Text('Войти или зарегистрироваться'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+
+  void _openProfile() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    widget.onOpenProfile();
+  }
+
+  String _transportLabel(String value) {
+    switch (value) {
+      case 'public':
+      case 'masstransit':
+      case 'multimodal':
+        return 'Общественный транспорт';
+      case 'auto':
+      case 'car':
+        return 'На автомобиле';
+      case 'pedestrian':
+      case 'walking':
+        return 'Пешком';
+      case 'bus':
+        return 'Автобус';
+      default:
+        return value;
+    }
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: AppTheme.gold),
+            const SizedBox(width: 10),
+            Expanded(child: Text(text)),
+          ],
         ),
       );
 }
@@ -405,8 +632,3 @@ class _SectionHeading extends StatelessWidget {
 Map<String, dynamic> _asMap(dynamic value) => value is Map
     ? Map<String, dynamic>.from(value)
     : const <String, dynamic>{};
-
-Future<void> _openSite(String path) async {
-  final uri = Uri.parse('${ApiClient.siteBaseUrl}$path');
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
-}

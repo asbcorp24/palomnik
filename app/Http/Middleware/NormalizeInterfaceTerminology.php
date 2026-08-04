@@ -28,6 +28,11 @@ class NormalizeInterfaceTerminology
 
         $html = $this->replaceTerms($html);
         $html = $this->removeHolySpringControls($html);
+
+        if ($request->routeIs('objects.show')) {
+            $html = $this->simplifyObjectMapActions($html);
+        }
+
         $html = $this->injectMapEnhancements($html);
 
         $response->setContent($html);
@@ -104,6 +109,19 @@ class NormalizeInterfaceTerminology
         ];
 
         return preg_replace($patterns, '', $html) ?: $html;
+    }
+
+    private function simplifyObjectMapActions(string $html): string
+    {
+        $html = str_replace(
+            '<h2 class="h5 mb-3">Построить маршрут</h2>',
+            '<h2 class="h5 mb-3">Построить маршрут в Яндекс Картах</h2>',
+            $html
+        );
+
+        $pattern = '~\s*<a\s+class="btn btn-outline-pm py-3"\s+href="[^"]*/map(?:\?[^"]*)?">\s*<i\s+class="bi bi-map me-2"></i>\s*Открыть на общей карте\s*</a>~iu';
+
+        return preg_replace($pattern, '', $html) ?: $html;
     }
 
     private function injectMapEnhancements(string $html): string

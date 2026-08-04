@@ -67,6 +67,25 @@
                 </div>
             </div>
 
+            @if($object->exists && $object->childObjects->isNotEmpty())
+                <div class="card-soft p-4 mb-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                        <div>
+                            <h2 class="h5 mb-1">Дочерние объекты</h2>
+                            <div class="small text-secondary">Нажмите на объект, чтобы открыть его карточку редактирования.</div>
+                        </div>
+                        <span class="badge bg-light text-dark border">{{ $object->childObjects->count() }} на первом уровне</span>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        @include('admin.objects._descendant_tree', [
+                            'children' => $object->childObjects,
+                            'level' => 0,
+                        ])
+                    </div>
+                </div>
+            @endif
+
             <div class="card-soft p-4 mb-4">
                 <h2 class="h5 mb-4">Расположение</h2>
                 <div class="row g-3">

@@ -14,7 +14,7 @@ class AdminObjectDescendantsTest extends TestCase
 
     public function test_edit_form_shows_nested_descendants_with_links_to_their_cards(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $admin = $this->admin();
         $monasteryType = $this->objectType('Монастырь', 'monastery');
         $churchType = $this->objectType('Храм', 'church');
         $chapelType = $this->objectType('Часовня', 'chapel');
@@ -39,7 +39,7 @@ class AdminObjectDescendantsTest extends TestCase
 
     public function test_edit_form_does_not_show_descendant_block_without_children(): void
     {
-        $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $admin = $this->admin();
         $churchType = $this->objectType('Храм', 'church');
         $church = $this->object($churchType, 'Самостоятельный храм', 'single-church');
 
@@ -47,6 +47,14 @@ class AdminObjectDescendantsTest extends TestCase
             ->get(route('admin.objects.edit', $church))
             ->assertOk()
             ->assertDontSee('Дочерние объекты');
+    }
+
+    private function admin(): User
+    {
+        return User::factory()->create([
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
+        ]);
     }
 
     private function objectType(string $name, string $slug): ObjectType

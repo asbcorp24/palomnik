@@ -1,0 +1,1 @@
+Launcher icon source and generated platform icons are managed by flutter_launcher_icons.

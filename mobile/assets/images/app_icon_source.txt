@@ -1,1 +1,0 @@
-Источник launcher-иконки: assets/images/app_icon.png. Файл подготовлен из утверждённого изображения пользователя и используется flutter_launcher_icons.

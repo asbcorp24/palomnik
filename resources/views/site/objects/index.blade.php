@@ -62,8 +62,9 @@
                 <div class="col-md-6 col-lg-2">
                     <label class="form-label" for="sort">Сортировка</label>
                     <select class="form-select" id="sort" name="sort">
-                        <option value="name" @selected(($filters['sort'] ?? 'name') === 'name')>По названию</option>
-                        <option value="newest" @selected(($filters['sort'] ?? '') === 'newest')>Сначала новые</option>
+                        <option value="none" @selected(($filters['sort'] ?? 'none') === 'none')>Без сортировки</option>
+                        <option value="popular" @selected(($filters['sort'] ?? '') === 'popular')>Популярные</option>
+                        <option value="reviews" @selected(($filters['sort'] ?? '') === 'reviews')>С отзывами</option>
                     </select>
                 </div>
                 <div class="col-12 d-flex flex-wrap gap-2">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Controller;
+use App\Models\AnalyticsEvent;
 use App\Models\Deanery;
 use App\Models\ObjectMedia;
 use App\Models\ObjectType;
@@ -29,7 +30,7 @@ class ObjectController extends Controller
             'type' => ['nullable', 'string', 'max:255'],
             'vicariate' => ['nullable', 'string', 'max:255'],
             'deanery' => ['nullable', 'string', 'max:255'],
-            'sort' => ['nullable', 'in:name,newest'],
+            'sort' => ['nullable', 'in:none,popular,reviews,name,newest'],
             'picker' => ['nullable', 'in:route'],
         ]);
 
@@ -49,8 +50,21 @@ class ObjectController extends Controller
                 'publishedChildObjects.objectType',
                 'publishedChildObjects.sanctities',
             ])
-            ->withCount('publishedChildObjects')
-            ->withAvg(['reviews as published_rating' => fn ($query) => $query->where('status', 'published')], 'rating')
+            ->withCount([
+                'publishedChildObjects',
+                'reviews as published_reviews_count' => fn ($query) => $query->where('status', 'published'),
+            ])
+            ->withAvg(
+                ['reviews as published_rating' => fn ($query) => $query->where('status', 'published')],
+                'rating'
+            )
+            ->addSelect([
+                'popularity_count' => AnalyticsEvent::query()
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('entity_id', 'pilgrimage_objects.id')
+                    ->where('event', 'object_view')
+                    ->where('entity_type', 'PilgrimageObject'),
+            ])
             ->typeOrParentOfType($filters['type'] ?? null)
             ->when($filters['vicariate'] ?? null, function (Builder $query, string $slug) {
                 $query->whereHas('vicariate', fn (Builder $query) => $query->where('slug', $slug));
@@ -60,19 +74,66 @@ class ObjectController extends Controller
             });
 
         $searchTerm = trim((string) ($filters['q'] ?? ''));
+        $sort = $filters['sort'] ?? 'none';
 
         if ($searchTerm !== '') {
             $rankedObjects = $fuzzySearch->rank($query->get(), $searchTerm);
 
-            if ($request->filled('sort')) {
-                $rankedObjects = ($filters['sort'] ?? 'name') === 'newest'
-                    ? $rankedObjects->sortByDesc(fn (PilgrimageObject $object) => $object->published_at?->getTimestamp() ?? 0)->values()
-                    : $rankedObjects->sortBy(fn (PilgrimageObject $object) => mb_strtolower($object->name, 'UTF-8'))->values();
+            if ($sort === 'popular') {
+                $rankedObjects = $rankedObjects
+                    ->sort(function (PilgrimageObject $first, PilgrimageObject $second): int {
+                        $comparison = (int) $second->popularity_count <=> (int) $first->popularity_count;
+                        if ($comparison !== 0) {
+                            return $comparison;
+                        }
+
+                        $comparison = (int) $second->published_reviews_count <=> (int) $first->published_reviews_count;
+
+                        return $comparison !== 0
+                            ? $comparison
+                            : strcasecmp($first->name, $second->name);
+                    })
+                    ->values();
+            } elseif ($sort === 'reviews') {
+                $rankedObjects = $rankedObjects
+                    ->filter(fn (PilgrimageObject $object): bool => (int) $object->published_reviews_count > 0)
+                    ->sort(function (PilgrimageObject $first, PilgrimageObject $second): int {
+                        $comparison = (int) $second->published_reviews_count <=> (int) $first->published_reviews_count;
+                        if ($comparison !== 0) {
+                            return $comparison;
+                        }
+
+                        $comparison = (float) $second->published_rating <=> (float) $first->published_rating;
+
+                        return $comparison !== 0
+                            ? $comparison
+                            : strcasecmp($first->name, $second->name);
+                    })
+                    ->values();
+            } elseif ($sort === 'newest') {
+                $rankedObjects = $rankedObjects
+                    ->sortByDesc(fn (PilgrimageObject $object) => $object->published_at?->getTimestamp() ?? 0)
+                    ->values();
+            } elseif ($sort === 'name') {
+                $rankedObjects = $rankedObjects
+                    ->sortBy(fn (PilgrimageObject $object) => mb_strtolower($object->name, 'UTF-8'))
+                    ->values();
             }
 
             $objects = $this->paginateCollection($rankedObjects, $request, 12);
         } else {
-            if (($filters['sort'] ?? 'name') === 'newest') {
+            if ($sort === 'popular') {
+                $query
+                    ->orderByDesc('popularity_count')
+                    ->orderByDesc('published_reviews_count')
+                    ->orderBy('name');
+            } elseif ($sort === 'reviews') {
+                $query
+                    ->whereHas('reviews', fn (Builder $query) => $query->where('status', 'published'))
+                    ->orderByDesc('published_reviews_count')
+                    ->orderByDesc('published_rating')
+                    ->orderBy('name');
+            } elseif ($sort === 'newest') {
                 $query->orderByDesc('published_at')->orderByDesc('id');
             } else {
                 $query->orderBy('name');
@@ -87,6 +148,7 @@ class ObjectController extends Controller
                 'type' => $filters['type'] ?? null,
                 'vicariate' => $filters['vicariate'] ?? null,
                 'deanery' => $filters['deanery'] ?? null,
+                'sort' => $sort,
             ], $searchTerm);
 
             if ($objects->total() === 0) {
@@ -94,6 +156,7 @@ class ObjectController extends Controller
                     'type' => $filters['type'] ?? null,
                     'vicariate' => $filters['vicariate'] ?? null,
                     'deanery' => $filters['deanery'] ?? null,
+                    'sort' => $sort,
                 ], $searchTerm);
             }
         }

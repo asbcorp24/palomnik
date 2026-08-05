@@ -9,6 +9,7 @@ import 'auth_screen.dart';
 import 'community_hub.dart';
 import 'enhanced_root_shell.dart';
 import 'maplibre_map.dart';
+import 'sorted_object_catalog.dart';
 
 class PublicRootShell extends StatefulWidget {
   const PublicRootShell({super.key, required this.session});
@@ -27,7 +28,7 @@ class _PublicRootShellState extends State<PublicRootShell> {
           onOpenAudioGuides: () => _select(2),
           onOpenCommunity: () => _select(5),
         ),
-        const AudioCatalogTab(),
+        const SortedObjectCatalogTab(),
         const AudioGuidesScreen(),
         const MapLibreMapTab(),
         const CalendarTab(),

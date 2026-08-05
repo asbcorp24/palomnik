@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PilgrimageObjectResource;
+use App\Models\AnalyticsEvent;
 use App\Models\PilgrimageObject;
+use App\Services\AnalyticsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -19,7 +21,7 @@ class PilgrimageObjectController extends Controller
             'vicariate' => ['nullable', 'string', 'max:255'],
             'deanery' => ['nullable', 'string', 'max:255'],
             'sanctity' => ['nullable', 'string', 'max:255'],
-            'sort' => ['nullable', 'in:name,newest'],
+            'sort' => ['nullable', 'in:none,popular,reviews,name,newest'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -34,7 +36,21 @@ class PilgrimageObjectController extends Controller
                 'parentObject.objectType',
                 'publishedChildObjects.objectType',
             ])
-            ->withCount('publishedChildObjects')
+            ->withCount([
+                'publishedChildObjects',
+                'reviews as published_reviews_count' => fn ($query) => $query->where('status', 'published'),
+            ])
+            ->withAvg(
+                ['reviews as published_rating' => fn ($query) => $query->where('status', 'published')],
+                'rating'
+            )
+            ->addSelect([
+                'popularity_count' => AnalyticsEvent::query()
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('entity_id', 'pilgrimage_objects.id')
+                    ->where('event', 'object_view')
+                    ->where('entity_type', 'PilgrimageObject'),
+            ])
             ->search($validated['q'] ?? null);
 
         $query->typeOrParentOfType($validated['type'] ?? null);
@@ -57,7 +73,20 @@ class PilgrimageObjectController extends Controller
             });
         });
 
-        if (($validated['sort'] ?? 'name') === 'newest') {
+        $sort = $validated['sort'] ?? 'none';
+
+        if ($sort === 'popular') {
+            $query
+                ->orderByDesc('popularity_count')
+                ->orderByDesc('published_reviews_count')
+                ->orderBy('name');
+        } elseif ($sort === 'reviews') {
+            $query
+                ->whereHas('reviews', fn (Builder $query) => $query->where('status', 'published'))
+                ->orderByDesc('published_reviews_count')
+                ->orderByDesc('published_rating')
+                ->orderBy('name');
+        } elseif ($sort === 'newest') {
             $query->orderByDesc('published_at')->orderByDesc('id');
         } else {
             $query->orderBy('name');
@@ -68,8 +97,11 @@ class PilgrimageObjectController extends Controller
         );
     }
 
-    public function show(PilgrimageObject $pilgrimageObject): PilgrimageObjectResource
-    {
+    public function show(
+        Request $request,
+        PilgrimageObject $pilgrimageObject,
+        AnalyticsService $analytics
+    ): PilgrimageObjectResource {
         $pilgrimageObject->loadMissing('objectType');
         $isScheduledForFuture = $pilgrimageObject->published_at
             && $pilgrimageObject->published_at->isFuture();
@@ -95,6 +127,13 @@ class PilgrimageObjectController extends Controller
             'nearbyObjects',
             $this->nearbyObjects($pilgrimageObject)
         );
+
+        $analytics->track($request, 'object_view', $pilgrimageObject, [
+            'source' => 'mobile_api',
+            'type' => $pilgrimageObject->objectType?->slug,
+            'vicariate_id' => $pilgrimageObject->vicariate_id,
+            'deanery_id' => $pilgrimageObject->deanery_id,
+        ]);
 
         return new PilgrimageObjectResource($pilgrimageObject);
     }

@@ -1,4 +1,21 @@
 @php
+    $objectEditUrl = null;
+    $objectEditor = auth()->user();
+
+    if ($objectEditor && $objectEditor->hasVerifiedEmail()) {
+        if ($objectEditor->hasPermission(\App\Models\User::PERMISSION_CONTENT_MANAGE)) {
+            $objectEditUrl = route('admin.objects.edit', $object);
+        } elseif (
+            $objectEditor->hasPermission(\App\Models\User::PERMISSION_ASSIGNED_OBJECTS_MANAGE)
+            && $objectEditor->objectRepresentatives()
+                ->where('pilgrimage_object_id', $object->id)
+                ->where('status', 'approved')
+                ->exists()
+        ) {
+            $objectEditUrl = route('service.objects.edit', $object);
+        }
+    }
+
     $parentMonastery = $object->parentObject
         && optional($object->parentObject->objectType)->slug === 'monastery'
             ? $object->parentObject
@@ -11,6 +28,27 @@
                 ->values()
             : collect();
 @endphp
+
+@if($objectEditUrl)
+    <a
+        class="btn btn-pm-green"
+        id="publicObjectEditButton"
+        href="{{ $objectEditUrl }}"
+    >
+        <i class="bi bi-pencil-square me-1"></i>Редактировать карточку
+    </a>
+
+    <script>
+        (function () {
+            const button = document.getElementById('publicObjectEditButton');
+            const actions = document.querySelector('.page-hero .col-lg-4 .d-flex.flex-wrap');
+
+            if (button && actions) {
+                actions.prepend(button);
+            }
+        })();
+    </script>
+@endif
 
 @if($parentMonastery)
 <section class="mb-5">

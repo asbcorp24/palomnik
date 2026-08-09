@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Controller;
+use App\Models\AnalyticsEvent;
 use App\Models\CalendarEvent;
 use App\Models\ObjectType;
 use App\Models\PilgrimageObject;
@@ -18,8 +19,19 @@ class HomeController extends Controller
         $featuredObjects = PilgrimageObject::query()
             ->published()
             ->with(['objectType', 'vicariate', 'deanery', 'coverMedia', 'sanctities'])
-            ->orderByDesc('published_at')
-            ->orderByDesc('id')
+            ->withCount([
+                'reviews as published_reviews_count' => fn ($query) => $query->where('status', 'published'),
+            ])
+            ->addSelect([
+                'popularity_count' => AnalyticsEvent::query()
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('entity_id', 'pilgrimage_objects.id')
+                    ->where('event', 'object_view')
+                    ->where('entity_type', 'PilgrimageObject'),
+            ])
+            ->orderByDesc('popularity_count')
+            ->orderByDesc('published_reviews_count')
+            ->orderBy('name')
             ->limit(6)
             ->get();
 

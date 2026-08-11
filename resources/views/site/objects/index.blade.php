@@ -2,6 +2,46 @@
 
 @section('title', 'Храмы и монастыри — Московский паломник')
 
+@push('styles')
+<link href="{{ asset('assets/vendor/maplibre/maplibre-gl.css') }}" rel="stylesheet">
+<style>
+    .object-catalog-map-card { overflow:hidden; padding:0; }
+    .object-catalog-mini-map { position:relative; width:100%; height:340px; background:#ebe7df; }
+    .object-catalog-mini-map .maplibregl-canvas { outline:none; }
+    .object-catalog-map-marker {
+        width:38px;
+        height:38px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        border:3px solid #fffdf9;
+        border-radius:50% 50% 50% 12%;
+        color:#fff;
+        font-size:17px;
+        box-shadow:0 8px 22px rgba(24,35,31,.3);
+        transform:rotate(-45deg);
+        background:var(--pm-gold);
+        cursor:pointer;
+    }
+    .object-catalog-map-marker i { transform:rotate(45deg); }
+    .object-catalog-map-empty {
+        min-height:340px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:30px;
+        text-align:center;
+        color:var(--pm-muted);
+    }
+    .object-catalog-map-popup { min-width:210px; max-width:270px; }
+    .object-catalog-map-popup a { color:var(--pm-green); font-weight:700; text-decoration:none; }
+    @media (max-width:767.98px) {
+        .object-catalog-mini-map { height:285px; }
+        .object-catalog-map-empty { min-height:285px; }
+    }
+</style>
+@endpush
+
 @section('content')
 <section class="page-hero">
     <div class="container">
@@ -74,6 +114,46 @@
             </div>
         </form>
 
+        @php
+            $catalogMapObjects = collect($objects->items())
+                ->filter(fn ($object) => $object->latitude !== null && $object->longitude !== null)
+                ->map(fn ($object) => [
+                    'name' => $object->name,
+                    'address' => $object->address,
+                    'type' => optional($object->objectType)->name ?: 'Паломнический объект',
+                    'latitude' => (float) $object->latitude,
+                    'longitude' => (float) $object->longitude,
+                    'url' => route('objects.show', $object),
+                ])
+                ->values();
+            $catalogMapQuery = collect([
+                'q' => $filters['q'] ?? null,
+                'type' => $filters['type'] ?? null,
+                'vicariate' => $filters['vicariate'] ?? null,
+                'deanery' => $filters['deanery'] ?? null,
+            ])->filter(fn ($value) => filled($value))->all();
+        @endphp
+
+        <section class="info-card object-catalog-map-card mb-5" aria-labelledby="objectCatalogMapTitle">
+            <div class="p-4 d-flex flex-wrap align-items-center justify-content-between gap-3 border-bottom">
+                <div>
+                    <div class="section-kicker mb-1">На карте</div>
+                    <h2 class="h4 mb-1" id="objectCatalogMapTitle">Объекты этой страницы</h2>
+                    <div class="small text-secondary">Показаны храмы и монастыри из текущей выборки, у которых указаны координаты.</div>
+                </div>
+                <a class="btn btn-outline-pm" href="{{ route('map', $catalogMapQuery) }}">
+                    <i class="bi bi-arrows-fullscreen me-2"></i>Открыть большую карту
+                </a>
+            </div>
+            <div
+                id="objectCatalogMiniMap"
+                class="object-catalog-mini-map"
+                data-style-url="{{ url('/api/v1/map/style.json') }}"
+                aria-label="Карта объектов текущей страницы"
+            ></div>
+            <script type="application/json" id="objectCatalogMiniMapData">@json($catalogMapObjects)</script>
+        </section>
+
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
             <div class="text-secondary">Найдено объектов: <strong class="text-dark">{{ $objects->total() }}</strong></div>
         </div>
@@ -101,6 +181,8 @@
 @endsection
 
 @push('scripts')
+<script src="{{ asset('assets/vendor/maplibre/maplibre-gl.js') }}"></script>
+<script src="{{ asset('js/object-catalog-mini-map.js') }}?v=1"></script>
 <script>
 (function () {
     const vicariate = document.getElementById('vicariate');

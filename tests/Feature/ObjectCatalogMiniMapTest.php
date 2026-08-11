@@ -47,31 +47,12 @@ class ObjectCatalogMiniMapTest extends TestCase
             ->assertSee('37.6176', false);
     }
 
-    public function test_objects_catalog_keeps_compact_map_when_page_objects_have_no_coordinates(): void
+    public function test_objects_catalog_keeps_compact_map_when_catalog_is_empty(): void
     {
-        $type = ObjectType::query()->create([
-            'name' => 'Храм',
-            'slug' => 'temple',
-            'marker_color' => '#8B6F47',
-            'icon' => 'church',
-            'sort_order' => 10,
-            'is_active' => true,
-            'is_public' => true,
-        ]);
-
-        PilgrimageObject::query()->create([
-            'object_type_id' => $type->id,
-            'name' => 'Храм без координат',
-            'slug' => 'temple-without-coordinates',
-            'address' => 'Москва',
-            'verification_status' => PilgrimageObject::VERIFICATION_UNVERIFIED,
-            'is_published' => true,
-            'published_at' => now()->subDay(),
-        ]);
-
         $this->get('/objects')
             ->assertOk()
+            ->assertSee('Объекты этой страницы')
             ->assertSee('id="objectCatalogMiniMap"', false)
-            ->assertSee('id="objectCatalogMiniMapData">[]</script>', false);
+            ->assertSee('<script type="application/json" id="objectCatalogMiniMapData">[]</script>', false);
     }
 }

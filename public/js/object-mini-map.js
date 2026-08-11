@@ -6,11 +6,10 @@
         return;
     }
 
-    const routeCard = Array.from(sidebar.children).find((element) => {
-        return element.classList.contains('info-card')
-            && element.querySelector('h2')?.textContent.trim() === 'Построить маршрут';
-    });
-    const routeLink = routeCard?.querySelector('a[href*="yandex.ru/maps"][href*="rtext="]');
+    // Не привязываемся к тексту заголовка: он может меняться в middleware/шаблоне.
+    // Карточка маршрута однозначно определяется по ссылке Яндекс Карт с rtext.
+    const routeLink = sidebar.querySelector('a[href*="yandex.ru/maps"][href*="rtext="]');
+    const routeCard = routeLink?.closest('.info-card');
 
     if (!routeCard || !routeLink) {
         return;

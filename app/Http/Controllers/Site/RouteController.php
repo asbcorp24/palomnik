@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Site;
 
 use App\Http\Controllers\Controller;
 use App\Models\PilgrimageRoute;
+use App\Models\Trip;
 use App\Services\AnalyticsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -39,6 +40,15 @@ class RouteController extends Controller
             ->paginate(12)
             ->withQueryString();
 
+        $upcomingTrips = Trip::query()
+            ->whereIn('status', ['planned', 'open'])
+            ->where('starts_at', '>=', now())
+            ->whereHas('pilgrimageRoute', fn (Builder $query) => $query->published())
+            ->with(['pilgrimageRoute' => fn ($query) => $query->published()])
+            ->orderBy('starts_at')
+            ->limit(12)
+            ->get();
+
         $searchTerm = trim((string) ($filters['q'] ?? ''));
         if ($searchTerm !== '') {
             $analytics->track($request, 'route_search', null, [
@@ -50,6 +60,7 @@ class RouteController extends Controller
 
         return view('site.routes.index', [
             'routes' => $routes,
+            'upcomingTrips' => $upcomingTrips,
             'filters' => $filters,
             'categories' => $this->categories(),
             'difficulties' => $this->difficulties(),

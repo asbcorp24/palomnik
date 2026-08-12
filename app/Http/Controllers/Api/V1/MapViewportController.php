@@ -15,6 +15,11 @@ class MapViewportController extends Controller
     public function objects(Request $request, MapViewportService $map): Response
     {
         $filters = $this->viewportFilters($request);
+
+        if (! empty($filters['route_only'])) {
+            return $this->cacheableJson($request, $this->routeOnlyPayload($filters));
+        }
+
         $payload = $map->objects($filters);
 
         return $this->cacheableJson($request, $payload);
@@ -23,6 +28,11 @@ class MapViewportController extends Controller
     public function pointsOfInterest(Request $request, MapViewportService $map): Response
     {
         $filters = $this->viewportFilters($request, true);
+
+        if (! empty($filters['route_only'])) {
+            return $this->cacheableJson($request, $this->routeOnlyPayload($filters));
+        }
+
         $payload = $map->pointsOfInterest($filters);
 
         return $this->cacheableJson($request, $payload);
@@ -55,6 +65,7 @@ class MapViewportController extends Controller
             'vicariate' => ['nullable', 'string', 'max:255'],
             'deanery' => ['nullable', 'string', 'max:255'],
             'sanctity' => ['nullable', 'string', 'max:255'],
+            'route_only' => ['nullable', 'boolean'],
         ];
 
         if ($withCategories) {
@@ -83,6 +94,27 @@ class MapViewportController extends Controller
         }
 
         return $filters;
+    }
+
+    private function routeOnlyPayload(array $filters): array
+    {
+        return [
+            'type' => 'FeatureCollection',
+            'features' => [],
+            'meta' => [
+                'mode' => 'points',
+                'returned' => 0,
+                'visible_objects' => 0,
+                'truncated' => false,
+                'route_only' => true,
+                'bounds' => [
+                    'min_lat' => (float) $filters['min_lat'],
+                    'max_lat' => (float) $filters['max_lat'],
+                    'min_lng' => (float) $filters['min_lng'],
+                    'max_lng' => (float) $filters['max_lng'],
+                ],
+            ],
+        ];
     }
 
     private function cacheableJson(Request $request, array $payload, int $browserTtl = 60): Response

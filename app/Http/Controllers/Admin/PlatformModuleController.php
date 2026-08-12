@@ -78,13 +78,15 @@ class PlatformModuleController extends Controller
         $config = $this->config($resource);
         $data = $this->validated($request, $resource);
         $objectIds = $data['object_ids'] ?? [];
-        unset($data['object_ids']);
+        $stayMinutes = $data['stay_minutes'] ?? [];
+        $pointNotes = $data['point_notes'] ?? [];
+        unset($data['object_ids'], $data['stay_minutes'], $data['point_notes']);
         $data = $this->transform($request, $resource, $data);
 
         $item = $config['model']::query()->create($data);
 
         if ($resource === 'routes') {
-            $this->syncRouteObjects($item, $objectIds);
+            $this->syncRouteObjects($item, $objectIds, $stayMinutes, $pointNotes);
         }
 
         return redirect()
@@ -116,12 +118,14 @@ class PlatformModuleController extends Controller
         $item = $config['model']::query()->findOrFail($id);
         $data = $this->validated($request, $resource, $item);
         $objectIds = $data['object_ids'] ?? [];
-        unset($data['object_ids']);
+        $stayMinutes = $data['stay_minutes'] ?? [];
+        $pointNotes = $data['point_notes'] ?? [];
+        unset($data['object_ids'], $data['stay_minutes'], $data['point_notes']);
         $data = $this->transform($request, $resource, $data, $item);
         $item->update($data);
 
         if ($resource === 'routes') {
-            $this->syncRouteObjects($item, $objectIds);
+            $this->syncRouteObjects($item, $objectIds, $stayMinutes, $pointNotes);
         }
 
         return redirect()
@@ -170,7 +174,11 @@ class PlatformModuleController extends Controller
                 'is_published' => ['nullable', 'boolean'],
                 'published_at' => ['nullable', 'date'],
                 'object_ids' => ['nullable', 'array'],
-                'object_ids.*' => ['integer', 'exists:pilgrimage_objects,id'],
+                'object_ids.*' => ['integer', 'distinct', 'exists:pilgrimage_objects,id'],
+                'stay_minutes' => ['nullable', 'array'],
+                'stay_minutes.*' => ['nullable', 'integer', 'min:0', 'max:10080'],
+                'point_notes' => ['nullable', 'array'],
+                'point_notes.*' => ['nullable', 'string', 'max:2000'],
             ]);
         }
 
@@ -247,12 +255,25 @@ class PlatformModuleController extends Controller
         return $data;
     }
 
-    private function syncRouteObjects(PilgrimageRoute $route, array $objectIds): void
-    {
+    private function syncRouteObjects(
+        PilgrimageRoute $route,
+        array $objectIds,
+        array $stayMinutes = [],
+        array $pointNotes = []
+    ): void {
         $sync = [];
-        foreach (array_values(array_unique($objectIds)) as $index => $objectId) {
-            $sync[$objectId] = ['sort_order' => $index + 1];
+
+        foreach (array_values(array_unique(array_map('intval', $objectIds))) as $index => $objectId) {
+            $minutes = $stayMinutes[$objectId] ?? null;
+            $note = trim((string) ($pointNotes[$objectId] ?? ''));
+
+            $sync[$objectId] = [
+                'sort_order' => $index + 1,
+                'stay_minutes' => $minutes === null || $minutes === '' ? null : (int) $minutes,
+                'note' => $note !== '' ? $note : null,
+            ];
         }
+
         $route->objects()->sync($sync);
     }
 

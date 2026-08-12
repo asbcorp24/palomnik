@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -132,6 +133,11 @@ class PlatformModuleController extends Controller
     {
         $config = $this->config($resource);
         $item = $config['model']::query()->findOrFail($id);
+
+        if ($resource === 'routes' && $item->cover_path) {
+            Storage::disk('public')->delete($item->cover_path);
+        }
+
         $item->delete();
 
         return redirect()
@@ -158,6 +164,8 @@ class PlatformModuleController extends Controller
                 'short_description' => ['nullable', 'string', 'max:2000'],
                 'description' => ['nullable', 'string'],
                 'program' => ['nullable', 'string'],
+                'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+                'remove_cover' => ['nullable', 'boolean'],
                 'is_group' => ['nullable', 'boolean'],
                 'is_published' => ['nullable', 'boolean'],
                 'published_at' => ['nullable', 'date'],
@@ -208,6 +216,23 @@ class PlatformModuleController extends Controller
         }
 
         if ($resource === 'routes') {
+            $oldCoverPath = $item instanceof PilgrimageRoute ? $item->cover_path : null;
+
+            if ($request->hasFile('cover_image')) {
+                $data['cover_path'] = $request->file('cover_image')->store('routes/covers', 'public');
+
+                if ($oldCoverPath && $oldCoverPath !== $data['cover_path']) {
+                    Storage::disk('public')->delete($oldCoverPath);
+                }
+            } elseif ($request->boolean('remove_cover')) {
+                if ($oldCoverPath) {
+                    Storage::disk('public')->delete($oldCoverPath);
+                }
+                $data['cover_path'] = null;
+            }
+
+            unset($data['cover_image'], $data['remove_cover']);
+
             $data['is_group'] = $request->boolean('is_group');
             $data['is_published'] = $request->boolean('is_published');
             $data['published_at'] = $data['is_published']

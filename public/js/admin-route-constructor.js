@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         results.querySelectorAll('.route-object-add').forEach((button) => {
             const active = selected.has(button.dataset.id);
             button.disabled = active;
-            button.classList.toggle('btn-outline-green', !active);
+            button.classList.toggle('btn-outline-success', !active);
             button.classList.toggle('btn-light', active);
             button.title = active ? 'Уже добавлен в маршрут' : 'Добавить в маршрут';
             const icon = button.querySelector('i');

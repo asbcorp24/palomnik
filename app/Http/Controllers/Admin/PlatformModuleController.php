@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -77,13 +78,15 @@ class PlatformModuleController extends Controller
         $config = $this->config($resource);
         $data = $this->validated($request, $resource);
         $objectIds = $data['object_ids'] ?? [];
-        unset($data['object_ids']);
+        $stayMinutes = $data['stay_minutes'] ?? [];
+        $pointNotes = $data['point_notes'] ?? [];
+        unset($data['object_ids'], $data['stay_minutes'], $data['point_notes']);
         $data = $this->transform($request, $resource, $data);
 
         $item = $config['model']::query()->create($data);
 
         if ($resource === 'routes') {
-            $this->syncRouteObjects($item, $objectIds);
+            $this->syncRouteObjects($item, $objectIds, $stayMinutes, $pointNotes);
         }
 
         return redirect()
@@ -115,12 +118,14 @@ class PlatformModuleController extends Controller
         $item = $config['model']::query()->findOrFail($id);
         $data = $this->validated($request, $resource, $item);
         $objectIds = $data['object_ids'] ?? [];
-        unset($data['object_ids']);
+        $stayMinutes = $data['stay_minutes'] ?? [];
+        $pointNotes = $data['point_notes'] ?? [];
+        unset($data['object_ids'], $data['stay_minutes'], $data['point_notes']);
         $data = $this->transform($request, $resource, $data, $item);
         $item->update($data);
 
         if ($resource === 'routes') {
-            $this->syncRouteObjects($item, $objectIds);
+            $this->syncRouteObjects($item, $objectIds, $stayMinutes, $pointNotes);
         }
 
         return redirect()
@@ -132,6 +137,11 @@ class PlatformModuleController extends Controller
     {
         $config = $this->config($resource);
         $item = $config['model']::query()->findOrFail($id);
+
+        if ($resource === 'routes' && $item->cover_path) {
+            Storage::disk('public')->delete($item->cover_path);
+        }
+
         $item->delete();
 
         return redirect()
@@ -158,11 +168,17 @@ class PlatformModuleController extends Controller
                 'short_description' => ['nullable', 'string', 'max:2000'],
                 'description' => ['nullable', 'string'],
                 'program' => ['nullable', 'string'],
+                'cover_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
+                'remove_cover' => ['nullable', 'boolean'],
                 'is_group' => ['nullable', 'boolean'],
                 'is_published' => ['nullable', 'boolean'],
                 'published_at' => ['nullable', 'date'],
                 'object_ids' => ['nullable', 'array'],
-                'object_ids.*' => ['integer', 'exists:pilgrimage_objects,id'],
+                'object_ids.*' => ['integer', 'distinct', 'exists:pilgrimage_objects,id'],
+                'stay_minutes' => ['nullable', 'array'],
+                'stay_minutes.*' => ['nullable', 'integer', 'min:0', 'max:10080'],
+                'point_notes' => ['nullable', 'array'],
+                'point_notes.*' => ['nullable', 'string', 'max:2000'],
             ]);
         }
 
@@ -208,6 +224,23 @@ class PlatformModuleController extends Controller
         }
 
         if ($resource === 'routes') {
+            $oldCoverPath = $item instanceof PilgrimageRoute ? $item->cover_path : null;
+
+            if ($request->hasFile('cover_image')) {
+                $data['cover_path'] = $request->file('cover_image')->store('routes/covers', 'public');
+
+                if ($oldCoverPath && $oldCoverPath !== $data['cover_path']) {
+                    Storage::disk('public')->delete($oldCoverPath);
+                }
+            } elseif ($request->boolean('remove_cover')) {
+                if ($oldCoverPath) {
+                    Storage::disk('public')->delete($oldCoverPath);
+                }
+                $data['cover_path'] = null;
+            }
+
+            unset($data['cover_image'], $data['remove_cover']);
+
             $data['is_group'] = $request->boolean('is_group');
             $data['is_published'] = $request->boolean('is_published');
             $data['published_at'] = $data['is_published']
@@ -222,12 +255,25 @@ class PlatformModuleController extends Controller
         return $data;
     }
 
-    private function syncRouteObjects(PilgrimageRoute $route, array $objectIds): void
-    {
+    private function syncRouteObjects(
+        PilgrimageRoute $route,
+        array $objectIds,
+        array $stayMinutes = [],
+        array $pointNotes = []
+    ): void {
         $sync = [];
-        foreach (array_values(array_unique($objectIds)) as $index => $objectId) {
-            $sync[$objectId] = ['sort_order' => $index + 1];
+
+        foreach (array_values(array_unique(array_map('intval', $objectIds))) as $index => $objectId) {
+            $minutes = $stayMinutes[$objectId] ?? null;
+            $note = trim((string) ($pointNotes[$objectId] ?? ''));
+
+            $sync[$objectId] = [
+                'sort_order' => $index + 1,
+                'stay_minutes' => $minutes === null || $minutes === '' ? null : (int) $minutes,
+                'note' => $note !== '' ? $note : null,
+            ];
         }
+
         $route->objects()->sync($sync);
     }
 

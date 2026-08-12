@@ -11,7 +11,7 @@
     </div>
 </div>
 
-<form method="POST" action="{{ $item->exists ? route('admin.modules.update', [$resource, $item->getKey()]) : route('admin.modules.store', $resource) }}">
+<form method="POST" enctype="multipart/form-data" action="{{ $item->exists ? route('admin.modules.update', [$resource, $item->getKey()]) : route('admin.modules.store', $resource) }}">
     @csrf
     @if($item->exists) @method('PUT') @endif
 
@@ -72,18 +72,50 @@
                     </div>
                 </div>
 
-                <div class="card-soft p-4">
-                    <h2 class="h5 mb-2">Точки маршрута</h2>
-                    <div class="small text-secondary mb-4">Выберите храмы и другие объекты. Порядок сейчас соответствует порядку выбора; отдельная сортировка точек будет добавлена в конструкторе маршрута.</div>
-                    <select class="form-select" name="object_ids[]" multiple size="14">
-                        @foreach($options['objects'] as $object)
-                            <option value="{{ $object->id }}" @selected(in_array($object->id, old('object_ids', $selectedObjectIds)))>{{ $object->name }} — {{ $object->address }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @include('admin.modules._route_constructor')
             </div>
             <div class="col-xl-4">
                 <div class="card-soft p-4 position-sticky" style="top:100px">
+                    <h2 class="h5 mb-3">Обложка маршрута</h2>
+
+                    @if($item->cover_url)
+                        <img
+                            src="{{ $item->cover_url }}"
+                            alt="Обложка маршрута {{ $item->title }}"
+                            class="w-100 rounded-3 border mb-3"
+                            style="aspect-ratio:16/10;object-fit:cover"
+                        >
+                    @else
+                        <div class="border rounded-3 bg-light d-flex align-items-center justify-content-center text-secondary mb-3" style="aspect-ratio:16/10">
+                            <div class="text-center px-3">
+                                <i class="bi bi-image fs-2 d-block mb-2"></i>
+                                <span class="small">Обложка пока не загружена</span>
+                            </div>
+                        </div>
+                    @endif
+
+                    <label class="form-label" for="cover_image">Фото маршрута</label>
+                    <input
+                        class="form-control @error('cover_image') is-invalid @enderror"
+                        id="cover_image"
+                        type="file"
+                        name="cover_image"
+                        accept="image/jpeg,image/png,image/webp"
+                    >
+                    @error('cover_image')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <div class="form-text mb-3">JPG, PNG или WebP, до 10 МБ. Новое фото заменит текущее.</div>
+
+                    @if($item->cover_path)
+                        <div class="form-check mb-4">
+                            <input type="hidden" name="remove_cover" value="0">
+                            <input class="form-check-input" id="remove_cover" type="checkbox" name="remove_cover" value="1" @checked(old('remove_cover'))>
+                            <label class="form-check-label text-danger" for="remove_cover">Удалить текущую обложку</label>
+                        </div>
+                    @endif
+
+                    <hr class="my-4">
                     <h2 class="h5 mb-4">Публикация</h2>
                     <div class="form-check form-switch mb-3">
                         <input type="hidden" name="is_group" value="0">
@@ -229,5 +261,9 @@
             'fieldPrefix' => 'route',
         ])
     </div>
+@endif
+
+@if($resource === 'routes')
+    <script src="{{ asset('js/admin-route-constructor.js') }}"></script>
 @endif
 @endsection

@@ -24,7 +24,9 @@
 
                 <div id="route-object-results" class="route-object-results">
                     @foreach($options['objects'] as $object)
-                        @php($alreadySelected = in_array((int) $object->id, $selectedIds, true))
+                        @php
+                            $alreadySelected = in_array((int) $object->id, $selectedIds, true);
+                        @endphp
                         <div class="route-object-candidate" data-search="{{ mb_strtolower($object->name.' '.$object->address) }}">
                             <div class="d-flex gap-2 align-items-start p-2 rounded-3">
                                 <div class="flex-grow-1 min-w-0">

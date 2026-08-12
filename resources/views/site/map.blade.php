@@ -31,7 +31,13 @@
     <aside class="map-sidebar">
         <div class="section-kicker mb-2">MapLibre · OpenStreetMap</div>
         <h1 class="h2 mb-3">Храмы и монастыри</h1>
-        <p class="text-secondary small mb-4">Карта загружает только объекты в видимой области. Приближайте карту, чтобы увидеть отдельные храмы и точки интереса.</p>
+        <p class="text-secondary small mb-4">
+            @if($selectedRoute)
+                Показаны только точки выбранного маршрута. Посторонние храмы, монастыри и точки интереса скрыты.
+            @else
+                Карта загружает только объекты в видимой области. Приближайте карту, чтобы увидеть отдельные храмы и точки интереса.
+            @endif
+        </p>
 
         <form class="mb-4" action="{{ route('map') }}" method="GET">
             <div class="mb-3">
@@ -100,7 +106,8 @@
             <div class="info-card p-3 mb-3">
                 <div class="small text-secondary mb-1">Выбранный маршрут</div>
                 <div class="fw-semibold mb-2">{{ $selectedRoute['title'] }}</div>
-                <div class="small text-secondary mb-3">Точек пути: {{ count($selectedRoute['points']) }}</div>
+                <div class="small text-secondary mb-2">Точек пути: {{ count($selectedRoute['points']) }}</div>
+                <div class="small text-success mb-3"><i class="bi bi-eye me-1"></i>На карте отображаются только объекты этого маршрута.</div>
                 <a class="btn btn-sm btn-outline-pm w-100" href="{{ $selectedRoute['url'] }}">Открыть описание маршрута</a>
             </div>
         @endif
@@ -119,35 +126,57 @@
             <div class="small text-secondary mt-2">Маршрут рассчитывается движком Valhalla по данным OpenStreetMap.</div>
         </div>
 
-        <div class="info-card p-3 mb-3">
-            <div class="small fw-semibold mb-2"><i class="bi bi-pin-map-fill me-2"></i>Точки интереса рядом</div>
-            @foreach($poiCategories as $key => $category)
-                <label class="poi-filter-row small">
-                    <input class="form-check-input mt-0" type="checkbox" data-poi-category value="{{ $key }}" checked>
-                    <span class="poi-filter-dot" style="background:{{ $category['color'] }}"></span>
-                    <i class="bi {{ $category['icon'] }}"></i>
-                    <span>{{ $category['label'] }}</span>
-                </label>
-            @endforeach
-            <div class="small text-secondary mt-2">В текущей области: <strong id="mapPoiCount">загрузка…</strong></div>
-            <div class="small text-secondary">Точки интереса загружаются только после достаточного приближения карты.</div>
-        </div>
+        @unless($selectedRoute)
+            <div class="info-card p-3 mb-3">
+                <div class="small fw-semibold mb-2"><i class="bi bi-pin-map-fill me-2"></i>Точки интереса рядом</div>
+                @foreach($poiCategories as $key => $category)
+                    <label class="poi-filter-row small">
+                        <input class="form-check-input mt-0" type="checkbox" data-poi-category value="{{ $key }}" checked>
+                        <span class="poi-filter-dot" style="background:{{ $category['color'] }}"></span>
+                        <i class="bi {{ $category['icon'] }}"></i>
+                        <span>{{ $category['label'] }}</span>
+                    </label>
+                @endforeach
+                <div class="small text-secondary mt-2">В текущей области: <strong id="mapPoiCount">загрузка…</strong></div>
+                <div class="small text-secondary">Точки интереса загружаются только после достаточного приближения карты.</div>
+            </div>
+        @endunless
 
         <div class="info-card p-3 mb-4">
             <div class="small fw-semibold mb-2"><i class="bi bi-layers me-2"></i>Слои карты</div>
             <div class="small text-secondary">Основной слой использует единый стиль MapLibre. Спутниковый и исторический слои появятся после задания лицензированных URL тайлов в <code>.env</code>.</div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center small text-secondary mb-3">
-            <span>Объектов в области: <strong id="mapObjectCount" class="text-dark">загрузка…</strong></span>
-            <span><i class="bi bi-arrows-move me-1"></i>Перемещайте карту</span>
-        </div>
-        <div id="mapObjectList" class="map-object-list d-grid gap-2" aria-live="polite">
-            <div class="map-object-row text-center py-4">
-                <span class="spinner-border spinner-border-sm text-secondary"></span>
-                <p class="small text-secondary mt-3 mb-0">Загружаем объекты текущей области…</p>
+        @if($selectedRoute)
+            <div class="d-flex justify-content-between align-items-center small text-secondary mb-3">
+                <span>Точек маршрута: <strong class="text-dark">{{ count($selectedRoute['points']) }}</strong></span>
+                <span><i class="bi bi-list-ol me-1"></i>Порядок посещения</span>
             </div>
-        </div>
+            <div class="map-object-list d-grid gap-2">
+                @foreach($selectedRoute['points'] as $point)
+                    <button class="map-object-row text-start" type="button" data-map-object="{{ $point['id'] }}">
+                        <div class="d-flex gap-3 align-items-start">
+                            <span class="category-icon flex-shrink-0 fw-bold">{{ $point['number'] }}</span>
+                            <div class="min-w-0">
+                                <div class="fw-semibold lh-sm mb-2">{{ $point['name'] }}</div>
+                                <div class="small text-secondary"><i class="bi bi-geo-alt me-1"></i>{{ $point['address'] }}</div>
+                            </div>
+                        </div>
+                    </button>
+                @endforeach
+            </div>
+        @else
+            <div class="d-flex justify-content-between align-items-center small text-secondary mb-3">
+                <span>Объектов в области: <strong id="mapObjectCount" class="text-dark">загрузка…</strong></span>
+                <span><i class="bi bi-arrows-move me-1"></i>Перемещайте карту</span>
+            </div>
+            <div id="mapObjectList" class="map-object-list d-grid gap-2" aria-live="polite">
+                <div class="map-object-row text-center py-4">
+                    <span class="spinner-border spinner-border-sm text-secondary"></span>
+                    <p class="small text-secondary mt-3 mb-0">Загружаем объекты текущей области…</p>
+                </div>
+            </div>
+        @endif
     </aside>
 
     <div id="pilgrim-map" class="map-canvas position-relative">
@@ -185,6 +214,7 @@
             'vicariate' => $filters['vicariate'] ?? null,
             'deanery' => $filters['deanery'] ?? null,
             'sanctity' => $filters['sanctity'] ?? null,
+            'route_only' => $selectedRoute ? 1 : null,
         ],
         'selectedRoute' => $selectedRoute,
         'focusedPointOfInterestId' => $focusedPointOfInterestId,

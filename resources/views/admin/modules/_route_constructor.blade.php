@@ -32,7 +32,7 @@
                                     <div class="text-secondary small text-truncate">{{ $object->address ?: 'Адрес не указан' }}</div>
                                 </div>
                                 <button
-                                    class="btn btn-sm {{ $alreadySelected ? 'btn-light' : 'btn-outline-green' }} route-object-add"
+                                    class="btn btn-sm {{ $alreadySelected ? 'btn-light' : 'btn-outline-success' }} route-object-add"
                                     type="button"
                                     data-id="{{ $object->id }}"
                                     data-name="{{ $object->name }}"
@@ -117,7 +117,7 @@
     .route-point { transition:border-color .15s ease, box-shadow .15s ease, opacity .15s ease; }
     .route-point:hover { border-color:rgba(176,138,62,.45)!important; box-shadow:0 7px 20px rgba(47,37,28,.05); }
     .route-point.is-dragging { opacity:.45; }
-    .route-point.is-drag-over { border-color:var(--pilgrim-gold)!important; }
+    .route-point.is-drag-over { border-color:var(--pm-gold, #b58a32)!important; }
     .route-point-drag { cursor:grab; }
     .route-point-drag:active { cursor:grabbing; }
     .route-point-number { min-width:28px; }

@@ -28,6 +28,7 @@ class AdminRouteCoverTest extends TestCase
             'cover_image' => $this->tinyPng('route-cover.png'),
         ]);
 
+        $create->assertSessionHasNoErrors();
         $route = PilgrimageRoute::query()->firstOrFail();
         $create->assertRedirect('/admin/modules/routes/'.$route->id.'/edit');
         $this->assertNotNull($route->cover_path);
@@ -52,6 +53,7 @@ class AdminRouteCoverTest extends TestCase
             'cover_image' => $this->tinyPng('route-cover-new.png'),
         ]);
 
+        $replace->assertSessionHasNoErrors();
         $replace->assertRedirect('/admin/modules/routes/'.$route->id.'/edit');
         $route->refresh();
         $this->assertNotSame($oldPath, $route->cover_path);
@@ -70,6 +72,7 @@ class AdminRouteCoverTest extends TestCase
             'remove_cover' => 1,
         ]);
 
+        $remove->assertSessionHasNoErrors();
         $remove->assertRedirect('/admin/modules/routes/'.$route->id.'/edit');
         $route->refresh();
         $this->assertNull($route->cover_path);
@@ -81,6 +84,7 @@ class AdminRouteCoverTest extends TestCase
         return User::query()->create([
             'name' => 'Администратор маршрутов',
             'email' => 'route-cover@example.test',
+            'email_verified_at' => now(),
             'password' => bcrypt('password'),
             'role' => User::ROLE_SUPER_ADMIN,
             'is_active' => true,

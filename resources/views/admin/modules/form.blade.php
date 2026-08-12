@@ -72,15 +72,7 @@
                     </div>
                 </div>
 
-                <div class="card-soft p-4">
-                    <h2 class="h5 mb-2">Точки маршрута</h2>
-                    <div class="small text-secondary mb-4">Выберите храмы и другие объекты. Порядок сейчас соответствует порядку выбора; отдельная сортировка точек будет добавлена в конструкторе маршрута.</div>
-                    <select class="form-select" name="object_ids[]" multiple size="14">
-                        @foreach($options['objects'] as $object)
-                            <option value="{{ $object->id }}" @selected(in_array($object->id, old('object_ids', $selectedObjectIds)))>{{ $object->name }} — {{ $object->address }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @include('admin.modules._route_constructor')
             </div>
             <div class="col-xl-4">
                 <div class="card-soft p-4 position-sticky" style="top:100px">
@@ -269,5 +261,9 @@
             'fieldPrefix' => 'route',
         ])
     </div>
+@endif
+
+@if($resource === 'routes')
+    <script src="{{ asset('js/admin-route-constructor.js') }}"></script>
 @endif
 @endsection

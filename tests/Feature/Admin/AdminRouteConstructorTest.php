@@ -36,6 +36,7 @@ class AdminRouteConstructorTest extends TestCase
             ],
         ]);
 
+        $response->assertSessionHasNoErrors();
         $route = PilgrimageRoute::query()->firstOrFail();
         $response->assertRedirect('/admin/modules/routes/'.$route->id.'/edit');
 
@@ -79,6 +80,7 @@ class AdminRouteConstructorTest extends TestCase
             ],
         ]);
 
+        $update->assertSessionHasNoErrors();
         $update->assertRedirect('/admin/modules/routes/'.$route->id.'/edit');
         $this->assertDatabaseHas('pilgrimage_route_object', [
             'pilgrimage_route_id' => $route->id,
@@ -108,6 +110,7 @@ class AdminRouteConstructorTest extends TestCase
         return User::query()->create([
             'name' => 'Администратор маршрутов',
             'email' => 'route-constructor@example.test',
+            'email_verified_at' => now(),
             'password' => bcrypt('password'),
             'role' => User::ROLE_SUPER_ADMIN,
             'is_active' => true,

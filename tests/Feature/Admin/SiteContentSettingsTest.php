@@ -16,11 +16,13 @@ class SiteContentSettingsTest extends TestCase
         $admin = User::query()->create([
             'name' => 'Администратор контента',
             'email' => 'site-content@example.test',
-            'email_verified_at' => now(),
             'password' => bcrypt('password'),
-            'role' => User::ROLE_SUPER_ADMIN,
             'is_active' => true,
         ]);
+        $admin->forceFill([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'email_verified_at' => now(),
+        ])->save();
 
         $this->actingAs($admin)
             ->get('/admin/settings')

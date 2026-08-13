@@ -1,5 +1,6 @@
 <?php
 use App\Http\Controllers\Admin\SiteSettingController;
+use App\Http\Controllers\SiteContentSettingController;
 use App\Http\Controllers\Site\SeoController;
 use Illuminate\Support\Facades\Route;
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
@@ -11,5 +12,5 @@ Route::prefix('admin/settings')->name('admin.settings.')->middleware(['auth','ve
     Route::put('/themes/{siteColorScheme}/activate', [SiteSettingController::class, 'activateTheme'])->name('themes.activate');
     Route::delete('/themes/{siteColorScheme}', [SiteSettingController::class, 'destroyTheme'])->name('themes.destroy');
     Route::put('/seo', [SiteSettingController::class, 'updateSeo'])->name('seo.update');
-    Route::put('/content', [SiteSettingController::class, 'updateContent'])->name('content.update');
+    Route::put('/content', [SiteContentSettingController::class, 'update'])->name('content.update');
 });

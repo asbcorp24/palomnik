@@ -10,13 +10,13 @@ class SiteContentSettingController extends Controller
 {
     public function update(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'brand_name' => ['nullable', 'string', 'max:120'],
-            'header_tagline' => ['nullable', 'string', 'max:180'],
-        ]);
+        $rules = [];
+        foreach (array_keys(SiteContentSetting::DEFAULTS) as $key) {
+            $rules[$key] = ['nullable', 'string', 'max:1500'];
+        }
 
-        $current = SiteContentSetting::values();
-        SiteContentSetting::put(array_replace($current, $data));
+        $data = $request->validate($rules);
+        SiteContentSetting::put(array_replace(SiteContentSetting::values(), $data));
 
         return back()->with('success', 'Внешний вид и тексты сайта сохранены.');
     }

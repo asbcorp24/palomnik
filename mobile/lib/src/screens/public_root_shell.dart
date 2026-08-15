@@ -190,6 +190,12 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
             }
 
             final data = snapshot.data!;
+            final presentation = data['presentation'] is Map
+                ? Map<String, dynamic>.from(data['presentation'] as Map)
+                : <String, dynamic>{};
+            final stats = data['stats'] is Map
+                ? Map<String, dynamic>.from(data['stats'] as Map)
+                : <String, dynamic>{};
             final objects = mapList(data['objects']);
             final routes = mapList(data['routes']);
             final events = mapList(data['events']);
@@ -210,18 +216,18 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                     children: [
                       const Icon(Icons.church, color: AppTheme.gold, size: 40),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Святые места становятся ближе',
-                        style: TextStyle(
+                      Text(
+                        '${presentation['home_title'] ?? 'Святые места становятся ближе'}',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 25,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        'Храмы, монастыри, маршруты, события, аудиогиды и материалы сообщества доступны без обязательной регистрации.',
-                        style: TextStyle(color: Colors.white70, height: 1.5),
+                      Text(
+                        '${presentation['home_lead'] ?? 'Найдите храм, узнайте о святынях и расписании, выберите событие и подготовьте маршрут.'}',
+                        style: const TextStyle(color: Colors.white70, height: 1.5),
                       ),
                       const SizedBox(height: 18),
                       Wrap(
@@ -264,7 +270,37 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                     ],
                   ),
                 ),
-                const SectionTitle(title: 'Рекомендуемые святыни'),
+                if (stats.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          value: '${stats['objects'] ?? 0}',
+                          label: 'объектов',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatCard(
+                          value: '${stats['sanctities'] ?? 0}',
+                          label: 'святынь',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatCard(
+                          value: '${stats['routes'] ?? 0}',
+                          label: 'маршрутов',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                SectionTitle(
+                  title:
+                      '${presentation['home_objects_title'] ?? 'Храмы и монастыри'}',
+                ),
                 if (objects.isEmpty)
                   const EmptyCard(text: 'Объекты пока не опубликованы.')
                 else
@@ -280,7 +316,10 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
                       ),
                     ),
                   ),
-                const SectionTitle(title: 'Ближайшие события'),
+                SectionTitle(
+                  title:
+                      '${presentation['home_events_title'] ?? 'События паломника'}',
+                ),
                 if (events.isEmpty)
                   const EmptyCard(text: 'События пока не опубликованы.'),
                 ...events.take(4).map((event) => EventTile(item: event)),
@@ -328,6 +367,42 @@ class _PublicHomeTabState extends State<PublicHomeTab> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.green,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
       ),
     );
   }

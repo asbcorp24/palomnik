@@ -48,12 +48,12 @@ class ApiClient {
 
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000/api/v1',
+    defaultValue: 'https://mospalom.ru/api/v1',
   );
 
   static const siteBaseUrl = String.fromEnvironment(
     'SITE_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'https://mospalom.ru',
   );
 
   static final ApiClient instance = ApiClient._();

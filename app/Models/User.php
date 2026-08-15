@@ -136,8 +136,21 @@ class User extends Authenticatable implements MustVerifyEmailContract
             : $this->vk_avatar_url;
     }
 
+    public function hasVerifiedEmail()
+    {
+        if (filled($this->vk_id)) {
+            return true;
+        }
+
+        return parent::hasVerifiedEmail();
+    }
+
     public function sendEmailVerificationNotification(): void
     {
+        if (filled($this->vk_id)) {
+            return;
+        }
+
         $this->notify(new VerifyEmailNotification());
     }
 

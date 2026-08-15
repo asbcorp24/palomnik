@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
@@ -21,6 +22,12 @@ class VkEmailVerificationBypassTest extends TestCase
             'email' => 'vk_7063816@users.palomnik.invalid',
         ]);
 
+        $this->assertTrue($user->hasVerifiedEmail());
+
+        Notification::fake();
+        $user->sendEmailVerificationNotification();
+        Notification::assertNothingSent();
+
         $this->actingAs($user)
             ->get('/__test/vk-verified')
             ->assertOk()
@@ -35,6 +42,8 @@ class VkEmailVerificationBypassTest extends TestCase
         $user = User::factory()->unverified()->create([
             'vk_id' => null,
         ]);
+
+        $this->assertFalse($user->hasVerifiedEmail());
 
         $this->actingAs($user)
             ->get('/__test/email-verified')

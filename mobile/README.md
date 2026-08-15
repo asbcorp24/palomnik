@@ -210,8 +210,8 @@ flutter run \
 
 ```bash
 flutter run \
-  --dart-define=API_BASE_URL=https://palom.specdpo.ru/api/v1 \
-  --dart-define=SITE_BASE_URL=https://palom.specdpo.ru
+  --dart-define=API_BASE_URL=https://mospalom.ru/api/v1 \
+  --dart-define=SITE_BASE_URL=https://mospalom.ru
 ```
 
 `SITE_BASE_URL` используется в том числе для открытия разрешённых рабочих кабинетов сотрудников.
@@ -239,16 +239,16 @@ flutter test
 
 ```bash
 flutter build appbundle --release \
-  --dart-define=API_BASE_URL=https://palom.specdpo.ru/api/v1 \
-  --dart-define=SITE_BASE_URL=https://palom.specdpo.ru
+  --dart-define=API_BASE_URL=https://mospalom.ru/api/v1 \
+  --dart-define=SITE_BASE_URL=https://mospalom.ru
 ```
 
 APK для внутреннего тестирования:
 
 ```bash
 flutter build apk --release \
-  --dart-define=API_BASE_URL=https://palom.specdpo.ru/api/v1 \
-  --dart-define=SITE_BASE_URL=https://palom.specdpo.ru
+  --dart-define=API_BASE_URL=https://mospalom.ru/api/v1 \
+  --dart-define=SITE_BASE_URL=https://mospalom.ru
 ```
 
 ## Важные ограничения

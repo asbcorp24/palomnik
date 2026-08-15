@@ -13,6 +13,8 @@ use App\Models\JointPilgrimageMember;
 use App\Models\PilgrimageObject;
 use App\Models\PilgrimageRoute;
 use App\Models\Review;
+use App\Models\Sanctity;
+use App\Models\SiteContentSetting;
 use App\Models\Trip;
 use App\Models\UserRoutePlan;
 use App\Models\Visit;
@@ -56,6 +58,12 @@ class MobileController extends Controller
             ->get();
 
         return response()->json([
+            'presentation' => SiteContentSetting::values(),
+            'stats' => [
+                'objects' => PilgrimageObject::query()->published()->count(),
+                'sanctities' => Sanctity::query()->count(),
+                'routes' => PilgrimageRoute::query()->published()->count(),
+            ],
             'objects' => $objects->map(fn ($object) => $this->objectData($object)),
             'routes' => $routes->map(fn ($route) => $this->routeData($route)),
             'events' => $events->map(fn ($event) => $this->eventData($event)),

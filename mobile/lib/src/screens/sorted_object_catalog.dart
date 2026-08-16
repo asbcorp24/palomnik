@@ -15,6 +15,11 @@ class SortedObjectCatalogTab extends StatefulWidget {
 class _SortedObjectCatalogTabState extends State<SortedObjectCatalogTab> {
   final TextEditingController _search = TextEditingController();
   String _sort = 'none';
+  String? _type;
+  String? _vicariate;
+  String? _deanery;
+  String? _sanctity;
+  late final Future<Map<String, List<Map<String, dynamic>>>> _directories = _loadDirectories();
   late Future<List<Map<String, dynamic>>> _future = _load();
 
   @override
@@ -29,12 +34,43 @@ class _SortedObjectCatalogTabState extends State<SortedObjectCatalogTab> {
       queryParameters: {
         'per_page': 50,
         'sort': _sort,
+        if (_type != null) 'type': _type,
+        if (_vicariate != null) 'vicariate': _vicariate,
+        if (_deanery != null) 'deanery': _deanery,
+        if (_sanctity != null) 'sanctity': _sanctity,
         if (_search.text.trim().isNotEmpty) 'q': _search.text.trim(),
       },
       forceRefresh: refresh,
     ) as Map;
 
     return _mapList(payload['data']);
+  }
+
+  Future<Map<String, List<Map<String, dynamic>>>> _loadDirectories() async {
+    final results = await Future.wait([
+      ApiClient.instance.dio.get('/directories/object-types'),
+      ApiClient.instance.dio.get('/directories/vicariates'),
+      ApiClient.instance.dio.get('/directories/deaneries'),
+      ApiClient.instance.dio.get('/directories/sanctities'),
+    ]);
+    return {
+      'types': _mapList(results[0].data['data']),
+      'vicariates': _mapList(results[1].data['data']),
+      'deaneries': _mapList(results[2].data['data']),
+      'sanctities': _mapList(results[3].data['data']),
+    };
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _search.clear();
+      _sort = 'none';
+      _type = null;
+      _vicariate = null;
+      _deanery = null;
+      _sanctity = null;
+      _future = _load(refresh: true);
+    });
   }
 
   void _reload() {
@@ -78,31 +114,44 @@ class _SortedObjectCatalogTabState extends State<SortedObjectCatalogTab> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: DropdownButtonFormField<String>(
-              value: _sort,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Сортировка',
-                prefixIcon: Icon(Icons.sort),
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: 'none',
-                  child: Text('Без сортировки'),
-                ),
-                DropdownMenuItem(
-                  value: 'popular',
-                  child: Text('Популярные'),
-                ),
-                DropdownMenuItem(
-                  value: 'reviews',
-                  child: Text('С отзывами'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value == null || value == _sort) return;
-                _sort = value;
-                _reload();
+            child: FutureBuilder<Map<String, List<Map<String, dynamic>>>>(
+              future: _directories,
+              builder: (context, snapshot) {
+                final directories = snapshot.data ?? const {};
+                final deaneries = (directories['deaneries'] ?? const [])
+                    .where((item) => _vicariate == null || (item['vicariate'] is Map && item['vicariate']['slug'] == _vicariate))
+                    .toList();
+                return ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.tune),
+                  title: const Text('Фильтры каталога'),
+                  subtitle: Text([_type, _vicariate, _deanery, _sanctity].whereType<String>().isEmpty ? 'Все объекты' : 'Фильтры применены'),
+                  children: [
+                    _filterDropdown('Тип объекта', _type, directories['types'] ?? const [], (value) => setState(() => _type = value)),
+                    _filterDropdown('Викариатство', _vicariate, directories['vicariates'] ?? const [], (value) => setState(() { _vicariate = value; _deanery = null; })),
+                    _filterDropdown('Благочиние', _deanery, deaneries, (value) => setState(() => _deanery = value)),
+                    _filterDropdown('Святыня', _sanctity, directories['sanctities'] ?? const [], (value) => setState(() => _sanctity = value)),
+                    DropdownButtonFormField<String>(
+                      value: _sort,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Сортировка', prefixIcon: Icon(Icons.sort)),
+                      items: const [
+                        DropdownMenuItem(value: 'none', child: Text('По названию')),
+                        DropdownMenuItem(value: 'popular', child: Text('Популярные')),
+                        DropdownMenuItem(value: 'reviews', child: Text('С отзывами')),
+                        DropdownMenuItem(value: 'newest', child: Text('Новые')),
+                      ],
+                      onChanged: (value) => setState(() => _sort = value ?? 'none'),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: OutlinedButton(onPressed: _resetFilters, child: const Text('Сбросить'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: FilledButton(onPressed: _reload, child: const Text('Применить'))),
+                    ]),
+                    const SizedBox(height: 8),
+                  ],
+                );
               },
             ),
           ),
@@ -155,6 +204,22 @@ class _SortedObjectCatalogTabState extends State<SortedObjectCatalogTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _filterDropdown(String label, String? value, List<Map<String, dynamic>> items, ValueChanged<String?> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: DropdownButtonFormField<String>(
+        value: items.any((item) => item['slug'] == value) ? value : null,
+        isExpanded: true,
+        decoration: InputDecoration(labelText: label),
+        items: [
+          const DropdownMenuItem<String>(value: null, child: Text('Все')),
+          ...items.map((item) => DropdownMenuItem<String>(value: '${item['slug']}', child: Text('${item['name'] ?? ''}', overflow: TextOverflow.ellipsis))),
+        ],
+        onChanged: onChanged,
       ),
     );
   }

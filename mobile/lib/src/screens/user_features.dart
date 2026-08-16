@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:maplibre/maplibre.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../core/api_client.dart';
 import '../core/session_controller.dart';
 import '../theme/app_theme.dart';
+import '../widgets/audio_guide_player.dart';
 import '../widgets/pilgrim_map_marker.dart';
 
 class ObjectDetailScreen extends StatefulWidget {
@@ -34,14 +36,49 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
   Future<void> _favorite(Map<String, dynamic> item) async {
     setState(() => _busy = true);
     try {
-      final response = await ApiClient.instance.dio.post(
-        '/mobile/favorites/${item['id']}',
-      );
+      final response = await ApiClient.instance.dio.get('/mobile/favorites');
+      final lists = _list(response.data['data']);
       if (!mounted) return;
-      _snack(
-        response.data['is_favorite'] == true
-            ? 'Добавлено в избранное'
-            : 'Удалено из избранного',
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetContext) => StatefulBuilder(
+          builder: (context, setSheetState) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Добавить в список', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 10),
+                  ...lists.map((value) {
+                    final list = _map(value);
+                    final objects = _list(list['objects']);
+                    final selected = objects.any((object) => _map(object)['id'] == item['id']);
+                    return CheckboxListTile(
+                      value: selected,
+                      title: Text('${list['name'] ?? 'Избранное'}'),
+                      subtitle: list['is_default'] == true ? const Text('Основной список') : null,
+                      onChanged: (_) async {
+                        final path = '/mobile/favorite-lists/${list['id']}/objects/${item['id']}';
+                        if (selected) {
+                          await ApiClient.instance.dio.delete(path);
+                          objects.removeWhere((object) => _map(object)['id'] == item['id']);
+                        } else {
+                          await ApiClient.instance.dio.post(path);
+                          objects.add({'id': item['id']});
+                        }
+                        list['objects'] = objects;
+                        setSheetState(() {});
+                      },
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        ),
       );
     } catch (error) {
       if (mounted) _snack(ApiClient.instance.messageFrom(error), error: true);
@@ -53,11 +90,27 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
   Future<void> _visit(Map<String, dynamic> item) async {
     setState(() => _busy = true);
     try {
+      Position? position;
+      if (await Geolocator.isLocationServiceEnabled()) {
+        var permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+          position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+        }
+      }
       await ApiClient.instance.dio.post(
         '/mobile/visits',
-        data: {'pilgrimage_object_id': item['id']},
+        data: {
+          'pilgrimage_object_id': item['id'],
+          if (position != null) 'latitude': position.latitude,
+          if (position != null) 'longitude': position.longitude,
+        },
       );
-      if (mounted) _snack('Посещение отправлено на подтверждение.');
+      if (mounted) _snack(position == null
+          ? 'Посещение отправлено на ручное подтверждение.'
+          : 'Геопозиция получена. Посещение отправлено на подтверждение.');
     } catch (error) {
       if (mounted) _snack(ApiClient.instance.messageFrom(error), error: true);
     } finally {
@@ -163,6 +216,10 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
         final type = _map(item['type']);
         final cover = _map(item['cover']);
         final media = _list(item['media']);
+        final communityMedia = _list(item['community_media']);
+        final reviews = _list(item['reviews']);
+        final pointsOfInterest = _list(item['points_of_interest']);
+        final audioGuide = _map(item['audio_guide']);
         final sanctities = _list(item['sanctities']);
         final parentObject = _map(item['parent_object']);
         final childObjects = _list(item['child_objects']);
@@ -198,6 +255,19 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
                       color: AppTheme.green,
                     ),
                   ),
+                  if (item['rating'] != null || (item['reviews_count'] ?? 0) != 0) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: AppTheme.gold, size: 20),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${item['rating'] ?? '—'} · ${item['reviews_count'] ?? reviews.length} отзывов',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,6 +413,14 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
                       title: 'История',
                       text: '${item['history']}',
                     ),
+                  if (_text(audioGuide['audio_url']) != null) ...[
+                    const FeatureHeading('Аудиогид'),
+                    AudioGuidePlayer(
+                      url: '${audioGuide['audio_url']}',
+                      title: '${audioGuide['title'] ?? item['name'] ?? 'Аудиогид'}',
+                      transcript: _text(audioGuide['transcript']),
+                    ),
+                  ],
                   if (sanctities.isNotEmpty) ...[
                     const FeatureHeading('Святыни'),
                     ...sanctities.map((value) {
@@ -397,6 +475,20 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
                               ),
                             ),
                           ],
+                        ),
+                      );
+                    }),
+                  ],
+                  if (pointsOfInterest.isNotEmpty) ...[
+                    const FeatureHeading('Что посмотреть на территории'),
+                    ...pointsOfInterest.map((value) {
+                      final point = _map(value);
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          leading: const Icon(Icons.place_outlined, color: AppTheme.gold),
+                          title: Text('${point['name'] ?? point['title'] ?? 'Точка интереса'}'),
+                          subtitle: _text(point['description']) == null ? null : Text('${point['description']}'),
                         ),
                       );
                     }),
@@ -495,6 +587,78 @@ class _ObjectDetailScreenState extends State<ObjectDetailScreen> {
                       ),
                     ),
                   ],
+                  if (media.where((value) => ['video', 'audio', 'document'].contains(_map(value)['type'])).isNotEmpty) ...[
+                    const FeatureHeading('Видео, аудио и документы'),
+                    ...media.where((value) => ['video', 'audio', 'document'].contains(_map(value)['type'])).map((value) {
+                      final asset = _map(value);
+                      final type = '${asset['type']}';
+                      final icon = type == 'video' ? Icons.play_circle_outline : type == 'audio' ? Icons.audiotrack : Icons.description_outlined;
+                      return Card(
+                        child: ListTile(
+                          leading: Icon(icon, color: AppTheme.green),
+                          title: Text('${asset['title'] ?? (type == 'video' ? 'Видео' : type == 'audio' ? 'Аудиоматериал' : 'Документ')}'),
+                          subtitle: _text(asset['description']) == null ? null : Text('${asset['description']}'),
+                          trailing: const Icon(Icons.open_in_new),
+                          onTap: asset['url'] == null ? null : () => launchUrl(Uri.parse('${asset['url']}'), mode: LaunchMode.externalApplication),
+                        ),
+                      );
+                    }),
+                  ],
+                  if (communityMedia.isNotEmpty) ...[
+                    const FeatureHeading('Фотографии паломников'),
+                    SizedBox(
+                      height: 190,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: communityMedia.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final photo = _map(communityMedia[index]);
+                          return SizedBox(
+                            width: 250,
+                            child: Card(
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: Image.network('${photo['url']}', width: double.infinity, fit: BoxFit.cover)),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Text('${_map(photo['user'])['name'] ?? 'Паломник'}', maxLines: 1),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                  const FeatureHeading('Отзывы'),
+                  if (reviews.isEmpty)
+                    const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('Опубликованных отзывов пока нет.')))
+                  else
+                    ...reviews.map((value) {
+                      final review = _map(value);
+                      final author = _map(review['user']);
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Expanded(child: Text('${author['name'] ?? 'Паломник'}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                                ...List.generate(5, (index) => Icon(index < (review['rating'] ?? 0) ? Icons.star : Icons.star_border, color: AppTheme.gold, size: 17)),
+                              ]),
+                              const SizedBox(height: 8),
+                              Text('${review['body'] ?? ''}'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
                 ],
               ),
             ),
@@ -741,6 +905,8 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
         final item = snapshot.data!;
         final objects = _list(item['objects']);
         final trips = _list(item['trips']);
+        final photos = _list(item['photos']);
+        final audioGuide = _map(item['audio_guide']);
         return ListView(
           padding: const EdgeInsets.all(18),
           children: [
@@ -779,26 +945,65 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
               FeatureSection(title: 'Описание', text: '${item['description']}'),
             if (_text(item['program']) != null)
               FeatureSection(title: 'Программа', text: '${item['program']}'),
+            if (_text(audioGuide['audio_url']) != null) ...[
+              const FeatureHeading('Аудиогид маршрута'),
+              AudioGuidePlayer(
+                url: '${audioGuide['audio_url']}',
+                title: '${audioGuide['title'] ?? item['title'] ?? 'Аудиогид'}',
+                transcript: _text(audioGuide['transcript']),
+              ),
+            ],
             if (objects.isNotEmpty) ...[
               const FeatureHeading('Точки маршрута'),
               ...objects.asMap().entries.map((entry) {
                 final object = _map(entry.value);
                 return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(child: Text('${entry.key + 1}')),
-                    title: Text('${object['name'] ?? ''}'),
-                    subtitle: Text('${object['address'] ?? ''}'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ObjectDetailScreen(slug: '${object['slug']}'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        leading: CircleAvatar(child: Text('${entry.key + 1}')),
+                        title: Text('${object['name'] ?? ''}'),
+                        subtitle: Text('${object['address'] ?? ''}'),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ObjectDetailScreen(slug: '${object['slug']}'),
+                          ),
+                        ),
                       ),
-                    ),
+                      if (object['stay_minutes'] != null || _text(object['note']) != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: Text(
+                            '${object['stay_minutes'] != null ? 'Остановка: ${object['stay_minutes']} мин.' : ''}${_text(object['note']) != null ? '\n${object['note']}' : ''}',
+                            style: const TextStyle(color: Colors.black54),
+                          ),
+                        ),
+                    ],
                   ),
                 );
               }),
+            ],
+            if (photos.isNotEmpty) ...[
+              const FeatureHeading('Фотографии маршрута'),
+              SizedBox(
+                height: 190,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: photos.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final photo = _map(photos[index]);
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.network('${photo['url']}', width: 260, fit: BoxFit.cover),
+                    );
+                  },
+                ),
+              ),
             ],
             if (trips.isNotEmpty) ...[
               const FeatureHeading('Даты поездок'),

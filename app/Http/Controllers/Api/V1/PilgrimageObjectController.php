@@ -120,8 +120,18 @@ class PilgrimageObjectController extends Controller
             'coverMedia',
             'sanctities',
             'media',
+            'audioGuide',
+            'reviews' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
+            'userMedia' => fn ($query) => $query->where('status', 'published')->with('user')->latest(),
             'publishedPointsOfInterest.pilgrimageObject',
         ]);
+
+        $pilgrimageObject->loadCount([
+            'reviews as published_reviews_count' => fn ($query) => $query->where('status', 'published'),
+        ])->loadAvg(
+            ['reviews as published_rating' => fn ($query) => $query->where('status', 'published')],
+            'rating'
+        );
 
         $pilgrimageObject->setRelation(
             'nearbyObjects',

@@ -150,6 +150,11 @@ class EnhancedProfileTab extends StatelessWidget {
             onTap: () => _open(context, const GeoVisitScreen()),
           ),
           ProfileAction(
+            icon: Icons.history,
+            title: 'Мои посещения и отзывы',
+            onTap: () => _open(context, const ActivityHistoryScreen()),
+          ),
+          ProfileAction(
             icon: Icons.emoji_events_outlined,
             title: 'Достижения и статистика',
             onTap: () => _open(context, const ProfileStatsScreen()),

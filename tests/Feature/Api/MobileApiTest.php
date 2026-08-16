@@ -2,9 +2,13 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\ObjectType;
+use App\Models\PilgrimageObject;
 use App\Models\PilgrimageRoute;
+use App\Models\Review;
 use App\Models\Trip;
 use App\Models\User;
+use App\Models\Visit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -98,5 +102,64 @@ class MobileApiTest extends TestCase
         $booking = $user->bookings()->firstOrFail();
         $this->assertNotEmpty($booking->ticket_token);
         $this->assertSame(2, $trip->fresh()->booked_count);
+    }
+
+    public function test_mobile_user_can_manage_favorite_lists_and_activity(): void
+    {
+        $user = User::query()->create([
+            'name' => 'Паломник',
+            'email' => 'parity@example.test',
+            'password' => bcrypt('Password123'),
+            'role' => User::ROLE_PILGRIM,
+            'is_active' => true,
+            'preferences' => [],
+        ]);
+        $type = ObjectType::query()->create(['name' => 'Храм', 'slug' => 'temple', 'sort_order' => 1]);
+        $object = PilgrimageObject::query()->create([
+            'object_type_id' => $type->id,
+            'name' => 'Храм для мобильного приложения',
+            'slug' => 'mobile-parity-temple',
+            'is_published' => true,
+        ]);
+        $token = $user->createToken('Flutter parity')->plainTextToken;
+
+        $listId = $this->withToken($token)
+            ->postJson('/api/v1/mobile/favorite-lists', ['name' => 'На выходные'])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->withToken($token)
+            ->postJson('/api/v1/mobile/favorite-lists/'.$listId.'/objects/'.$object->id)
+            ->assertOk();
+        $this->withToken($token)
+            ->getJson('/api/v1/mobile/favorites')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'На выходные'])
+            ->assertJsonFragment(['slug' => 'mobile-parity-temple']);
+
+        Visit::query()->create([
+            'user_id' => $user->id,
+            'pilgrimage_object_id' => $object->id,
+            'visited_at' => now(),
+            'verification_method' => 'manual',
+            'status' => 'pending',
+        ]);
+        $review = Review::query()->create([
+            'user_id' => $user->id,
+            'pilgrimage_object_id' => $object->id,
+            'rating' => 5,
+            'body' => 'Очень красивый и спокойный храм.',
+            'status' => 'pending',
+        ]);
+
+        $this->withToken($token)
+            ->getJson('/api/v1/mobile/activity')
+            ->assertOk()
+            ->assertJsonPath('visits.0.object.slug', 'mobile-parity-temple')
+            ->assertJsonPath('reviews.0.id', $review->id);
+        $this->withToken($token)
+            ->deleteJson('/api/v1/mobile/reviews/'.$review->id)
+            ->assertOk();
+        $this->assertDatabaseMissing('reviews', ['id' => $review->id]);
     }
 }

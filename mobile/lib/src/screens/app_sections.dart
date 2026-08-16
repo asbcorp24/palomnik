@@ -272,6 +272,7 @@ class ProfileTab extends StatelessWidget {
         ProfileAction(icon: Icons.offline_pin_outlined, title: 'Сохранено офлайн', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OfflineObjectsScreen()))),
         ProfileAction(icon: Icons.confirmation_number_outlined, title: 'Бронирования и QR-билеты', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookingsScreen()))),
         ProfileAction(icon: Icons.where_to_vote_outlined, title: 'Отметить посещение', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GeoVisitScreen()))),
+        ProfileAction(icon: Icons.history, title: 'Мои посещения и отзывы', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ActivityHistoryScreen()))),
         ProfileAction(icon: Icons.emoji_events_outlined, title: 'Достижения и статистика', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileStatsScreen()))),
         ProfileAction(icon: Icons.route_outlined, title: 'Конструктор маршрутов', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoutePlansScreen()))),
         ProfileAction(icon: Icons.groups_outlined, title: 'Мои совместные паломничества', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTogetherManagerScreen()))),
@@ -292,18 +293,85 @@ class ProfileTab extends StatelessWidget {
   }
 }
 
-class RoutesScreen extends StatelessWidget {
+class RoutesScreen extends StatefulWidget {
   const RoutesScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => ApiListScreen(
-        title: 'Паломнические маршруты',
-        endpoint: '/mobile/routes',
-        icon: Icons.route_outlined,
-        itemTitle: (item) => '${item['title'] ?? 'Маршрут'}',
-        itemSubtitle: (item) => '${item['short_description'] ?? ''}\n${item['objects_count'] ?? 0} точек',
-        onTap: (item) => Navigator.push(context, MaterialPageRoute(builder: (_) => RouteDetailScreen(slug: '${item['slug']}'))),
-      );
+  State<RoutesScreen> createState() => _RoutesScreenState();
+}
+
+class _RoutesScreenState extends State<RoutesScreen> {
+  final TextEditingController _search = TextEditingController();
+  String? _category;
+  String? _difficulty;
+
+  Future<List<Map<String, dynamic>>> _load() async {
+    final response = await ApiClient.instance.dio.get('/mobile/routes', queryParameters: {
+      if (_search.text.trim().isNotEmpty) 'q': _search.text.trim(),
+      if (_category != null) 'category': _category,
+      if (_difficulty != null) 'difficulty': _difficulty,
+    });
+    return mapList(response.data['data']);
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureListPage(
+    key: ValueKey('${_search.text}|$_category|$_difficulty'),
+    title: 'Паломнические маршруты',
+    loader: _load,
+    header: Column(children: [
+      TextField(
+        controller: _search,
+        decoration: InputDecoration(
+          labelText: 'Поиск маршрута',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: IconButton(onPressed: () => setState(() {}), icon: const Icon(Icons.arrow_forward)),
+        ),
+        onSubmitted: (_) => setState(() {}),
+      ),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(child: DropdownButtonFormField<String>(
+          value: _category,
+          decoration: const InputDecoration(labelText: 'Категория'),
+          items: const [
+            DropdownMenuItem(value: null, child: Text('Все')),
+            DropdownMenuItem(value: 'one_day', child: Text('Однодневные')),
+            DropdownMenuItem(value: 'multi_day', child: Text('Многодневные')),
+            DropdownMenuItem(value: 'thematic', child: Text('Тематические')),
+            DropdownMenuItem(value: 'family', child: Text('Семейные')),
+            DropdownMenuItem(value: 'youth', child: Text('Молодёжные')),
+            DropdownMenuItem(value: 'individual', child: Text('Индивидуальные')),
+          ],
+          onChanged: (value) => setState(() => _category = value),
+        )),
+        const SizedBox(width: 10),
+        Expanded(child: DropdownButtonFormField<String>(
+          value: _difficulty,
+          decoration: const InputDecoration(labelText: 'Сложность'),
+          items: const [
+            DropdownMenuItem(value: null, child: Text('Любая')),
+            DropdownMenuItem(value: 'easy', child: Text('Лёгкая')),
+            DropdownMenuItem(value: 'medium', child: Text('Средняя')),
+            DropdownMenuItem(value: 'hard', child: Text('Сложная')),
+          ],
+          onChanged: (value) => setState(() => _difficulty = value),
+        )),
+      ]),
+    ]),
+    builder: (item) => BasicCard(
+      title: '${item['title'] ?? 'Маршрут'}',
+      subtitle: '${item['short_description'] ?? ''}\n${item['objects_count'] ?? 0} точек · ${item['duration_days'] ?? 1} дн. · от ${item['base_price'] ?? 0} ₽',
+      icon: Icons.route_outlined,
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RouteDetailScreen(slug: '${item['slug']}'))),
+    ),
+  );
 }
 
 class CommunityScreen extends StatelessWidget {
@@ -391,6 +459,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) => FutureListPage(
         title: 'Уведомления',
         loader: _load,
+        header: Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () async {
+              await ApiClient.instance.dio.post('/mobile/notifications/read-all');
+              if (mounted) setState(() {});
+            },
+            icon: const Icon(Icons.done_all),
+            label: const Text('Прочитать все'),
+          ),
+        ),
         builder: (item) {
           final data = item['data'] is Map ? Map<String, dynamic>.from(item['data'] as Map) : <String, dynamic>{};
           return BasicCard(
@@ -403,19 +482,153 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
 }
 
-class FavoritesScreen extends StatelessWidget {
+class ActivityHistoryScreen extends StatefulWidget {
+  const ActivityHistoryScreen({super.key});
+
+  @override
+  State<ActivityHistoryScreen> createState() => _ActivityHistoryScreenState();
+}
+
+class _ActivityHistoryScreenState extends State<ActivityHistoryScreen> {
+  late Future<Map<String, dynamic>> _future = _load();
+
+  Future<Map<String, dynamic>> _load() async {
+    final response = await ApiClient.instance.dio.get('/mobile/activity');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<void> _deleteReview(Map<String, dynamic> review) async {
+    await ApiClient.instance.dio.delete('/mobile/reviews/${review['id']}');
+    if (mounted) setState(() => _future = _load());
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Посещения и отзывы')),
+    body: FutureBuilder<Map<String, dynamic>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return ErrorPane(error: snapshot.error!, onRetry: () => setState(() => _future = _load()));
+        final visits = mapList(snapshot.data?['visits']);
+        final reviews = mapList(snapshot.data?['reviews']);
+        return ListView(padding: const EdgeInsets.all(16), children: [
+          const SectionTitle(title: 'Мои посещения'),
+          if (visits.isEmpty) const EmptyCard(text: 'Подтверждённых или ожидающих посещений пока нет.'),
+          ...visits.map((visit) {
+            final object = visit['object'] is Map ? Map<String, dynamic>.from(visit['object'] as Map) : <String, dynamic>{};
+            return BasicCard(
+              title: '${object['name'] ?? 'Паломнический объект'}',
+              subtitle: '${formatDate(visit['visited_at'])}\nСтатус: ${visit['status'] ?? ''} · ${visit['verification_method'] ?? ''}',
+              icon: Icons.where_to_vote_outlined,
+              onTap: object['slug'] == null ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ObjectDetailScreen(slug: '${object['slug']}'))),
+            );
+          }),
+          const SectionTitle(title: 'Мои отзывы'),
+          if (reviews.isEmpty) const EmptyCard(text: 'Вы пока не оставляли отзывы.'),
+          ...reviews.map((review) {
+            final object = review['object'] is Map ? Map<String, dynamic>.from(review['object'] as Map) : <String, dynamic>{};
+            return Card(child: ListTile(
+              leading: const Icon(Icons.rate_review_outlined, color: AppTheme.green),
+              title: Text('${object['name'] ?? 'Отзыв'}'),
+              subtitle: Text('${List.filled(review['rating'] as int? ?? 0, '★').join()}\n${review['body'] ?? ''}\nСтатус: ${review['status'] ?? ''}'),
+              isThreeLine: true,
+              onTap: object['slug'] == null ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => ObjectDetailScreen(slug: '${object['slug']}'))),
+              trailing: IconButton(tooltip: 'Удалить отзыв', onPressed: () => _deleteReview(review), icon: const Icon(Icons.delete_outline, color: Colors.red)),
+            ));
+          }),
+        ]);
+      },
+    ),
+  );
+}
+
+class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => FutureListPage(
-        title: 'Избранное',
-        loader: () async {
-          final response = await ApiClient.instance.dio.get('/mobile/favorites');
-          final lists = response.data['data'] as List? ?? [];
-          return lists.expand((list) => (list['objects'] as List? ?? [])).map((item) => Map<String, dynamic>.from(item as Map)).toList();
-        },
-        builder: (item) => ObjectCard(item: item),
-      );
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  late Future<List<Map<String, dynamic>>> _future = _load();
+
+  Future<List<Map<String, dynamic>>> _load() async {
+    final response = await ApiClient.instance.dio.get('/mobile/favorites');
+    return mapList(response.data['data']);
+  }
+
+  void _reload() => setState(() => _future = _load());
+
+  Future<void> _createList() async {
+    final controller = TextEditingController();
+    final accepted = await showDialog<bool>(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Новый список'),
+      content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Название списка')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Отмена')),
+        FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Создать')),
+      ],
+    ));
+    final name = controller.text.trim();
+    controller.dispose();
+    if (accepted != true || name.isEmpty) return;
+    await ApiClient.instance.dio.post('/mobile/favorite-lists', data: {'name': name});
+    _reload();
+  }
+
+  Future<void> _deleteList(Map<String, dynamic> list) async {
+    await ApiClient.instance.dio.delete('/mobile/favorite-lists/${list['id']}');
+    _reload();
+  }
+
+  Future<void> _remove(Map<String, dynamic> list, Map<String, dynamic> object) async {
+    await ApiClient.instance.dio.delete('/mobile/favorite-lists/${list['id']}/objects/${object['id']}');
+    _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Избранное'),
+      actions: [IconButton(tooltip: 'Создать список', onPressed: _createList, icon: const Icon(Icons.create_new_folder_outlined))],
+    ),
+    body: FutureBuilder<List<Map<String, dynamic>>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return ErrorPane(error: snapshot.error!, onRetry: _reload);
+        final lists = snapshot.data ?? const [];
+        return RefreshIndicator(
+          onRefresh: () async => _reload(),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: lists.map((list) {
+              final objects = mapList(list['objects']);
+              return Card(
+                margin: const EdgeInsets.only(bottom: 14),
+                child: ExpansionTile(
+                  initiallyExpanded: list['is_default'] == true,
+                  leading: Icon(list['is_default'] == true ? Icons.favorite : Icons.folder_outlined, color: AppTheme.green),
+                  title: Text('${list['name'] ?? 'Избранное'}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text('${objects.length} объектов'),
+                  trailing: list['is_default'] == true ? null : IconButton(tooltip: 'Удалить список', onPressed: () => _deleteList(list), icon: const Icon(Icons.delete_outline, color: Colors.red)),
+                  children: objects.isEmpty
+                    ? const [Padding(padding: EdgeInsets.all(18), child: Text('В этом списке пока нет объектов.'))]
+                    : objects.map((object) => ListTile(
+                        title: Text('${object['name'] ?? ''}'),
+                        subtitle: Text('${object['address'] ?? ''}'),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ObjectDetailScreen(slug: '${object['slug']}'))),
+                        trailing: IconButton(tooltip: 'Убрать из списка', onPressed: () => _remove(list, object), icon: const Icon(Icons.remove_circle_outline)),
+                      )).toList(),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class BookingsScreen extends StatefulWidget {

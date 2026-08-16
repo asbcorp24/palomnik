@@ -86,6 +86,10 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::post('/profile', [MobileProfileController::class, 'update'])->name('profile.update');
             Route::get('/favorites', [MobileController::class, 'favorites'])->name('favorites.index');
             Route::post('/favorites/{pilgrimageObject}', [MobileController::class, 'toggleFavorite'])->name('favorites.toggle');
+            Route::post('/favorite-lists', [MobileActionController::class, 'storeFavoriteList'])->name('favorite-lists.store');
+            Route::delete('/favorite-lists/{favoriteList}', [MobileActionController::class, 'destroyFavoriteList'])->name('favorite-lists.destroy');
+            Route::post('/favorite-lists/{favoriteList}/objects/{pilgrimageObject}', [MobileActionController::class, 'addFavoriteObject'])->name('favorite-lists.objects.store');
+            Route::delete('/favorite-lists/{favoriteList}/objects/{pilgrimageObject}', [MobileActionController::class, 'removeFavoriteObject'])->name('favorite-lists.objects.destroy');
 
             Route::get('/bookings', [MobileController::class, 'bookings'])->name('bookings.index');
             Route::post('/trips/{trip}/bookings', [MobileBookingController::class, 'store'])->name('bookings.store');
@@ -93,8 +97,11 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
 
             Route::get('/notifications', [MobileController::class, 'notifications'])->name('notifications.index');
             Route::put('/notifications/{notification}/read', [MobileController::class, 'readNotification'])->name('notifications.read');
+            Route::post('/notifications/read-all', [MobileActionController::class, 'readAllNotifications'])->name('notifications.read-all');
+            Route::get('/activity', [MobileActionController::class, 'activity'])->name('activity.index');
             Route::post('/visits', [MobileController::class, 'storeVisit'])->name('visits.store');
             Route::post('/reviews', [MobileController::class, 'storeReview'])->name('reviews.store');
+            Route::delete('/reviews/{review}', [MobileActionController::class, 'destroyReview'])->name('reviews.destroy');
 
             Route::get('/posts', [MobileContentController::class, 'posts'])->name('posts.index');
             Route::post('/posts', [MobileContentController::class, 'storePost'])->name('posts.store');

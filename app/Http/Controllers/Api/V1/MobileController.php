@@ -103,6 +103,12 @@ class MobileController extends Controller
         $pilgrimageRoute->load([
             'objects.objectType',
             'objects.coverMedia',
+            'audioGuide',
+            'pilgrimagePhotos' => fn ($query) => $query
+                ->where('publication_requested', true)
+                ->where('status', 'published')
+                ->with('user')
+                ->latest('published_at'),
             'trips' => fn ($query) => $query->where('starts_at', '>=', now())->whereIn('status', ['planned', 'open'])->orderBy('starts_at'),
         ])->loadCount('objects');
 
@@ -586,7 +592,24 @@ class MobileController extends Controller
         if ($full) {
             $data['description'] = $route->description;
             $data['program'] = $route->program;
-            $data['objects'] = $route->objects->map(fn ($object) => $this->objectData($object));
+            $data['objects'] = $route->objects->map(fn ($object) => [
+                ...$this->objectData($object),
+                'stay_minutes' => $object->pivot?->stay_minutes,
+                'note' => $object->pivot?->note,
+            ]);
+            $data['audio_guide'] = $route->relationLoaded('audioGuide') && $route->audioGuide ? [
+                'id' => $route->audioGuide->id,
+                'title' => $route->audioGuide->title,
+                'audio_url' => $route->audioGuide->url,
+                'transcript' => $route->audioGuide->transcript,
+            ] : null;
+            $data['photos'] = $route->relationLoaded('pilgrimagePhotos') ? $route->pilgrimagePhotos->map(fn ($photo) => [
+                'id' => $photo->id,
+                'url' => $photo->url,
+                'title' => $photo->title,
+                'description' => $photo->description,
+                'user' => $photo->user ? $this->publicUserData($photo->user) : null,
+            ])->values() : [];
         }
 
         return $data;

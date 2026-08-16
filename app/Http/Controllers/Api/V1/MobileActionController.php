@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\FavoriteList;
 use App\Models\JointPilgrimage;
 use App\Models\JointPilgrimageMember;
 use App\Models\PilgrimageObject;
 use App\Models\PushDevice;
+use App\Models\Review;
 use App\Models\Trip;
 use App\Models\UserMedia;
 use App\Models\UserRoutePlan;
@@ -22,6 +24,95 @@ use Illuminate\Validation\ValidationException;
 
 class MobileActionController extends Controller
 {
+    public function storeFavoriteList(Request $request): JsonResponse
+    {
+        $data = $request->validate(['name' => ['required', 'string', 'max:100']]);
+        $list = $request->user()->favoriteLists()->create([
+            'name' => trim($data['name']),
+            'is_default' => false,
+        ]);
+
+        return response()->json(['data' => [
+            'id' => $list->id,
+            'name' => $list->name,
+            'is_default' => false,
+            'objects' => [],
+        ]], 201);
+    }
+
+    public function destroyFavoriteList(Request $request, FavoriteList $favoriteList): JsonResponse
+    {
+        abort_unless((int) $favoriteList->user_id === (int) $request->user()->id, 403);
+        abort_if($favoriteList->is_default, 422, 'Основной список удалить нельзя.');
+        $favoriteList->objects()->detach();
+        $favoriteList->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
+    public function addFavoriteObject(Request $request, FavoriteList $favoriteList, PilgrimageObject $pilgrimageObject): JsonResponse
+    {
+        abort_unless((int) $favoriteList->user_id === (int) $request->user()->id, 403);
+        $favoriteList->objects()->syncWithoutDetaching([$pilgrimageObject->id]);
+
+        return response()->json(['attached' => true]);
+    }
+
+    public function removeFavoriteObject(Request $request, FavoriteList $favoriteList, PilgrimageObject $pilgrimageObject): JsonResponse
+    {
+        abort_unless((int) $favoriteList->user_id === (int) $request->user()->id, 403);
+        $favoriteList->objects()->detach($pilgrimageObject->id);
+
+        return response()->json(['detached' => true]);
+    }
+
+    public function readAllNotifications(Request $request): JsonResponse
+    {
+        $request->user()->unreadNotifications->markAsRead();
+
+        return response()->json(['read' => true, 'unread_count' => 0]);
+    }
+
+    public function activity(Request $request): JsonResponse
+    {
+        $visits = $request->user()->visits()->with('pilgrimageObject')->latest('visited_at')->get();
+        $reviews = $request->user()->reviews()->with('pilgrimageObject')->latest()->get();
+
+        return response()->json([
+            'visits' => $visits->map(fn ($visit) => [
+                'id' => $visit->id,
+                'visited_at' => optional($visit->visited_at)->toIso8601String(),
+                'verification_method' => $visit->verification_method,
+                'status' => $visit->status,
+                'notes' => $visit->notes,
+                'object' => $visit->pilgrimageObject ? [
+                    'id' => $visit->pilgrimageObject->id,
+                    'slug' => $visit->pilgrimageObject->slug,
+                    'name' => $visit->pilgrimageObject->name,
+                ] : null,
+            ])->values(),
+            'reviews' => $reviews->map(fn ($review) => [
+                'id' => $review->id,
+                'rating' => (int) $review->rating,
+                'body' => $review->body,
+                'status' => $review->status,
+                'created_at' => optional($review->created_at)->toIso8601String(),
+                'object' => $review->pilgrimageObject ? [
+                    'id' => $review->pilgrimageObject->id,
+                    'slug' => $review->pilgrimageObject->slug,
+                    'name' => $review->pilgrimageObject->name,
+                ] : null,
+            ])->values(),
+        ]);
+    }
+
+    public function destroyReview(Request $request, Review $review): JsonResponse
+    {
+        abort_unless((int) $review->user_id === (int) $request->user()->id, 403);
+        $review->delete();
+
+        return response()->json(['deleted' => true]);
+    }
 
     public function storeBooking(
         Request $request,

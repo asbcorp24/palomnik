@@ -123,6 +123,53 @@ class PilgrimageObjectResource extends JsonResource
                     ];
                 })->values();
             }),
+            'audio_guide' => $this->whenLoaded('audioGuide', function () {
+                return $this->audioGuide ? [
+                    'id' => $this->audioGuide->id,
+                    'title' => $this->audioGuide->title,
+                    'audio_url' => $this->audioGuide->url,
+                    'transcript' => $this->audioGuide->transcript,
+                    'original_name' => $this->audioGuide->original_name,
+                    'mime_type' => $this->audioGuide->mime_type,
+                    'size' => $this->audioGuide->size,
+                ] : null;
+            }),
+            'rating' => $this->when(
+                array_key_exists('published_rating', $this->getAttributes()),
+                $this->published_rating !== null ? round((float) $this->published_rating, 1) : null
+            ),
+            'reviews_count' => $this->when(
+                array_key_exists('published_reviews_count', $this->getAttributes()),
+                (int) ($this->published_reviews_count ?? 0)
+            ),
+            'reviews' => $this->whenLoaded('reviews', function () {
+                return $this->reviews->map(fn ($review) => [
+                    'id' => $review->id,
+                    'rating' => (int) $review->rating,
+                    'body' => $review->body,
+                    'created_at' => optional($review->created_at)->toIso8601String(),
+                    'user' => $review->user ? [
+                        'id' => $review->user->id,
+                        'name' => $review->user->name,
+                        'avatar_url' => $review->user->avatar_url,
+                    ] : null,
+                ])->values();
+            }),
+            'community_media' => $this->whenLoaded('userMedia', function () {
+                return $this->userMedia->map(fn ($media) => [
+                    'id' => $media->id,
+                    'type' => $media->type,
+                    'url' => $media->url,
+                    'title' => $media->title,
+                    'description' => $media->description,
+                    'published_at' => optional($media->published_at)->toIso8601String(),
+                    'user' => $media->user ? [
+                        'id' => $media->user->id,
+                        'name' => $media->user->name,
+                        'avatar_url' => $media->user->avatar_url,
+                    ] : null,
+                ])->values();
+            }),
             'points_of_interest' => PointOfInterestResource::collection(
                 $this->whenLoaded('publishedPointsOfInterest')
             ),

@@ -34,16 +34,22 @@ void main() {
 
   final kotlinBuild = File('android/app/build.gradle.kts');
   final groovyBuild = File('android/app/build.gradle');
+  late final bool configured;
 
   if (kotlinBuild.existsSync()) {
-    _ensureKotlinDsl(kotlinBuild);
+    configured = _ensureKotlinDsl(kotlinBuild);
   } else if (groovyBuild.existsSync()) {
-    _ensureGroovyDsl(groovyBuild);
+    configured = _ensureGroovyDsl(groovyBuild);
   } else {
     stderr.writeln(
       'Neither android/app/build.gradle.kts nor android/app/build.gradle exists.',
     );
     exitCode = 3;
+    return;
+  }
+
+  if (!configured) {
+    exitCode = 4;
     return;
   }
 
@@ -62,73 +68,112 @@ void _ensureRules(File file) {
   stdout.writeln('Updated ${file.path}.');
 }
 
-void _ensureKotlinDsl(File file) {
+bool _ensureKotlinDsl(File file) {
   final source = file.readAsStringSync();
-  if (source.contains('"proguard-rules.pro"')) {
-    stdout.writeln('${file.path} already references proguard-rules.pro.');
-    return;
-  }
-
-  final block = _findReleaseBlock(source, const [
+  final block = _findBuildTypeReleaseBlock(source, const [
     'release {',
     'getByName("release") {',
   ]);
   if (block == null) {
-    _failToPatch(file.path);
-    return;
+    return _failToPatch(file.path);
+  }
+
+  if (_blockContainsProguardRules(source, block)) {
+    stdout.writeln('${file.path} release already references proguard-rules.pro.');
+    return true;
   }
 
   final indent = _lineIndent(source, block.start) + '    ';
-  final addition = '''\n$indent// Keep AndroidX WorkManager/Room usable after R8 shrinking.\n${indent}proguardFiles(\n$indent    getDefaultProguardFile("proguard-android-optimize.txt"),\n$indent    "proguard-rules.pro",\n$indent)\n''';
+  final addition = '''
+$indent// Keep AndroidX WorkManager/Room usable after R8 shrinking.
+${indent}proguardFiles(
+$indent    getDefaultProguardFile("proguard-android-optimize.txt"),
+$indent    "proguard-rules.pro",
+$indent)
+''';
   final updated = source.replaceRange(block.end, block.end, addition);
   file.writeAsStringSync(updated);
   stdout.writeln('Updated ${file.path}.');
+  return true;
 }
 
-void _ensureGroovyDsl(File file) {
+bool _ensureGroovyDsl(File file) {
   final source = file.readAsStringSync();
-  if (source.contains("'proguard-rules.pro'") ||
-      source.contains('"proguard-rules.pro"')) {
-    stdout.writeln('${file.path} already references proguard-rules.pro.');
-    return;
+  final block = _findBuildTypeReleaseBlock(source, const ['release {']);
+  if (block == null) {
+    return _failToPatch(file.path);
   }
 
-  final block = _findReleaseBlock(source, const ['release {']);
-  if (block == null) {
-    _failToPatch(file.path);
-    return;
+  if (_blockContainsProguardRules(source, block)) {
+    stdout.writeln('${file.path} release already references proguard-rules.pro.');
+    return true;
   }
 
   final indent = _lineIndent(source, block.start) + '    ';
-  final addition = '''\n$indent// Keep AndroidX WorkManager/Room usable after R8 shrinking.\n${indent}proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'\n''';
+  final addition = '''
+$indent// Keep AndroidX WorkManager/Room usable after R8 shrinking.
+${indent}proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+''';
   final updated = source.replaceRange(block.end, block.end, addition);
   file.writeAsStringSync(updated);
   stdout.writeln('Updated ${file.path}.');
+  return true;
 }
 
-_Block? _findReleaseBlock(String source, List<String> signatures) {
+bool _blockContainsProguardRules(String source, _Block block) {
+  final blockSource = source.substring(block.openingBrace, block.end);
+  return blockSource.contains('proguard-rules.pro');
+}
+
+_Block? _findBuildTypeReleaseBlock(
+  String source,
+  List<String> releaseSignatures,
+) {
+  final buildTypes = _findBlock(source, const ['buildTypes {']);
+  if (buildTypes == null) return null;
+
+  return _findBlock(
+    source,
+    releaseSignatures,
+    searchStart: buildTypes.openingBrace + 1,
+    searchEnd: buildTypes.end,
+  );
+}
+
+_Block? _findBlock(
+  String source,
+  List<String> signatures, {
+  int searchStart = 0,
+  int? searchEnd,
+}) {
+  final limit = searchEnd ?? source.length;
+
   for (final signature in signatures) {
-    var searchFrom = 0;
-    while (true) {
-      final start = source.indexOf(signature, searchFrom);
-      if (start < 0) break;
+    var from = searchStart;
+    while (from < limit) {
+      final start = source.indexOf(signature, from);
+      if (start < 0 || start >= limit) break;
 
       final openingBrace = source.indexOf('{', start);
-      if (openingBrace < 0) break;
+      if (openingBrace < 0 || openingBrace >= limit) break;
 
       var depth = 0;
-      for (var i = openingBrace; i < source.length; i++) {
+      for (var i = openingBrace; i < limit; i++) {
         final char = source[i];
         if (char == '{') depth++;
         if (char == '}') {
           depth--;
           if (depth == 0) {
-            return _Block(start: start, end: i);
+            return _Block(
+              start: start,
+              openingBrace: openingBrace,
+              end: i,
+            );
           }
         }
       }
 
-      searchFrom = start + signature.length;
+      from = start + signature.length;
     }
   }
   return null;
@@ -141,17 +186,22 @@ String _lineIndent(String source, int index) {
   return RegExp(r'^\s*').firstMatch(line)?.group(0) ?? '';
 }
 
-void _failToPatch(String path) {
+bool _failToPatch(String path) {
   stderr.writeln(
-    'Could not locate the release build block in $path. '
+    'Could not locate buildTypes.release in $path. '
     'proguard-rules.pro was created, but Gradle was not modified.',
   );
-  exitCode = 4;
+  return false;
 }
 
 class _Block {
-  const _Block({required this.start, required this.end});
+  const _Block({
+    required this.start,
+    required this.openingBrace,
+    required this.end,
+  });
 
   final int start;
+  final int openingBrace;
   final int end;
 }
